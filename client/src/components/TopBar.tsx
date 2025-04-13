@@ -49,7 +49,10 @@ export default function TopBar({ project, teamMembers, onSearch }: TopBarProps) 
               />
             ))}
             {teamMembers.length > 3 && (
-              <div className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-white bg-gray-200 text-xs font-medium text-gray-500">
+              <div 
+                key="more-members-count"
+                className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-white bg-gray-200 text-xs font-medium text-gray-500"
+              >
                 +{teamMembers.length - 3}
               </div>
             )}

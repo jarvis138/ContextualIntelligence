@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import * as d3 from "d3";
+import * as d3Module from "d3";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Relationship } from "@shared/schema";
+
+// Cast d3 to any to avoid TypeScript errors
+const d3 = d3Module as any;
 
 interface RelationshipNetworkChartProps {
   relationships: Relationship[];

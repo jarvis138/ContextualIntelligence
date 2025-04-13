@@ -179,7 +179,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Progress Chart */}
             <ProjectProgressChart 
-              activities={dashboardData?.recentActivities || []} 
+              activities={dashboardData?.recentActivities as any[] || []} 
             />
             
             {/* Team Progress Chart */}
