@@ -1130,24 +1130,71 @@ export class DatabaseStorage implements IStorage {
 
   // Integrations
   async getIntegration(id: number): Promise<Integration | undefined> {
-    const [integration] = await db.select().from(integrations).where(eq(integrations.id, id));
+    // Modified query to match actual database structure (no lastSyncAt field)
+    const [integration] = await db.select({
+      id: integrations.id,
+      name: integrations.name,
+      type: integrations.type,
+      config: integrations.config,
+      active: integrations.active,
+      userId: integrations.userId
+    }).from(integrations).where(eq(integrations.id, id));
     return integration || undefined;
   }
 
   async getIntegrations(userId: number): Promise<Integration[]> {
-    return await db.select().from(integrations).where(eq(integrations.userId, userId));
+    // Modified query to match actual database structure (no lastSyncAt field)
+    return await db.select({
+      id: integrations.id,
+      name: integrations.name,
+      type: integrations.type,
+      config: integrations.config,
+      active: integrations.active,
+      userId: integrations.userId
+    }).from(integrations).where(eq(integrations.userId, userId));
   }
 
   async createIntegration(insertIntegration: InsertIntegration): Promise<Integration> {
-    const [integration] = await db.insert(integrations).values(insertIntegration).returning();
+    // Filter out any fields that don't exist in the actual database
+    const validFields = {
+      name: insertIntegration.name,
+      type: insertIntegration.type,
+      config: insertIntegration.config,
+      active: insertIntegration.active !== undefined ? insertIntegration.active : true,
+      userId: insertIntegration.userId
+    };
+    
+    const [integration] = await db.insert(integrations).values(validFields).returning({
+      id: integrations.id,
+      name: integrations.name,
+      type: integrations.type,
+      config: integrations.config,
+      active: integrations.active,
+      userId: integrations.userId
+    });
     return integration;
   }
 
   async updateIntegration(id: number, integration: Partial<InsertIntegration>): Promise<Integration | undefined> {
+    // Filter out any fields that don't exist in the actual database
+    const validFields: Partial<InsertIntegration> = {};
+    if (integration.name !== undefined) validFields.name = integration.name;
+    if (integration.type !== undefined) validFields.type = integration.type;
+    if (integration.config !== undefined) validFields.config = integration.config;
+    if (integration.active !== undefined) validFields.active = integration.active;
+    if (integration.userId !== undefined) validFields.userId = integration.userId;
+    
     const [updatedIntegration] = await db.update(integrations)
-      .set(integration)
+      .set(validFields)
       .where(eq(integrations.id, id))
-      .returning();
+      .returning({
+        id: integrations.id,
+        name: integrations.name,
+        type: integrations.type,
+        config: integrations.config,
+        active: integrations.active,
+        userId: integrations.userId
+      });
     return updatedIntegration || undefined;
   }
 

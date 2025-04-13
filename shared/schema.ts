@@ -325,19 +325,15 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   }),
 }));
 
-// Integrations schema
+// Integrations schema - updated to match actual database structure
 export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  type: integrationTypeEnum("type").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // Using text instead of enum to match actual DB
   config: jsonb("config").notNull(),
   active: boolean("active").notNull().default(true),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  lastSyncAt: timestamp("last_sync_at"),
-  syncStatus: varchar("sync_status", { length: 50 }),
-  syncMessage: text("sync_message"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // Removed lastSyncAt, syncStatus, syncMessage, createdAt, updatedAt that don't exist in actual DB
 }, (table) => {
   return {
     userTypeIdx: uniqueIndex("integration_user_type_idx").on(table.userId, table.type),
@@ -509,8 +505,7 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
 
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  // No createdAt/updatedAt fields to omit since they don't exist in the actual schema
 });
 
 export const insertInsightSchema = createInsertSchema(insights).omit({
