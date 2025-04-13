@@ -483,6 +483,31 @@ export class MemStorage implements IStorage {
     this.users.set(id, updatedUser);
     return updatedUser;
   }
+  
+  async getUserByExternalId(externalId: string, provider: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.externalId === externalId && user.authMethod === provider,
+    );
+  }
+
+  // OAuth Tokens
+  private oauthTokens: Map<string, any> = new Map();
+  
+  async saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any> {
+    const key = `${token.userId}:${token.provider}`;
+    this.oauthTokens.set(key, token);
+    return token;
+  }
+  
+  async getOAuthToken(userId: number, provider: string): Promise<any | undefined> {
+    const key = `${userId}:${provider}`;
+    return this.oauthTokens.get(key);
+  }
+  
+  async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
+    const key = `${userId}:${provider}`;
+    return this.oauthTokens.delete(key);
+  }
 
   // Projects
   async getProject(id: number): Promise<Project | undefined> {
@@ -782,6 +807,59 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return updatedUser || undefined;
+  }
+  
+  async getUserByExternalId(externalId: string, provider: string): Promise<User | undefined> {
+    const [user] = await db.select()
+      .from(users)
+      .where(
+        sql`${users.externalId} = ${externalId} AND ${users.authMethod} = ${provider}`
+      );
+    return user || undefined;
+  }
+  
+  // OAuth Tokens
+  async saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any> {
+    // Check if token exists
+    const [existingToken] = await db.select()
+      .from(oauthTokens)
+      .where(
+        sql`${oauthTokens.userId} = ${token.userId} AND ${oauthTokens.provider} = ${token.provider}`
+      );
+    
+    if (existingToken) {
+      // Update existing token
+      const [updatedToken] = await db.update(oauthTokens)
+        .set(token)
+        .where(
+          sql`${oauthTokens.userId} = ${token.userId} AND ${oauthTokens.provider} = ${token.provider}`
+        )
+        .returning();
+      return updatedToken;
+    } else {
+      // Insert new token
+      const [newToken] = await db.insert(oauthTokens)
+        .values(token)
+        .returning();
+      return newToken;
+    }
+  }
+  
+  async getOAuthToken(userId: number, provider: string): Promise<any | undefined> {
+    const [token] = await db.select()
+      .from(oauthTokens)
+      .where(
+        sql`${oauthTokens.userId} = ${userId} AND ${oauthTokens.provider} = ${provider}`
+      );
+    return token || undefined;
+  }
+  
+  async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
+    await db.delete(oauthTokens)
+      .where(
+        sql`${oauthTokens.userId} = ${userId} AND ${oauthTokens.provider} = ${provider}`
+      );
+    return true; // We don't actually get a boolean back from drizzle
   }
 
   // Projects
