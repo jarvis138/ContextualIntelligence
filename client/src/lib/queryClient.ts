@@ -20,9 +20,13 @@ export async function apiRequest(
     if (data) {
       try {
         body = JSON.stringify(data);
-      } catch (jsonError) {
+      } catch (jsonError: unknown) {
         console.error(`Failed to stringify request data for ${method} ${url}:`, jsonError, data);
-        throw new Error(`Invalid request data: ${jsonError.message}`);
+        if (jsonError instanceof Error) {
+          throw new Error(`Invalid request data: ${jsonError.message}`);
+        } else {
+          throw new Error(`Invalid request data: Unable to stringify`);
+        }
       }
     }
     
@@ -61,9 +65,13 @@ export const getQueryFn: <T>(options: {
       
       try {
         return await res.json();
-      } catch (parseError) {
+      } catch (parseError: unknown) {
         console.error(`Failed to parse JSON response for ${queryKey[0]}:`, parseError);
-        throw new Error(`Invalid JSON response: ${parseError.message}`);
+        if (parseError instanceof Error) {
+          throw new Error(`Invalid JSON response: ${parseError.message}`);
+        } else {
+          throw new Error(`Invalid JSON response: Unknown parsing error`);
+        }
       }
     } catch (error) {
       console.error(`Query failed for ${queryKey[0]}:`, error);
