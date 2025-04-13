@@ -52,12 +52,18 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
   const {
     data: document,
     isLoading: isLoadingDocument,
-    isError: isDocumentError
+    isError: isDocumentError,
+    error: documentError
   } = useQuery({
     queryKey: [`/api/documents/${documentId}`],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/documents/${documentId}`);
-      return await res.json();
+      try {
+        const res = await apiRequest("GET", `/api/documents/${documentId}`);
+        return await res.json();
+      } catch (error) {
+        console.error("Error fetching document details:", error);
+        throw error;
+      }
     }
   });
 
@@ -66,16 +72,22 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
     data: summary,
     isLoading: isLoadingSummary,
     isError: isSummaryError,
-    refetch: refetchSummary
+    refetch: refetchSummary,
+    error: summaryError
   } = useQuery({
     queryKey: [`/api/documents/${documentId}/summarize`],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/documents/${documentId}/summarize`);
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.message || "Failed to generate summary");
+      try {
+        const res = await apiRequest("GET", `/api/documents/${documentId}/summarize`);
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.message || "Failed to generate summary");
+        }
+        return data.summary as DocumentSummaryData;
+      } catch (error) {
+        console.error("Error fetching document summary:", error);
+        throw error;
       }
-      return data.summary as DocumentSummaryData;
     },
     enabled: !!documentId,
     retry: false // Don't retry automatically as this is an expensive operation
@@ -294,7 +306,7 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
                 <CardContent>
                   {document.content ? (
                     <div className="prose max-w-none">
-                      {document.content.split('\n').map((paragraph, idx) => (
+                      {document.content.split('\n').map((paragraph: string, idx: number) => (
                         <p key={idx}>{paragraph}</p>
                       ))}
                     </div>
