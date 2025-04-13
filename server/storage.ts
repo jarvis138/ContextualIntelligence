@@ -765,7 +765,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsers(): Promise<User[]> {
-    return db.select().from(users);
+    return await db.select().from(users);
   }
 
   async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
@@ -817,7 +817,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeams(): Promise<Team[]> {
-    return db.select().from(teams);
+    return await db.select().from(teams);
   }
 
   async getTeamsByProject(projectId: number): Promise<Team[]> {
@@ -846,7 +846,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeamMembers(teamId: number): Promise<TeamMember[]> {
-    return db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+    return await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
   }
 
   async createTeamMember(insertTeamMember: InsertTeamMember): Promise<TeamMember> {
@@ -866,11 +866,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTasks(projectId: number): Promise<Task[]> {
-    return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+    return await db.select().from(tasks).where(eq(tasks.projectId, projectId));
   }
 
   async getTasksByTeam(teamId: number): Promise<Task[]> {
-    return db.select().from(tasks).where(eq(tasks.teamId, teamId));
+    return await db.select().from(tasks).where(eq(tasks.teamId, teamId));
   }
 
   async createTask(insertTask: InsertTask): Promise<Task> {
@@ -893,11 +893,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocuments(projectId: number): Promise<Document[]> {
-    return db.select().from(documents).where(eq(documents.projectId, projectId));
+    return await db.select().from(documents).where(eq(documents.projectId, projectId));
   }
 
   async getRecentDocuments(limit: number): Promise<Document[]> {
-    return db
+    return await db
       .select()
       .from(documents)
       .orderBy(desc(documents.updatedAt))
