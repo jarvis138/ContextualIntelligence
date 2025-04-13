@@ -12,6 +12,7 @@ import { AlertCircle, ArrowLeft, Calendar, Clock, Download, Users, Share } from 
 import { SlackDataExtractor } from '@/components/integrations/SlackDataExtractor';
 import { SlackShareDialog } from '@/components/integrations/SlackShareDialog';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { Integration } from '@shared/schema';
 
 interface ProjectDetailProps {
   params: {
@@ -95,7 +96,7 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
   });
 
   // Find Slack integration if exists
-  const slackIntegration = integrations.find(i => i.type === 'slack' && i.active);
+  const slackIntegration = integrations.find((i: Integration) => i.type === 'slack' && i.active);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -252,15 +253,15 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Completed</span>
-                        <span className="font-medium">{tasks.filter(t => t.status === 'completed').length}</span>
+                        <span className="font-medium">{tasks.filter((t: any) => t.status === 'completed').length}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">In Progress</span>
-                        <span className="font-medium">{tasks.filter(t => t.status === 'in_progress').length}</span>
+                        <span className="font-medium">{tasks.filter((t: any) => t.status === 'in_progress').length}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Pending</span>
-                        <span className="font-medium">{tasks.filter(t => t.status === 'pending').length}</span>
+                        <span className="font-medium">{tasks.filter((t: any) => t.status === 'pending').length}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -283,15 +284,15 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Text Documents</span>
-                        <span className="font-medium">{documents.filter(d => d.fileType === 'text').length}</span>
+                        <span className="font-medium">{documents.filter((d: any) => d.fileType === 'text').length}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Spreadsheets</span>
-                        <span className="font-medium">{documents.filter(d => d.fileType === 'spreadsheet').length}</span>
+                        <span className="font-medium">{documents.filter((d: any) => d.fileType === 'spreadsheet').length}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Other Files</span>
-                        <span className="font-medium">{documents.filter(d => !['text', 'spreadsheet'].includes(d.fileType)).length}</span>
+                        <span className="font-medium">{documents.filter((d: any) => !['text', 'spreadsheet'].includes(d.fileType)).length}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -347,7 +348,7 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                 </div>
               ) : tasks.length > 0 ? (
                 <div className="space-y-4">
-                  {tasks.map(task => (
+                  {tasks.map((task: any) => (
                     <Card key={task.id} className="overflow-hidden">
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
@@ -395,7 +396,7 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                 </div>
               ) : documents.length > 0 ? (
                 <div className="space-y-4">
-                  {documents.map(doc => (
+                  {documents.map((doc: any) => (
                     <Card key={doc.id} className="overflow-hidden">
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
@@ -440,7 +441,7 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                 </div>
               ) : activities.length > 0 ? (
                 <div className="space-y-4">
-                  {activities.map(activity => (
+                  {activities.map((activity: any) => (
                     <Card key={activity.id} className="overflow-hidden">
                       <CardContent className="p-4">
                         <div className="flex items-start space-x-4">

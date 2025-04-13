@@ -576,7 +576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const token = slackIntegration.config?.token;
+      const token = slackIntegration.config?.token as string;
       
       if (!token) {
         return res.status(400).json({ 
@@ -590,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         project.name,
         message,
         channelId,
-        token as string
+        token
       );
       
       // Record the activity
