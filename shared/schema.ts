@@ -196,14 +196,11 @@ export const insertInsightSchema = createInsertSchema(insights).pick({
 export const relationships = pgTable("relationships", {
   id: serial("id").primaryKey(),
   sourceType: text("source_type").notNull(),
-  sourceId: text("source_id").notNull(),
+  sourceId: integer("source_id").notNull(),
   targetType: text("target_type").notNull(),
-  targetId: text("target_id").notNull(),
-  projectId: integer("project_id").notNull(),
-  relationship: text("relationship"),
+  targetId: integer("target_id").notNull(),
   strength: integer("strength").notNull().default(1),
   description: text("description"),
-  metadata: jsonb("metadata"),
 });
 
 export const insertRelationshipSchema = createInsertSchema(relationships).pick({
@@ -211,11 +208,8 @@ export const insertRelationshipSchema = createInsertSchema(relationships).pick({
   sourceId: true,
   targetType: true,
   targetId: true,
-  projectId: true,
-  relationship: true,
   strength: true,
   description: true,
-  metadata: true,
 });
 
 // Export types

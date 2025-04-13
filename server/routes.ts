@@ -112,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: user.id,
         projectId: project.id,
         entityType: "project",
-        entityId: project.id.toString()
+        entityId: project.id
       });
       
       // Create demo insight

@@ -585,15 +585,7 @@ ${keywords.join(', ')}
     fileType: "slack_extract",
     projectId,
     createdBy: userId,
-    updatedBy: userId,
-    metadata: {
-      source: "slack",
-      messageId: normalizedContent.messageMetadata.messageId,
-      channelId: normalizedContent.messageMetadata.channelId,
-      keywords,
-      sentiment: sentiment.label,
-      extractedEntities: entities.length
-    }
+    updatedBy: userId
   });
   
   return document.id;
@@ -641,11 +633,9 @@ async function createTasksFromEntities(
         title: taskEntity.content,
         description: `Task extracted from Slack message: "${normalizedContent.content.substring(0, 100)}..."`,
         status: "pending",
-        priority: "medium",
         projectId,
-        assignedTo: userId, // Default assignment to the user who extracted the data
-        dueDate: dueDate?.toISOString(),
-        createdBy: userId
+        assigneeId: userId, // Default assignment to the user who extracted the data
+        dueDate
       });
       
       taskIds.push(task.id);
@@ -655,13 +645,9 @@ async function createTasksFromEntities(
         sourceType: "task",
         sourceId: task.id,
         targetType: "slack_message",
-        targetId: normalizedContent.messageMetadata.messageId,
-        projectId,
-        relationship: "extracted_from",
-        metadata: {
-          confidence: taskEntity.confidence,
-          extractedBy: "slack_extraction_pipeline"
-        }
+        targetId: parseInt(normalizedContent.messageMetadata.messageId),
+        strength: Math.round(taskEntity.confidence * 10),
+        description: "Task extracted from Slack message"
       });
     } catch (error) {
       console.error("Error creating task from entity:", error);
@@ -727,12 +713,9 @@ export async function extractProjectDataFromSlack(
           sourceType: "document",
           sourceId: documentId,
           targetType: "slack_message",
-          targetId: normalizedContent.messageMetadata.messageId,
-          projectId,
-          relationship: "extracted_from",
-          metadata: {
-            extractedBy: "slack_extraction_pipeline"
-          }
+          targetId: parseInt(normalizedContent.messageMetadata.messageId),
+          strength: 10,
+          description: "Document created from Slack message"
         });
       }
       
