@@ -30,15 +30,19 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 interface ProjectProgressChartProps {
-  activities: Activity[];
+  activities: (Activity & { user?: any })[];
 }
 
 export function ProjectProgressChart({ activities }: ProjectProgressChartProps) {
   // Create chart data from activities
   const chartData = useMemo(() => {
-    // Sort activities by creation date
+    // Sort activities by creation date and ensure timestamp is treated as a Date
     const sortedActivities = [...activities].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      (a, b) => {
+        const dateA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+        const dateB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+        return dateA.getTime() - dateB.getTime();
+      }
     );
 
     // Group activities by day and count them by type
@@ -53,7 +57,8 @@ export function ProjectProgressChart({ activities }: ProjectProgressChartProps) 
         ai: number;
       };
     }>((acc, activity) => {
-      const date = new Date(activity.timestamp).toLocaleDateString();
+      const timestamp = activity.timestamp instanceof Date ? activity.timestamp : new Date(activity.timestamp);
+      const date = timestamp.toLocaleDateString();
       
       if (!acc[date]) {
         acc[date] = {

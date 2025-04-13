@@ -1,0 +1,37 @@
+[vite] connecting...
+DOMException {}
+
+at t.value (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Warning: validateDOMNesting(...): <a> cannot appear as a descendant of &lt;a&gt;.
+    at a
+    at a
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=116a2f22:337:18
+    at li
+    at ul
+    at nav
+    at aside
+    at Sidebar (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/Sidebar.tsx:35:35)
+    at div
+    at Dashboard (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/pages/Dashboard.tsx:37:21)
+    at Route (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=116a2f22:323:16)
+    at Switch (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=116a2f22:379:17)
+    at Router
+    at App (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/App.tsx?v=tKs53Wk0Q215H1UEx3K0A:80:3)
+    at QueryClientProvider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=116a2f22:2805:3)
+Warning: Encountered two children with the same key, &#x60;1&#x60;. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+    at div
+    at div
+    at div
+    at div
+    at TopBar (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/TopBar.tsx:21:34)
+    at main
+    at div
+    at Dashboard (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/pages/Dashboard.tsx:37:21)
+    at Route (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=116a2f22:323:16)
+    at Switch (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=116a2f22:379:17)
+    at Router
+    at App (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/App.tsx?v=tKs53Wk0Q215H1UEx3K0A:80:3)
+    at QueryClientProvider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=116a2f22:2805:3)

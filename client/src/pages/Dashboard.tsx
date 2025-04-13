@@ -111,10 +111,14 @@ export default function Dashboard() {
     role: 'Project Manager'
   };
   
-  // Extract team members for top bar
-  const teamMembers = dashboardData?.teams.reduce((acc, team) => {
-    // This is a simplification as we don't have the actual user objects for team members
-    return [...acc, user];
+  // Extract team members for top bar with unique keys
+  const teamMembers = dashboardData?.teams.reduce((acc, team, index) => {
+    // Create a unique user object for each team to avoid duplicate keys
+    const uniqueUser = { 
+      ...user, 
+      id: user.id + index + 1 // Ensure each user has a unique ID
+    };
+    return [...acc, uniqueUser];
   }, [] as any[]) || [user];
 
   return (
