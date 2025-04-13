@@ -202,8 +202,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Project routes
   router.get("/projects", async (req, res) => {
-    const projects = await storage.getProjects();
-    res.json(projects);
+    // Parse pagination parameters
+    const page = parseInt(req.query.page as string || "1");
+    const limit = parseInt(req.query.limit as string || "10");
+    
+    // Validate pagination parameters
+    const validPage = page > 0 ? page : 1;
+    const validLimit = limit > 0 && limit <= 50 ? limit : 10;
+    
+    // Calculate offset
+    const offset = (validPage - 1) * validLimit;
+    
+    // Get projects with pagination
+    const projects = await storage.getProjects(validLimit, offset);
+    
+    // Get total count for pagination metadata
+    const totalProjects = await storage.getProjectsCount();
+    const totalPages = Math.ceil(totalProjects / validLimit);
+    
+    res.json({
+      data: projects,
+      pagination: {
+        page: validPage,
+        limit: validLimit,
+        totalItems: totalProjects,
+        totalPages: totalPages,
+        hasNextPage: validPage < totalPages,
+        hasPrevPage: validPage > 1
+      }
+    });
   });
 
   router.get("/projects/:id", async (req, res) => {
