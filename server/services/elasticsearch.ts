@@ -295,19 +295,25 @@ export async function indexAllData(): Promise<{
     
     // Index all projects
     let indexedProjects = 0;
+    let allDocuments: any[] = [];
+    let allTasks: any[] = [];
+    
     for (const project of projects) {
       const success = await indexProject(project);
       if (success) indexedProjects++;
       
       // Index documents and tasks for this project
-      const documents = await storage.getDocuments(project.id);
-      const tasks = await storage.getTasks(project.id);
+      const projectDocuments = await storage.getDocuments(project.id);
+      const projectTasks = await storage.getTasks(project.id);
       
-      for (const document of documents) {
+      allDocuments = [...allDocuments, ...projectDocuments];
+      allTasks = [...allTasks, ...projectTasks];
+      
+      for (const document of projectDocuments) {
         await indexDocument(document);
       }
       
-      for (const task of tasks) {
+      for (const task of projectTasks) {
         await indexTask(task);
       }
     }
@@ -328,8 +334,8 @@ export async function indexAllData(): Promise<{
     
     return {
       projects: indexedProjects,
-      documents: documents.flat().length,
-      tasks: tasks.flat().length,
+      documents: allDocuments.length,
+      tasks: allTasks.length,
       users: indexedUsers,
       teams: indexedTeams
     };

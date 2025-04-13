@@ -18,6 +18,7 @@ import {
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import * as nlpController from "./controllers/nlpController";
+import * as searchController from "./controllers/searchController";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
 import { 
@@ -1060,6 +1061,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Semantic search
   router.post("/projects/:projectId/semantic-search", authenticateToken, nlpController.semanticSearch);
+  
+  // Search routes
+  router.get("/search/status", authenticateToken, searchController.checkElasticsearchStatus);
+  
+  router.post("/search/initialize", authenticateToken, authorizeRoles("admin"), searchController.initializeElasticsearch);
+  
+  router.post("/search/global", authenticateToken, searchController.globalSearch);
+  
+  router.post("/search/hybrid", authenticateToken, searchController.hybridSearch);
   
   // Dashboard data route - combined endpoint for dashboard data
   router.get("/projects/:projectId/dashboard", async (req, res) => {
