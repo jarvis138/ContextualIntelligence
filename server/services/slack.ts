@@ -694,13 +694,8 @@ export async function extractProjectDataFromSlack(
         userId,
         projectId,
         entityType: "slack_message",
-        entityId: normalizedContent.messageMetadata.messageId,
-        timestamp: normalizedContent.messageMetadata.timestamp,
-        metadata: {
-          channelId,
-          sentiment: normalizedContent.sentiment.label,
-          hasEntities: normalizedContent.entities.length > 0
-        }
+        entityId: parseInt(normalizedContent.messageMetadata.messageId),
+        timestamp: normalizedContent.messageMetadata.timestamp
       });
       
       // Step 3: For messages with significant content, create documents

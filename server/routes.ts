@@ -576,7 +576,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const token = slackIntegration.config?.token as string;
+      // Extract token from integration config
+      const token = (slackIntegration.config as any)?.token as string;
       
       if (!token) {
         return res.status(400).json({ 
