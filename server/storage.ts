@@ -11,7 +11,7 @@ import {
   relationships, type Relationship, type InsertRelationship
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "./db";
@@ -789,12 +789,12 @@ export class DatabaseStorage implements IStorage {
       query = query.limit(limit).offset(offset);
     }
     
-    return query;
+    return await query;
   }
   
   async getProjectsCount(): Promise<number> {
-    const result = await db.select({ count: count() }).from(projects);
-    return result[0].count;
+    const result = await db.select({ count: sql`count(*)` }).from(projects);
+    return Number(result[0].count);
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
