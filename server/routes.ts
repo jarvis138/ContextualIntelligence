@@ -20,6 +20,7 @@ import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
 import { testSlackIntegration, sendProjectUpdate, sendProjectInsight } from "./services/slack";
+import * as openaiService from "./services/openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
