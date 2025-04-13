@@ -1,17 +1,73 @@
 import OpenAI from "openai";
 
-// Initialize the OpenAI client with API key from environment variables
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY environment variable is not set");
-}
-
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
 
-// Create OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Initialize the OpenAI client with API key from environment variables
+let apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+  console.warn("OPENAI_API_KEY environment variable is not set");
+}
+
+// Create OpenAI client with the environment API key (can be undefined)
+let openai = new OpenAI({
+  apiKey: apiKey,
 });
+
+/**
+ * Test if an OpenAI API key is valid
+ */
+export async function testApiKey(testKey: string): Promise<{ valid: boolean; message: string }> {
+  try {
+    // Create a temporary OpenAI instance with the test key
+    const testOpenAI = new OpenAI({
+      apiKey: testKey,
+    });
+    
+    // Try to make a simple request to verify the key works
+    const response = await testOpenAI.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: "user", content: "This is a test message to verify API key. Please respond with 'API key is valid'." }],
+      max_tokens: 10,
+    });
+    
+    // If we get here, the key is valid
+    return {
+      valid: true,
+      message: "API key is valid"
+    };
+  } catch (error: any) {
+    console.error("Error testing OpenAI API key:", error?.message || error);
+    
+    // Check for specific error types
+    if (error?.status === 401) {
+      return {
+        valid: false,
+        message: "Invalid API key"
+      };
+    } else if (error?.status === 429) {
+      return {
+        valid: false,
+        message: "Rate limit exceeded or insufficient quota"
+      };
+    }
+    
+    return {
+      valid: false,
+      message: error?.message || "An error occurred while testing the API key"
+    };
+  }
+}
+
+/**
+ * Set the API key for the OpenAI client
+ */
+export function setApiKey(newApiKey: string): void {
+  apiKey = newApiKey;
+  openai = new OpenAI({
+    apiKey: newApiKey,
+  });
+}
 
 /**
  * Summarize a document or text content
