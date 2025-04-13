@@ -29,7 +29,8 @@ export interface IStorage {
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
-  getProjects(): Promise<Project[]>;
+  getProjects(limit?: number, offset?: number): Promise<Project[]>;
+  getProjectsCount(): Promise<number>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: number, project: Partial<InsertProject>): Promise<Project | undefined>;
 
@@ -480,8 +481,18 @@ export class MemStorage implements IStorage {
     return this.projects.get(id);
   }
 
-  async getProjects(): Promise<Project[]> {
-    return Array.from(this.projects.values());
+  async getProjects(limit?: number, offset?: number): Promise<Project[]> {
+    const projects = Array.from(this.projects.values());
+    
+    if (limit !== undefined && offset !== undefined) {
+      return projects.slice(offset, offset + limit);
+    }
+    
+    return projects;
+  }
+  
+  async getProjectsCount(): Promise<number> {
+    return this.projects.size;
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
@@ -771,8 +782,19 @@ export class DatabaseStorage implements IStorage {
     return project || undefined;
   }
 
-  async getProjects(): Promise<Project[]> {
-    return db.select().from(projects);
+  async getProjects(limit?: number, offset?: number): Promise<Project[]> {
+    let query = db.select().from(projects);
+    
+    if (limit !== undefined && offset !== undefined) {
+      query = query.limit(limit).offset(offset);
+    }
+    
+    return query;
+  }
+  
+  async getProjectsCount(): Promise<number> {
+    const result = await db.select({ count: count() }).from(projects);
+    return result[0].count;
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
