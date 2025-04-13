@@ -27,7 +27,7 @@ interface OpenAIIntegrationDialogProps {
   onSuccess?: () => void;
 }
 
-export function OpenAIIntegrationDialog({ open, onOpenChange, userId }: OpenAIIntegrationDialogProps) {
+export function OpenAIIntegrationDialog({ open, onOpenChange, userId, onSuccess }: OpenAIIntegrationDialogProps) {
   const [integrationStatus, setIntegrationStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -59,6 +59,8 @@ export function OpenAIIntegrationDialog({ open, onOpenChange, userId }: OpenAIIn
         description: "OpenAI has been successfully integrated!",
       });
       setIntegrationStatus("success");
+      // Call the onSuccess callback if provided
+      onSuccess?.();
       // Close the dialog after a brief delay to show success state
       setTimeout(() => onOpenChange(false), 1500);
     },
