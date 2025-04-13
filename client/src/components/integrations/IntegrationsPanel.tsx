@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Integration } from "@shared/schema";
 import { SlackIntegrationDialog } from "./SlackIntegrationDialog";
+import { OpenAIIntegrationDialog } from "./OpenAIIntegrationDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCcw, Slack, Github, MessageSquare, X } from "lucide-react";
+import { Loader2, RefreshCcw, Slack, Github, MessageSquare, X, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,6 +34,7 @@ interface IntegrationsPanelProps {
 
 export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
+  const [openAIDialogOpen, setOpenAIDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
@@ -143,6 +145,31 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
                   <CardFooter>
                     <Button
                       onClick={() => setSlackDialogOpen(true)}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Connect
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                {/* OpenAI Integration Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <Sparkles className="h-6 w-6 text-violet-500" />
+                      <Badge variant="outline" className="text-xs">
+                        AI Processing
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-lg mt-2">OpenAI</CardTitle>
+                    <CardDescription>
+                      Enable AI-powered features like document summarization and insights.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter>
+                    <Button
+                      onClick={() => setOpenAIDialogOpen(true)}
                       className="w-full"
                       variant="outline"
                     >
@@ -267,6 +294,13 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
         onClose={() => setSlackDialogOpen(false)}
         userId={userId}
         onSuccess={handleIntegrationSuccess}
+      />
+      
+      {/* OpenAI Integration Dialog */}
+      <OpenAIIntegrationDialog
+        open={openAIDialogOpen}
+        onOpenChange={setOpenAIDialogOpen}
+        userId={userId}
       />
 
       {/* Delete Confirmation Dialog */}
