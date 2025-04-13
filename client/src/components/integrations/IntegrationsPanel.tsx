@@ -412,6 +412,7 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
         open={openAIDialogOpen}
         onOpenChange={setOpenAIDialogOpen}
         userId={userId}
+        onSuccess={handleIntegrationSuccess}
       />
       
       {/* GitHub/GitLab Integration Dialog */}

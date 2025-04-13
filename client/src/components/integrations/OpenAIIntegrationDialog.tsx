@@ -24,6 +24,7 @@ interface OpenAIIntegrationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId: number;
+  onSuccess?: () => void;
 }
 
 export function OpenAIIntegrationDialog({ open, onOpenChange, userId }: OpenAIIntegrationDialogProps) {
