@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,10 @@ const integrationLinks: IntegrationLink[] = [
 export default function Sidebar({ user }: SidebarProps) {
   const [location] = useLocation();
 
+  const navigateTo = (path: string) => {
+    window.location.href = path;
+  };
+
   return (
     <aside className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -53,19 +57,18 @@ export default function Sidebar({ user }: SidebarProps) {
         <ul className="space-y-1">
           {navigationLinks.map((link) => (
             <li key={link.href}>
-              <Link href={link.href}>
-                <a
-                  className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
-                    location === link.href 
-                      ? "bg-primary bg-opacity-10 text-primary" 
-                      : "text-gray-700 hover:bg-gray-100"
-                  )}
-                >
-                  <i className={cn(link.icon, "mr-3 text-lg")}></i>
-                  {link.label}
-                </a>
-              </Link>
+              <button
+                onClick={() => navigateTo(link.href)}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
+                  location === link.href 
+                    ? "bg-primary bg-opacity-10 text-primary" 
+                    : "text-gray-700 hover:bg-gray-100"
+                )}
+              >
+                <i className={cn(link.icon, "mr-3 text-lg")}></i>
+                {link.label}
+              </button>
             </li>
           ))}
         </ul>
@@ -77,14 +80,15 @@ export default function Sidebar({ user }: SidebarProps) {
           <ul className="mt-2 space-y-1">
             {integrationLinks.map((integration) => (
               <li key={integration.name}>
-                <Link href="/integrations">
-                  <a className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer">
-                    <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
-                      <i className={cn(integration.icon, "text-sm")}></i>
-                    </span>
-                    {integration.name}
-                  </a>
-                </Link>
+                <button
+                  onClick={() => navigateTo("/integrations")}
+                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer"
+                >
+                  <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
+                    <i className={cn(integration.icon, "text-sm")}></i>
+                  </span>
+                  {integration.name}
+                </button>
               </li>
             ))}
           </ul>

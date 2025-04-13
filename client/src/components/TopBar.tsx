@@ -58,7 +58,14 @@ export default function TopBar({ project, teamMembers, onSearch }: TopBarProps) 
             )}
           </div>
           
-          <Button className="text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-600">
+          <Button 
+            className="text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-600"
+            onClick={() => {
+              const resourceTypes = ['Document', 'Task', 'Team Member'];
+              const randomType = resourceTypes[Math.floor(Math.random() * resourceTypes.length)];
+              window.alert(`Adding new ${randomType}. This would open a form to create a new ${randomType}.`);
+            }}
+          >
             <i className="ri-add-line mr-1"></i> Add Resource
           </Button>
         </div>
