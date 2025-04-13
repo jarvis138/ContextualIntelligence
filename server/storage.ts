@@ -949,7 +949,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getIntegrations(userId: number): Promise<Integration[]> {
-    return db.select().from(integrations).where(eq(integrations.userId, userId));
+    return await db.select().from(integrations).where(eq(integrations.userId, userId));
   }
 
   async createIntegration(insertIntegration: InsertIntegration): Promise<Integration> {
@@ -977,7 +977,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInsights(projectId: number): Promise<Insight[]> {
-    return db.select().from(insights).where(eq(insights.projectId, projectId));
+    return await db.select().from(insights).where(eq(insights.projectId, projectId));
   }
 
   async createInsight(insertInsight: InsertInsight): Promise<Insight> {
@@ -992,7 +992,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRelationships(projectId: number): Promise<Relationship[]> {
-    return db
+    return await db
       .select()
       .from(relationships)
       .where(eq(relationships.sourceId, projectId));
