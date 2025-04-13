@@ -19,6 +19,7 @@ import {
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
+import { testSlackIntegration, sendProjectUpdate, sendProjectInsight } from "./services/slack";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
@@ -482,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(savedInsights);
   });
 
-  // External data sync routes
+  // Integration actions routes
   router.post("/integrations/:id/sync", async (req, res) => {
     const id = parseInt(req.params.id);
     const integration = await storage.getIntegration(id);
@@ -493,6 +494,187 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Data synchronization started", data });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to sync data", error: error?.message || 'Unknown error' });
+    }
+  });
+  
+  // Slack integration specific routes
+  router.post("/integrations/slack/test", async (req, res) => {
+    try {
+      const { token, channelId } = req.body;
+      
+      if (!token || !channelId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Token and channelId are required" 
+        });
+      }
+      
+      const success = await testSlackIntegration(token, channelId);
+      
+      if (success) {
+        // If test is successful, create or update integration
+        if (req.body.userId) {
+          const userId = parseInt(req.body.userId);
+          const existingIntegrations = await storage.getIntegrations(userId);
+          const slackIntegration = existingIntegrations.find(i => i.type === 'slack');
+          
+          if (slackIntegration) {
+            // Update existing integration
+            await storage.updateIntegration(slackIntegration.id, {
+              config: {
+                token,
+                channelId
+              },
+              active: true
+            });
+          } else {
+            // Create new integration
+            await storage.createIntegration({
+              userId,
+              name: "Slack Integration",
+              type: "slack",
+              active: true,
+              config: {
+                token,
+                channelId
+              }
+            });
+          }
+        }
+        
+        res.json({ 
+          success: true, 
+          message: "Slack integration test successful" 
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: "Slack integration test failed" 
+        });
+      }
+    } catch (error: any) {
+      console.error("Slack test error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error testing Slack integration", 
+        error: error?.message || 'Unknown error' 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/slack/update", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { token, channelId, message } = req.body;
+      
+      if (!token || !channelId || !message) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Token, channelId, and message are required" 
+        });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Project not found" 
+        });
+      }
+      
+      const messageTs = await sendProjectUpdate(
+        projectId,
+        project.name,
+        message,
+        channelId,
+        token
+      );
+      
+      // Record the activity
+      await storage.createActivity({
+        type: "integration",
+        description: "Sent project update to Slack",
+        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        projectId,
+        entityType: "project",
+        entityId: projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Project update sent to Slack", 
+        messageTs 
+      });
+    } catch (error: any) {
+      console.error("Slack update error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error sending project update to Slack", 
+        error: error?.message || 'Unknown error' 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/slack/insight", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { token, channelId, insightId } = req.body;
+      
+      if (!token || !channelId || !insightId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Token, channelId, and insightId are required" 
+        });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Project not found" 
+        });
+      }
+      
+      const insight = await storage.getInsight(parseInt(insightId));
+      if (!insight) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Insight not found" 
+        });
+      }
+      
+      const messageTs = await sendProjectInsight(
+        projectId,
+        project.name,
+        insight.type,
+        insight.content,
+        insight.confidence,
+        channelId,
+        token
+      );
+      
+      // Record the activity
+      await storage.createActivity({
+        type: "integration",
+        description: "Shared project insight to Slack",
+        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        projectId,
+        entityType: "insight",
+        entityId: parseInt(insightId)
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Project insight sent to Slack", 
+        messageTs 
+      });
+    } catch (error: any) {
+      console.error("Slack insight error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error sending project insight to Slack", 
+        error: error?.message || 'Unknown error' 
+      });
     }
   });
 
