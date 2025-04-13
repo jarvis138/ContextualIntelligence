@@ -12,9 +12,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Integration } from "@shared/schema";
 import { SlackIntegrationDialog } from "./SlackIntegrationDialog";
 import { OpenAIIntegrationDialog } from "./OpenAIIntegrationDialog";
+import { GitHubIntegrationDialog } from "./GitHubIntegrationDialog";
+import { JiraIntegrationDialog } from "./JiraIntegrationDialog";
+import { BitbucketIntegrationDialog } from "./BitbucketIntegrationDialog";
+import { BrowserStackIntegrationDialog } from "./BrowserStackIntegrationDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCcw, Slack, Github, MessageSquare, X, Sparkles } from "lucide-react";
+import { 
+  Loader2, 
+  RefreshCcw, 
+  Slack, 
+  Github, 
+  GitBranch,
+  GitFork,
+  MessageSquare, 
+  X, 
+  Sparkles, 
+  Layout,
+  LayoutGrid
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
