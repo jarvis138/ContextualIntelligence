@@ -17,6 +17,7 @@ import {
   insertRelationshipSchema 
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
+import * as nlpController from "./controllers/nlpController";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
 import { 
@@ -1044,6 +1045,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NLP routes
+  // Extract entities from text
+  router.post("/nlp/extract-entities", authenticateToken, nlpController.extractEntities);
+  
+  // Document summarization
+  router.get("/documents/:documentId/summarize", authenticateToken, nlpController.summarizeDocument);
+  
+  // Process document (extract entities, create tasks, etc.)
+  router.post("/documents/:documentId/process", authenticateToken, nlpController.processDocument);
+  
+  // Context graph generation
+  router.get("/projects/:projectId/context-graph", authenticateToken, nlpController.generateContextGraph);
+  
+  // Semantic search
+  router.post("/projects/:projectId/semantic-search", authenticateToken, nlpController.semanticSearch);
+  
   // Dashboard data route - combined endpoint for dashboard data
   router.get("/projects/:projectId/dashboard", async (req, res) => {
     const projectId = parseInt(req.params.projectId);
