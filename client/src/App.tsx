@@ -7,6 +7,7 @@ import Team from "@/pages/Team";
 import Documents from "@/pages/Documents";
 import Conversations from "@/pages/Conversations";
 import Search from "@/pages/Search";
+import Integrations from "@/pages/Integrations";
 
 // Import CSS to fix timeline styling
 import { useEffect } from "react";
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/documents" component={Documents} />
       <Route path="/conversations" component={Conversations} />
       <Route path="/search" component={Search} />
+      <Route path="/integrations" component={Integrations} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
@@ -66,7 +68,12 @@ function App() {
     };
   }, []);
 
-  return <Router />;
+  return (
+    <>
+      <Router />
+      <Toaster />
+    </>
+  );
 }
 
 export default App;

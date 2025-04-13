@@ -164,6 +164,7 @@ export default function Dashboard() {
               changeValue={1}
               changeText="disconnected"
               changeType="decrease"
+              linkTo="/integrations"
             />
           </div>
           
