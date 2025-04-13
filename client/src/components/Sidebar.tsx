@@ -25,6 +25,7 @@ const navigationLinks: SidebarLink[] = [
   { href: "/documents", label: "Documents", icon: "ri-file-text-line" },
   { href: "/conversations", label: "Conversations", icon: "ri-chat-3-line" },
   { href: "/search", label: "Search", icon: "ri-search-line" },
+  { href: "/integrations", label: "Integrations", icon: "ri-links-line" },
 ];
 
 const integrationLinks: IntegrationLink[] = [
@@ -76,12 +77,14 @@ export default function Sidebar({ user }: SidebarProps) {
           <ul className="mt-2 space-y-1">
             {integrationLinks.map((integration) => (
               <li key={integration.name}>
-                <a href="#" className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">
-                  <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
-                    <i className={cn(integration.icon, "text-sm")}></i>
-                  </span>
-                  {integration.name}
-                </a>
+                <Link href="/integrations">
+                  <a className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">
+                    <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
+                      <i className={cn(integration.icon, "text-sm")}></i>
+                    </span>
+                    {integration.name}
+                  </a>
+                </Link>
               </li>
             ))}
           </ul>

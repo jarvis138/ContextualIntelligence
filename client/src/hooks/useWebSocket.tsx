@@ -94,13 +94,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
   }, []);
 
+  // Use empty dependency array to only connect on mount and disconnect on unmount
+  // The actual implementations of connect and disconnect already have proper dependencies
   useEffect(() => {
     connect();
     
     return () => {
       disconnect();
     };
-  }, [connect, disconnect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     isConnected,
