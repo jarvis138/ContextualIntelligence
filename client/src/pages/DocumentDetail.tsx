@@ -36,8 +36,13 @@ const user = {
   role: "Project Manager"
 };
 
-export default function DocumentDetail() {
-  const { documentId } = useParams();
+interface DocumentDetailProps {
+  documentId?: string;
+}
+
+export default function DocumentDetail({ documentId: docIdProp }: DocumentDetailProps) {
+  const params = useParams();
+  const documentId = docIdProp || params.documentId;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
