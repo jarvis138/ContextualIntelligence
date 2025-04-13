@@ -409,8 +409,8 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
       
       {/* OpenAI Integration Dialog */}
       <OpenAIIntegrationDialog
-        open={openAIDialogOpen}
-        onOpenChange={setOpenAIDialogOpen}
+        isOpen={openAIDialogOpen}
+        onClose={() => setOpenAIDialogOpen(false)}
         userId={userId}
         onSuccess={handleIntegrationSuccess}
       />

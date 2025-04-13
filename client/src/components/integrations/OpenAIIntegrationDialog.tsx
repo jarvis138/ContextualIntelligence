@@ -62,7 +62,7 @@ export function OpenAIIntegrationDialog({ isOpen, onClose, userId, onSuccess }: 
       // Call the onSuccess callback if provided
       onSuccess?.();
       // Close the dialog after a brief delay to show success state
-      setTimeout(() => onOpenChange(false), 1500);
+      setTimeout(() => onClose(), 1500);
     },
     onError: (error) => {
       console.error("Integration error:", error);
@@ -116,7 +116,9 @@ export function OpenAIIntegrationDialog({ isOpen, onClose, userId, onSuccess }: 
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Integrate with OpenAI</DialogTitle>
@@ -152,7 +154,7 @@ export function OpenAIIntegrationDialog({ isOpen, onClose, userId, onSuccess }: 
               <Button 
                 type="button" 
                 variant="outline" 
-                onClick={() => onOpenChange(false)}
+                onClick={onClose}
                 disabled={integrationStatus === "testing" || integrationStatus === "success"}
               >
                 Cancel
