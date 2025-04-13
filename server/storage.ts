@@ -864,12 +864,25 @@ export class DatabaseStorage implements IStorage {
 
   // Projects
   async getProject(id: number): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    const [project] = await db.select({
+      id: projects.id,
+      name: projects.name,
+      description: projects.description,
+      status: projects.status,
+      progress: projects.progress,
+    }).from(projects).where(eq(projects.id, id));
     return project || undefined;
   }
 
   async getProjects(limit?: number, offset?: number): Promise<Project[]> {
-    let query = db.select().from(projects);
+    // Select only columns that exist in the database
+    let query = db.select({
+      id: projects.id,
+      name: projects.name,
+      description: projects.description,
+      status: projects.status,
+      progress: projects.progress,
+    }).from(projects);
     
     if (limit !== undefined && offset !== undefined) {
       query = query.limit(limit).offset(offset);
@@ -1014,7 +1027,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(activities)
       .where(eq(activities.projectId, projectId))
-      .orderBy(desc(activities.timestamp));
+      .orderBy(desc(activities.timestamp)); // Use timestamp instead of createdAt
     
     if (limit) {
       return await query.limit(limit);
@@ -1073,13 +1086,33 @@ export class DatabaseStorage implements IStorage {
 
   // Relationships
   async getRelationship(id: number): Promise<Relationship | undefined> {
-    const [relationship] = await db.select().from(relationships).where(eq(relationships.id, id));
+    // Select only the columns that exist in the actual database table
+    const [relationship] = await db.select({
+      id: relationships.id,
+      sourceType: relationships.sourceType,
+      sourceId: relationships.sourceId,
+      targetType: relationships.targetType,
+      targetId: relationships.targetId,
+      strength: relationships.strength,
+      description: relationships.description
+    })
+    .from(relationships)
+    .where(eq(relationships.id, id));
     return relationship || undefined;
   }
 
   async getRelationships(projectId: number): Promise<Relationship[]> {
+    // Select only the columns that exist in the actual database table
     return await db
-      .select()
+      .select({
+        id: relationships.id,
+        sourceType: relationships.sourceType,
+        sourceId: relationships.sourceId,
+        targetType: relationships.targetType,
+        targetId: relationships.targetId,
+        strength: relationships.strength,
+        description: relationships.description
+      })
       .from(relationships)
       .where(eq(relationships.sourceId, projectId));
   }
