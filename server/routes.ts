@@ -18,9 +18,12 @@ import {
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
-import { authService, authenticateToken, authorizeRoles } from "./auth";
+import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup middleware
+  app.use(cookieParser());
+  
   // Create initial demo data if the database is empty
   const createInitialData = async () => {
     const projects = await storage.getProjects();
@@ -29,9 +32,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Creating initial demo data...");
       
       // Create demo user
+      const hashedPassword = await hashPassword("password");
       const user = await storage.createUser({
         username: "demo",
-        password: "password",
+        password: hashedPassword,
         fullName: "Demo User",
         email: "demo@example.com",
         role: "admin",
@@ -119,6 +123,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const router = express.Router();
 
+  // Authentication routes
+  router.post("/register", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const { user, token } = await authService.register(userData);
+      
+      // Set token in cookie and response
+      res.cookie('token', token, { 
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' 
+      });
+      
+      res.status(201).json({ user, token });
+    } catch (error: any) {
+      if (error?.message === 'Username already exists') {
+        return res.status(409).json({ message: error.message });
+      }
+      res.status(400).json({ message: "Registration failed", error: error?.message || 'Unknown error' });
+    }
+  });
+
+  router.post("/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      const { user, token } = await authService.login(username, password);
+      
+      // Set token in cookie and response
+      res.cookie('token', token, { 
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' 
+      });
+      
+      res.status(200).json({ user, token });
+    } catch (error: any) {
+      res.status(401).json({ message: "Invalid credentials", error: error?.message || 'Unknown error' });
+    }
+  });
+
+  router.post("/logout", (req, res) => {
+    res.clearCookie('token');
+    res.status(200).json({ message: "Logged out successfully" });
+  });
+
+  router.get("/me", authenticateToken, (req, res) => {
+    res.json(req.user);
+  });
+
   // User routes
   router.get("/users", async (req, res) => {
     const users = await storage.getUsers();
@@ -137,8 +193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = insertUserSchema.parse(req.body);
       const newUser = await storage.createUser(user);
       res.status(201).json(newUser);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid user data", error });
+    } catch (error: any) {
+      res.status(400).json({ message: "Invalid user data", error: error?.message || 'Unknown error' });
     }
   });
 
@@ -435,8 +491,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = await fetchExternalProjectData(integration);
       res.json({ success: true, message: "Data synchronization started", data });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to sync data", error });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to sync data", error: error?.message || 'Unknown error' });
     }
   });
 
@@ -523,8 +579,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }));
           }
         });
-      } catch (error) {
-        console.error('WebSocket message error:', error);
+      } catch (error: any) {
+        console.error('WebSocket message error:', error?.message || 'Unknown error');
       }
     });
     
