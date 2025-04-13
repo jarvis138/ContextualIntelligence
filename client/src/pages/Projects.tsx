@@ -18,10 +18,12 @@ export default function Projects() {
   });
   
   // Filter projects based on search query
-  const filteredProjects = projects?.filter(project => 
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-  );
+  const filteredProjects = Array.isArray(projects) 
+    ? projects.filter(project => 
+        project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      )
+    : [];
   
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {

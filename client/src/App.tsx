@@ -8,6 +8,7 @@ import Documents from "@/pages/Documents";
 import Conversations from "@/pages/Conversations";
 import Search from "@/pages/Search";
 import Integrations from "@/pages/Integrations";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Import CSS to fix timeline styling
 import { useEffect } from "react";
@@ -70,7 +71,9 @@ function App() {
 
   return (
     <>
-      <Router />
+      <ErrorBoundary>
+        <Router />
+      </ErrorBoundary>
       <Toaster />
     </>
   );

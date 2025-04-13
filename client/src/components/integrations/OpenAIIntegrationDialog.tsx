@@ -21,13 +21,13 @@ const openAIIntegrationSchema = z.object({
 type OpenAIIntegrationFormValues = z.infer<typeof openAIIntegrationSchema>;
 
 interface OpenAIIntegrationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
   userId: number;
   onSuccess?: () => void;
 }
 
-export function OpenAIIntegrationDialog({ open, onOpenChange, userId, onSuccess }: OpenAIIntegrationDialogProps) {
+export function OpenAIIntegrationDialog({ isOpen, onClose, userId, onSuccess }: OpenAIIntegrationDialogProps) {
   const [integrationStatus, setIntegrationStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const { toast } = useToast();
   const queryClient = useQueryClient();
