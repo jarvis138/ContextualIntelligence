@@ -42,7 +42,7 @@ export default function TopBar({ project, teamMembers, onSearch }: TopBarProps) 
           <div className="flex -space-x-2">
             {teamMembers.slice(0, 3).map((member) => (
               <img 
-                key={member.id}
+                key={`member-${member.id}`}
                 className="w-8 h-8 rounded-full border-2 border-white" 
                 src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}`} 
                 alt={member.fullName} 

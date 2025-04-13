@@ -54,7 +54,7 @@ export default function Sidebar({ user }: SidebarProps) {
           {navigationLinks.map((link) => (
             <li key={link.href}>
               <Link href={link.href}>
-                <div 
+                <a
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
                     location === link.href 
@@ -64,7 +64,7 @@ export default function Sidebar({ user }: SidebarProps) {
                 >
                   <i className={cn(link.icon, "mr-3 text-lg")}></i>
                   {link.label}
-                </div>
+                </a>
               </Link>
             </li>
           ))}
@@ -78,12 +78,12 @@ export default function Sidebar({ user }: SidebarProps) {
             {integrationLinks.map((integration) => (
               <li key={integration.name}>
                 <Link href="/integrations">
-                  <div className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer">
+                  <a className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer">
                     <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
                       <i className={cn(integration.icon, "text-sm")}></i>
                     </span>
                     {integration.name}
-                  </div>
+                  </a>
                 </Link>
               </li>
             ))}
