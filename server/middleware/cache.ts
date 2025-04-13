@@ -115,7 +115,7 @@ export function invalidateCache(patterns: string[]) {
     const originalEnd = res.end;
     
     // Override the end method to invalidate cache after successful modifications
-    res.end = function(this: Response, ...args: any[]): Response {
+    res.end = function(this: Response): Response {
       // Only invalidate on successful responses
       if (res.statusCode >= 200 && res.statusCode < 300) {
         patterns.forEach(pattern => {
@@ -124,7 +124,7 @@ export function invalidateCache(patterns: string[]) {
       }
       
       // Call the original end method with the original arguments
-      return originalEnd.apply(this, args);
+      return originalEnd.apply(this, arguments);
     };
 
     next();

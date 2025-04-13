@@ -11,7 +11,7 @@ import {
   relationships, type Relationship, type InsertRelationship
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "./db";
@@ -931,10 +931,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(activities.timestamp));
     
     if (limit) {
-      return query.limit(limit);
+      return await query.limit(limit);
     }
     
-    return query;
+    return await query;
   }
 
   async createActivity(insertActivity: InsertActivity): Promise<Activity> {
