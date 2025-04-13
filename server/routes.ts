@@ -1,6 +1,7 @@
-import express, { type Express } from "express";
+import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
+import cookieParser from "cookie-parser";
 import { z } from "zod";
 import { storage } from "./storage";
 import { 
@@ -17,6 +18,7 @@ import {
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
+import { authService, authenticateToken, authorizeRoles } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create initial demo data if the database is empty
