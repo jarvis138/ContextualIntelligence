@@ -258,10 +258,10 @@ export const documents = pgTable("documents", {
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   createdBy: integer("created_by").notNull().references(() => users.id),
   updatedBy: integer("updated_by").notNull().references(() => users.id),
-  embeddings: jsonb("embeddings"), // For semantic search
-  tags: text("tags").array(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // embeddings column doesn't exist in the actual database
+  // tags column doesn't exist in the actual database
+  // createdAt column doesn't exist in the actual database
+  // updatedAt column doesn't exist in the actual database
 }, (table) => {
   return {
     projectIdx: index("document_project_idx").on(table.projectId),
@@ -560,7 +560,17 @@ export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 
-export type Document = typeof documents.$inferSelect;
+// Explicitly define the Document type to match the actual database schema
+// instead of inferring it from the schema definition
+export type Document = {
+  id: number;
+  title: string;
+  content: string | null;
+  fileType: "text" | "requirements" | "design" | "code" | "meeting" | "summary" | "report";
+  projectId: number;
+  createdBy: number;
+  updatedBy: number;
+};
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
 export type Activity = typeof activities.$inferSelect;

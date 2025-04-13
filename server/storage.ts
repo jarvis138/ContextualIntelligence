@@ -1030,10 +1030,10 @@ export class DatabaseStorage implements IStorage {
         createdBy: documents.createdBy,
         updatedBy: documents.updatedBy,
         // sourceUrl column doesn't exist in the actual database
-        embeddings: documents.embeddings,
-        tags: documents.tags,
-        createdAt: documents.createdAt,
-        updatedAt: documents.updatedAt
+        // embeddings column doesn't exist in the actual database
+        // tags column doesn't exist in the actual database
+        // createdAt column doesn't exist in the actual database
+        // updatedAt column doesn't exist in the actual database
     })
     .from(documents)
     .where(eq(documents.id, id));
@@ -1050,10 +1050,10 @@ export class DatabaseStorage implements IStorage {
         createdBy: documents.createdBy,
         updatedBy: documents.updatedBy,
         // sourceUrl column doesn't exist in the actual database
-        embeddings: documents.embeddings,
-        tags: documents.tags,
-        createdAt: documents.createdAt,
-        updatedAt: documents.updatedAt
+        // embeddings column doesn't exist in the actual database
+        // tags column doesn't exist in the actual database
+        // createdAt column doesn't exist in the actual database
+        // updatedAt column doesn't exist in the actual database
     })
     .from(documents)
     .where(eq(documents.projectId, projectId));
@@ -1070,14 +1070,16 @@ export class DatabaseStorage implements IStorage {
         createdBy: documents.createdBy,
         updatedBy: documents.updatedBy,
         // sourceUrl column doesn't exist in the actual database
-        embeddings: documents.embeddings,
-        tags: documents.tags,
-        createdAt: documents.createdAt,
-        updatedAt: documents.updatedAt
+        // embeddings column doesn't exist in the actual database
+        // tags column doesn't exist in the actual database
+        // createdAt column doesn't exist in the actual database
+        // updatedAt column doesn't exist in the actual database
         // Explicitly exclude parentDocumentId which doesn't exist in the database
       })
       .from(documents)
-      .orderBy(desc(documents.updatedAt))
+      // We can't order by updatedAt as it doesn't exist
+      // Using id for now as a simple fallback
+      .orderBy(desc(documents.id))
       .limit(limit);
   }
 
@@ -1087,8 +1089,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
+    // Remove any timestamp fields that don't exist in the database
+    const documentToUpdate = { ...document };
+    // @ts-ignore - these properties don't exist in InsertDocument but TypeScript doesn't know that
+    delete documentToUpdate.createdAt;
+    // @ts-ignore
+    delete documentToUpdate.updatedAt;
+    
     const [updatedDocument] = await db.update(documents)
-      .set(document)
+      .set(documentToUpdate)
       .where(eq(documents.id, id))
       .returning();
     return updatedDocument || undefined;

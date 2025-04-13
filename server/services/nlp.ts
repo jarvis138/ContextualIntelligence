@@ -190,8 +190,9 @@ export async function generateContextGraph(projectId: number): Promise<GraphData
         label: document.title,
         properties: {
           fileType: document.fileType,
-          createdAt: document.createdAt || document.updatedAt, // Fallback to updatedAt if createdAt not available
-          updatedAt: document.updatedAt
+          // Remove createdAt and updatedAt references since they don't exist in the Document type
+          createdById: document.createdBy,
+          updatedById: document.updatedBy
         }
       };
       nodes.push(documentNode);
