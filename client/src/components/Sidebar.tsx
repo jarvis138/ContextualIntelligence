@@ -43,12 +43,12 @@ export default function Sidebar({ user }: SidebarProps) {
     <aside className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <Link href="/">
-          <a className="flex items-center space-x-2 cursor-pointer">
+          <div className="flex items-center space-x-2 cursor-pointer">
             <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
               <i className="ri-bubble-chart-fill text-white"></i>
             </div>
             <h1 className="text-lg font-semibold text-gray-800">CPI Hub</h1>
-          </a>
+          </div>
         </Link>
       </div>
       
@@ -57,7 +57,7 @@ export default function Sidebar({ user }: SidebarProps) {
           {navigationLinks.map((link) => (
             <li key={link.href}>
               <Link href={link.href}>
-                <a
+                <div
                   className={cn(
                     "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
                     location === link.href 
@@ -67,7 +67,7 @@ export default function Sidebar({ user }: SidebarProps) {
                 >
                   <i className={cn(link.icon, "mr-3 text-lg")}></i>
                   {link.label}
-                </a>
+                </div>
               </Link>
             </li>
           ))}
@@ -81,7 +81,7 @@ export default function Sidebar({ user }: SidebarProps) {
             {integrationLinks.map((integration) => (
               <li key={integration.name}>
                 <Link href={integration.integrationPath || "/integrations"}>
-                  <a
+                  <div
                     className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer"
                     data-integration-name={integration.name.toLowerCase()}
                   >
@@ -89,7 +89,7 @@ export default function Sidebar({ user }: SidebarProps) {
                       <i className={cn(integration.icon, "text-sm")}></i>
                     </span>
                     {integration.name}
-                  </a>
+                  </div>
                 </Link>
               </li>
             ))}
