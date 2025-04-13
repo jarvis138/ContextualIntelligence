@@ -1,0 +1,714 @@
+import {
+  users, type User, type InsertUser,
+  projects, type Project, type InsertProject,
+  teams, type Team, type InsertTeam,
+  teamMembers, type TeamMember, type InsertTeamMember,
+  tasks, type Task, type InsertTask,
+  documents, type Document, type InsertDocument,
+  activities, type Activity, type InsertActivity,
+  integrations, type Integration, type InsertIntegration,
+  insights, type Insight, type InsertInsight,
+  relationships, type Relationship, type InsertRelationship
+} from "@shared/schema";
+
+export interface IStorage {
+  // Users
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  getUsers(): Promise<User[]>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+
+  // Projects
+  getProject(id: number): Promise<Project | undefined>;
+  getProjects(): Promise<Project[]>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: number, project: Partial<InsertProject>): Promise<Project | undefined>;
+
+  // Teams
+  getTeam(id: number): Promise<Team | undefined>;
+  getTeams(): Promise<Team[]>;
+  getTeamsByProject(projectId: number): Promise<Team[]>;
+  createTeam(team: InsertTeam): Promise<Team>;
+  updateTeam(id: number, team: Partial<InsertTeam>): Promise<Team | undefined>;
+
+  // Team Members
+  getTeamMember(id: number): Promise<TeamMember | undefined>;
+  getTeamMembers(teamId: number): Promise<TeamMember[]>;
+  createTeamMember(teamMember: InsertTeamMember): Promise<TeamMember>;
+  deleteTeamMember(id: number): Promise<boolean>;
+
+  // Tasks
+  getTask(id: number): Promise<Task | undefined>;
+  getTasks(projectId: number): Promise<Task[]>;
+  getTasksByTeam(teamId: number): Promise<Task[]>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: number, task: Partial<InsertTask>): Promise<Task | undefined>;
+
+  // Documents
+  getDocument(id: number): Promise<Document | undefined>;
+  getDocuments(projectId: number): Promise<Document[]>;
+  getRecentDocuments(limit: number): Promise<Document[]>;
+  createDocument(document: InsertDocument): Promise<Document>;
+  updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
+
+  // Activities
+  getActivity(id: number): Promise<Activity | undefined>;
+  getActivities(projectId: number, limit?: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+
+  // Integrations
+  getIntegration(id: number): Promise<Integration | undefined>;
+  getIntegrations(userId: number): Promise<Integration[]>;
+  createIntegration(integration: InsertIntegration): Promise<Integration>;
+  updateIntegration(id: number, integration: Partial<InsertIntegration>): Promise<Integration | undefined>;
+  deleteIntegration(id: number): Promise<boolean>;
+
+  // Insights
+  getInsight(id: number): Promise<Insight | undefined>;
+  getInsights(projectId: number): Promise<Insight[]>;
+  createInsight(insight: InsertInsight): Promise<Insight>;
+
+  // Relationships
+  getRelationship(id: number): Promise<Relationship | undefined>;
+  getRelationships(projectId: number): Promise<Relationship[]>;
+  createRelationship(relationship: InsertRelationship): Promise<Relationship>;
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<number, User>;
+  private projects: Map<number, Project>;
+  private teams: Map<number, Team>;
+  private teamMembers: Map<number, TeamMember>;
+  private tasks: Map<number, Task>;
+  private documents: Map<number, Document>;
+  private activities: Map<number, Activity>;
+  private integrations: Map<number, Integration>;
+  private insights: Map<number, Insight>;
+  private relationships: Map<number, Relationship>;
+
+  private currentIds: {
+    users: number;
+    projects: number;
+    teams: number;
+    teamMembers: number;
+    tasks: number;
+    documents: number;
+    activities: number;
+    integrations: number;
+    insights: number;
+    relationships: number;
+  };
+
+  constructor() {
+    this.users = new Map();
+    this.projects = new Map();
+    this.teams = new Map();
+    this.teamMembers = new Map();
+    this.tasks = new Map();
+    this.documents = new Map();
+    this.activities = new Map();
+    this.integrations = new Map();
+    this.insights = new Map();
+    this.relationships = new Map();
+
+    this.currentIds = {
+      users: 1,
+      projects: 1,
+      teams: 1,
+      teamMembers: 1,
+      tasks: 1,
+      documents: 1,
+      activities: 1,
+      integrations: 1,
+      insights: 1,
+      relationships: 1
+    };
+
+    // Initialize with demo data
+    this.initDemoData();
+  }
+
+  private initDemoData() {
+    // Create demo users
+    const user1 = this.createUser({
+      username: "alexmorgan",
+      password: "password",
+      fullName: "Alex Morgan",
+      email: "alex.morgan@example.com",
+      role: "admin",
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+    });
+
+    const user2 = this.createUser({
+      username: "sarahchen",
+      password: "password",
+      fullName: "Sarah Chen",
+      email: "sarah.chen@example.com",
+      role: "user",
+      avatar: "https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+    });
+
+    const user3 = this.createUser({
+      username: "markjohnson",
+      password: "password",
+      fullName: "Mark Johnson",
+      email: "mark.johnson@example.com",
+      role: "user",
+      avatar: "https://images.unsplash.com/photo-1491528323818-fdd1faba62cc?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+    });
+
+    const user4 = this.createUser({
+      username: "lisawong",
+      password: "password",
+      fullName: "Lisa Wong",
+      email: "lisa.wong@example.com",
+      role: "user",
+      avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+    });
+
+    const user5 = this.createUser({
+      username: "davidkim",
+      password: "password",
+      fullName: "David Kim",
+      email: "david.kim@example.com",
+      role: "user",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2.25&w=256&h=256&q=80"
+    });
+
+    // Create demo project
+    const project = this.createProject({
+      name: "Web Application Redesign",
+      description: "Redesign of the company's web application with improved UX/UI and functionality",
+      status: "active",
+      progress: 67
+    });
+
+    // Create demo teams
+    const frontendTeam = this.createTeam({
+      name: "Frontend Team",
+      description: "Responsible for UI development",
+      icon: "ri-code-s-slash-line",
+      progress: 85
+    });
+
+    const backendTeam = this.createTeam({
+      name: "Backend Team",
+      description: "Responsible for API and database",
+      icon: "ri-database-2-line",
+      progress: 43
+    });
+
+    const designTeam = this.createTeam({
+      name: "Design Team",
+      description: "Responsible for UX/UI design",
+      icon: "ri-pen-nib-line",
+      progress: 92
+    });
+
+    const qaTeam = this.createTeam({
+      name: "QA Team",
+      description: "Responsible for testing",
+      icon: "ri-test-tube-line",
+      progress: 65
+    });
+
+    // Add team members
+    this.createTeamMember({ teamId: frontendTeam.id, userId: user2.id });
+    this.createTeamMember({ teamId: frontendTeam.id, userId: user3.id });
+    this.createTeamMember({ teamId: backendTeam.id, userId: user3.id });
+    this.createTeamMember({ teamId: backendTeam.id, userId: user5.id });
+    this.createTeamMember({ teamId: designTeam.id, userId: user2.id });
+    this.createTeamMember({ teamId: designTeam.id, userId: user4.id });
+    this.createTeamMember({ teamId: qaTeam.id, userId: user4.id });
+    this.createTeamMember({ teamId: qaTeam.id, userId: user5.id });
+
+    // Create demo tasks
+    for (let i = 1; i <= 24; i++) {
+      const teamId = i % 4 === 0 ? qaTeam.id :
+                     i % 3 === 0 ? designTeam.id :
+                     i % 2 === 0 ? backendTeam.id : frontendTeam.id;
+      
+      const assigneeId = i % 5 === 0 ? user5.id :
+                         i % 4 === 0 ? user4.id :
+                         i % 3 === 0 ? user3.id :
+                         i % 2 === 0 ? user2.id : user1.id;
+      
+      this.createTask({
+        title: `Task #${i}`,
+        description: `Description for task #${i}`,
+        status: i % 3 === 0 ? "completed" : (i % 4 === 0 ? "in_progress" : "pending"),
+        assigneeId,
+        projectId: project.id,
+        teamId,
+        dueDate: new Date(Date.now() + (i * 24 * 60 * 60 * 1000))
+      });
+    }
+
+    // Create demo documents
+    this.createDocument({
+      title: "UI Component Documentation",
+      content: "Detailed documentation of all UI components used in the application",
+      fileType: "text",
+      projectId: project.id,
+      createdBy: user2.id,
+      updatedBy: user2.id,
+      updatedAt: new Date(Date.now() - (2 * 60 * 60 * 1000))
+    });
+
+    this.createDocument({
+      title: "Project Timeline (Q3-Q4)",
+      content: "Timeline for the project covering Q3 and Q4",
+      fileType: "excel",
+      projectId: project.id,
+      createdBy: user1.id,
+      updatedBy: user1.id,
+      updatedAt: new Date(Date.now() - (24 * 60 * 60 * 1000))
+    });
+
+    this.createDocument({
+      title: "API Documentation",
+      content: "Documentation for all APIs used in the application",
+      fileType: "pdf",
+      projectId: project.id,
+      createdBy: user3.id,
+      updatedBy: user3.id,
+      updatedAt: new Date(Date.now() - (3 * 24 * 60 * 60 * 1000))
+    });
+
+    // Create demo activities
+    this.createActivity({
+      type: "update",
+      description: "Updated the UI Components document",
+      userId: user2.id,
+      projectId: project.id,
+      entityType: "document",
+      entityId: 1,
+      timestamp: new Date(Date.now() - (2 * 60 * 60 * 1000))
+    });
+
+    this.createActivity({
+      type: "comment",
+      description: "Commented on API Integration Issue #42",
+      userId: user3.id,
+      projectId: project.id,
+      entityType: "issue",
+      entityId: 42,
+      timestamp: new Date(Date.now() - (3 * 60 * 60 * 1000))
+    });
+
+    this.createActivity({
+      type: "assign",
+      description: "Assigned 3 tasks to Backend Team",
+      userId: user1.id,
+      projectId: project.id,
+      entityType: "team",
+      entityId: backendTeam.id,
+      timestamp: new Date(Date.now() - (24 * 60 * 60 * 1000))
+    });
+
+    this.createActivity({
+      type: "upload",
+      description: "Team meeting minutes uploaded",
+      userId: user4.id,
+      projectId: project.id,
+      entityType: "document",
+      entityId: 2,
+      timestamp: new Date(Date.now() - (26 * 60 * 60 * 1000))
+    });
+
+    this.createActivity({
+      type: "create",
+      description: "Created a new milestone Beta Release",
+      userId: user5.id,
+      projectId: project.id,
+      entityType: "milestone",
+      entityId: 1,
+      timestamp: new Date(Date.now() - (29 * 60 * 60 * 1000))
+    });
+
+    // Create demo integrations
+    this.createIntegration({
+      name: "Trello",
+      type: "trello",
+      config: { apiKey: "demo_api_key", token: "demo_token" },
+      active: true,
+      userId: user1.id
+    });
+
+    this.createIntegration({
+      name: "Jira",
+      type: "jira",
+      config: { url: "https://company.atlassian.net", token: "demo_token" },
+      active: true,
+      userId: user1.id
+    });
+
+    this.createIntegration({
+      name: "Slack",
+      type: "slack",
+      config: { token: "demo_token", channels: ["general", "dev"] },
+      active: true,
+      userId: user1.id
+    });
+
+    this.createIntegration({
+      name: "G Suite",
+      type: "gsuite",
+      config: { refreshToken: "demo_token" },
+      active: true,
+      userId: user1.id
+    });
+
+    // Create demo insights
+    this.createInsight({
+      type: "warning",
+      content: "Backend integration timeline at risk (17% behind schedule)",
+      projectId: project.id,
+      confidence: 85
+    });
+
+    this.createInsight({
+      type: "success",
+      content: "UI component library completed ahead of schedule (+3 days)",
+      projectId: project.id,
+      confidence: 95
+    });
+
+    this.createInsight({
+      type: "info",
+      content: "API documentation needs updates (mentioned in 5 recent discussions)",
+      projectId: project.id,
+      confidence: 78
+    });
+
+    // Create demo relationships
+    this.createRelationship({
+      sourceType: "project",
+      sourceId: project.id,
+      targetType: "document",
+      targetId: 1,
+      strength: 8,
+      description: "Project documentation"
+    });
+
+    this.createRelationship({
+      sourceType: "project",
+      sourceId: project.id,
+      targetType: "task",
+      targetId: 1,
+      strength: 5,
+      description: "Project task"
+    });
+
+    this.createRelationship({
+      sourceType: "project",
+      sourceId: project.id,
+      targetType: "team",
+      targetId: frontendTeam.id,
+      strength: 9,
+      description: "Project team"
+    });
+
+    this.createRelationship({
+      sourceType: "document",
+      sourceId: 1,
+      targetType: "task",
+      targetId: 2,
+      strength: 6,
+      description: "Document relates to task"
+    });
+
+    this.createRelationship({
+      sourceType: "team",
+      sourceId: frontendTeam.id,
+      targetType: "team",
+      targetId: designTeam.id,
+      strength: 7,
+      description: "Teams work closely together"
+    });
+  }
+
+  // Users
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentIds.users++;
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) return undefined;
+    
+    const updatedUser = { ...existingUser, ...user };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  // Projects
+  async getProject(id: number): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return Array.from(this.projects.values());
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const id = this.currentIds.projects++;
+    const project: Project = { ...insertProject, id };
+    this.projects.set(id, project);
+    return project;
+  }
+
+  async updateProject(id: number, project: Partial<InsertProject>): Promise<Project | undefined> {
+    const existingProject = this.projects.get(id);
+    if (!existingProject) return undefined;
+    
+    const updatedProject = { ...existingProject, ...project };
+    this.projects.set(id, updatedProject);
+    return updatedProject;
+  }
+
+  // Teams
+  async getTeam(id: number): Promise<Team | undefined> {
+    return this.teams.get(id);
+  }
+
+  async getTeams(): Promise<Team[]> {
+    return Array.from(this.teams.values());
+  }
+
+  async getTeamsByProject(projectId: number): Promise<Team[]> {
+    // In a real implementation, we would have a teams_projects relationship table
+    // For this demo, we'll just return all teams
+    return this.getTeams();
+  }
+
+  async createTeam(insertTeam: InsertTeam): Promise<Team> {
+    const id = this.currentIds.teams++;
+    const team: Team = { ...insertTeam, id };
+    this.teams.set(id, team);
+    return team;
+  }
+
+  async updateTeam(id: number, team: Partial<InsertTeam>): Promise<Team | undefined> {
+    const existingTeam = this.teams.get(id);
+    if (!existingTeam) return undefined;
+    
+    const updatedTeam = { ...existingTeam, ...team };
+    this.teams.set(id, updatedTeam);
+    return updatedTeam;
+  }
+
+  // Team Members
+  async getTeamMember(id: number): Promise<TeamMember | undefined> {
+    return this.teamMembers.get(id);
+  }
+
+  async getTeamMembers(teamId: number): Promise<TeamMember[]> {
+    return Array.from(this.teamMembers.values()).filter(
+      member => member.teamId === teamId
+    );
+  }
+
+  async createTeamMember(insertTeamMember: InsertTeamMember): Promise<TeamMember> {
+    const id = this.currentIds.teamMembers++;
+    const teamMember: TeamMember = { ...insertTeamMember, id };
+    this.teamMembers.set(id, teamMember);
+    return teamMember;
+  }
+
+  async deleteTeamMember(id: number): Promise<boolean> {
+    return this.teamMembers.delete(id);
+  }
+
+  // Tasks
+  async getTask(id: number): Promise<Task | undefined> {
+    return this.tasks.get(id);
+  }
+
+  async getTasks(projectId: number): Promise<Task[]> {
+    return Array.from(this.tasks.values()).filter(
+      task => task.projectId === projectId
+    );
+  }
+
+  async getTasksByTeam(teamId: number): Promise<Task[]> {
+    return Array.from(this.tasks.values()).filter(
+      task => task.teamId === teamId
+    );
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const id = this.currentIds.tasks++;
+    const task: Task = { ...insertTask, id };
+    this.tasks.set(id, task);
+    return task;
+  }
+
+  async updateTask(id: number, task: Partial<InsertTask>): Promise<Task | undefined> {
+    const existingTask = this.tasks.get(id);
+    if (!existingTask) return undefined;
+    
+    const updatedTask = { ...existingTask, ...task };
+    this.tasks.set(id, updatedTask);
+    return updatedTask;
+  }
+
+  // Documents
+  async getDocument(id: number): Promise<Document | undefined> {
+    return this.documents.get(id);
+  }
+
+  async getDocuments(projectId: number): Promise<Document[]> {
+    return Array.from(this.documents.values()).filter(
+      doc => doc.projectId === projectId
+    );
+  }
+
+  async getRecentDocuments(limit: number): Promise<Document[]> {
+    return Array.from(this.documents.values())
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, limit);
+  }
+
+  async createDocument(insertDocument: InsertDocument): Promise<Document> {
+    const id = this.currentIds.documents++;
+    const document: Document = { 
+      ...insertDocument, 
+      id,
+      updatedAt: insertDocument.updatedAt || new Date()
+    };
+    this.documents.set(id, document);
+    return document;
+  }
+
+  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
+    const existingDoc = this.documents.get(id);
+    if (!existingDoc) return undefined;
+    
+    const updatedDoc = { 
+      ...existingDoc, 
+      ...document,
+      updatedAt: new Date()
+    };
+    this.documents.set(id, updatedDoc);
+    return updatedDoc;
+  }
+
+  // Activities
+  async getActivity(id: number): Promise<Activity | undefined> {
+    return this.activities.get(id);
+  }
+
+  async getActivities(projectId: number, limit?: number): Promise<Activity[]> {
+    const activities = Array.from(this.activities.values())
+      .filter(activity => activity.projectId === projectId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    return limit ? activities.slice(0, limit) : activities;
+  }
+
+  async createActivity(insertActivity: InsertActivity): Promise<Activity> {
+    const id = this.currentIds.activities++;
+    const activity: Activity = { 
+      ...insertActivity, 
+      id,
+      timestamp: insertActivity.timestamp || new Date()
+    };
+    this.activities.set(id, activity);
+    return activity;
+  }
+
+  // Integrations
+  async getIntegration(id: number): Promise<Integration | undefined> {
+    return this.integrations.get(id);
+  }
+
+  async getIntegrations(userId: number): Promise<Integration[]> {
+    return Array.from(this.integrations.values()).filter(
+      integration => integration.userId === userId
+    );
+  }
+
+  async createIntegration(insertIntegration: InsertIntegration): Promise<Integration> {
+    const id = this.currentIds.integrations++;
+    const integration: Integration = { ...insertIntegration, id };
+    this.integrations.set(id, integration);
+    return integration;
+  }
+
+  async updateIntegration(id: number, integration: Partial<InsertIntegration>): Promise<Integration | undefined> {
+    const existingIntegration = this.integrations.get(id);
+    if (!existingIntegration) return undefined;
+    
+    const updatedIntegration = { ...existingIntegration, ...integration };
+    this.integrations.set(id, updatedIntegration);
+    return updatedIntegration;
+  }
+
+  async deleteIntegration(id: number): Promise<boolean> {
+    return this.integrations.delete(id);
+  }
+
+  // Insights
+  async getInsight(id: number): Promise<Insight | undefined> {
+    return this.insights.get(id);
+  }
+
+  async getInsights(projectId: number): Promise<Insight[]> {
+    return Array.from(this.insights.values()).filter(
+      insight => insight.projectId === projectId
+    );
+  }
+
+  async createInsight(insertInsight: InsertInsight): Promise<Insight> {
+    const id = this.currentIds.insights++;
+    const insight: Insight = { 
+      ...insertInsight, 
+      id,
+      timestamp: new Date()
+    };
+    this.insights.set(id, insight);
+    return insight;
+  }
+
+  // Relationships
+  async getRelationship(id: number): Promise<Relationship | undefined> {
+    return this.relationships.get(id);
+  }
+
+  async getRelationships(projectId: number): Promise<Relationship[]> {
+    // This is a simplified implementation. In a real app, we would query
+    // relationships where source or target is related to the project
+    return Array.from(this.relationships.values()).filter(
+      rel => (rel.sourceType === 'project' && rel.sourceId === projectId) ||
+             (rel.targetType === 'project' && rel.targetId === projectId)
+    );
+  }
+
+  async createRelationship(insertRelationship: InsertRelationship): Promise<Relationship> {
+    const id = this.currentIds.relationships++;
+    const relationship: Relationship = { ...insertRelationship, id };
+    this.relationships.set(id, relationship);
+    return relationship;
+  }
+}
+
+export const storage = new MemStorage();
