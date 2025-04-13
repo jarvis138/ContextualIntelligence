@@ -804,9 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           projectId,
           type: insight.type,
           content: insight.content,
-          confidence: insight.confidence,
-          source: insight.source || "AI Analysis",
-          createdAt: new Date()
+          confidence: insight.confidence
         }))
       );
       

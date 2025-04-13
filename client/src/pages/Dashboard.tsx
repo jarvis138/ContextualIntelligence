@@ -11,7 +11,10 @@ import {
   AIInsights, 
   RecentActivities, 
   TeamOverview, 
-  RecentDocuments 
+  RecentDocuments,
+  ProjectProgressChart,
+  TeamProgressChart,
+  RelationshipNetworkChart
 } from '@/components/dashboard';
 import { Activity, WebSocketMessage } from '@/lib/types';
 
@@ -168,12 +171,28 @@ export default function Dashboard() {
             />
           </div>
           
+          {/* Data Visualization Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Project Progress Chart */}
+            <ProjectProgressChart 
+              activities={dashboardData?.recentActivities || []} 
+            />
+            
+            {/* Team Progress Chart */}
+            <TeamProgressChart 
+              teams={dashboardData?.teams || []} 
+            />
+          </div>
+          
           {/* Main Content Rows */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Project Network */}
-              <ProjectNetwork relationships={relationships || []} />
+              {/* Enhanced Network Visualization */}
+              <RelationshipNetworkChart relationships={relationships || []} />
+              
+              {/* Legacy Project Network (as backup) */}
+              {/* <ProjectNetwork relationships={relationships || []} /> */}
               
               {/* AI Insights */}
               <AIInsights
