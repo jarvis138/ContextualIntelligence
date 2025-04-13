@@ -8,25 +8,45 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, AlertCircle, Search, FileText, Network } from "lucide-react";
 import ContextGraph from "@/components/nlp/ContextGraph";
-import DocumentSummary from "@/components/nlp/DocumentSummary";
+import DocumentSummary, { DocumentSummaryData } from "@/components/nlp/DocumentSummary";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/queryClient";
 import * as nlpService from "@/lib/nlpService";
 
+interface ProjectType {
+  id: number;
+  name: string;
+  description: string;
+  status: string;
+  progress: number;
+}
+
+interface DocumentType {
+  id: number;
+  title: string;
+  content: string | null;
+  fileType: string;
+  projectId: number;
+  createdBy: number;
+  updatedBy: number;
+  updatedAt: string;
+}
+
 const ProjectInsights = () => {
-  const { projectId } = useParams();
+  const params = useParams();
+  const projectId = params.projectId || "";
   const id = parseInt(projectId);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   
   // Fetch project data
-  const { data: project, isLoading: isLoadingProject } = useQuery({
+  const { data: project, isLoading: isLoadingProject } = useQuery<ProjectType>({
     queryKey: ['/api/projects', id],
     enabled: !isNaN(id)
   });
   
   // Fetch documents for the project
-  const { data: documents, isLoading: isLoadingDocuments } = useQuery({
+  const { data: documents, isLoading: isLoadingDocuments } = useQuery<DocumentType[]>({
     queryKey: ['/api/projects', id, 'documents'],
     enabled: !isNaN(id)
   });
@@ -36,11 +56,13 @@ const ProjectInsights = () => {
     data: graphData,
     isLoading: isLoadingGraph,
     error: graphError
-  } = useQuery({
+  } = useQuery<nlpService.GraphData>({
     queryKey: ['/api/projects', id, 'context-graph'],
     queryFn: async () => {
-      if (isNaN(id)) return null;
-      return nlpService.generateContextGraph(id);
+      if (isNaN(id)) throw new Error("Invalid project ID");
+      const result = await nlpService.generateContextGraph(id);
+      if (!result) throw new Error("Failed to generate context graph");
+      return result;
     },
     enabled: !isNaN(id)
   });
@@ -50,11 +72,13 @@ const ProjectInsights = () => {
     data: documentSummary,
     isLoading: isLoadingSummary,
     error: summaryError
-  } = useQuery({
+  } = useQuery<DocumentSummaryData>({
     queryKey: ['/api/documents', selectedDocumentId, 'summary'],
     queryFn: async () => {
-      if (!selectedDocumentId) return null;
-      return nlpService.summarizeDocument(selectedDocumentId);
+      if (!selectedDocumentId) throw new Error("No document selected");
+      const result = await nlpService.summarizeDocument(selectedDocumentId);
+      if (!result) throw new Error("Failed to generate document summary");
+      return result;
     },
     enabled: selectedDocumentId !== null
   });
@@ -64,7 +88,7 @@ const ProjectInsights = () => {
     data: searchResults,
     isLoading: isSearching,
     error: searchError
-  } = useQuery({
+  } = useQuery<nlpService.SearchResult[]>({
     queryKey: ['/api/projects', id, 'search', searchQuery],
     queryFn: async () => {
       if (isNaN(id) || !searchQuery.trim()) return [];
