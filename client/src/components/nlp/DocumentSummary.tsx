@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Entity } from "../services/nlp";
+export interface Entity {
+  name: string;
+  type: string;
+  confidence: number;
+  start?: number;
+  end?: number;
+  metadata?: Record<string, any>;
+}
 
 export interface DocumentSummaryData {
   summary: string;
