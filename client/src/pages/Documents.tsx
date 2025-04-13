@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getRecentDocuments } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 import Sidebar from '@/components/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export default function Documents() {
   const { toast } = useToast();
+  const [_, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   
   const { data: documents, isLoading } = useQuery({
@@ -138,10 +140,10 @@ export default function Documents() {
                   {filteredDocuments?.map(document => (
                     <Card key={document.id} className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardContent className="p-0">
-                        <div className="p-4 cursor-pointer" onClick={() => toast({ 
-                          title: "Open Document", 
-                          description: `Opening ${document.title}`
-                        })}>
+                        <div 
+                          className="p-4 cursor-pointer" 
+                          onClick={() => navigate(`/documents/${document.id}`)}
+                        >
                           <div className="flex items-start space-x-3">
                             <div className={`w-12 h-12 rounded flex items-center justify-center ${getDocumentIconColor(document.fileType)}`}>
                               <i className={`${getDocumentIcon(document.fileType)} text-xl`}></i>

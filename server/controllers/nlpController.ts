@@ -215,71 +215,20 @@ export async function semanticSearch(req: Request, res: Response) {
 export async function processDocument(req: Request, res: Response) {
   try {
     const documentId = parseInt(req.params.documentId);
+    const userId = req.body.userId || 1;
     
-    // Check if document exists
-    const document = await storage.getDocument(documentId);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found"
-      });
-    }
+    // Process document using the enhanced document processor service
+    const processingResult = await processDocumentService(documentId, userId);
     
-    // Step 1: Generate summary with entities
-    const summary = await nlpService.summarizeDocument(documentId);
-    
-    if (!summary) {
+    if (!processingResult.success) {
       return res.status(400).json({
         success: false,
-        message: "Could not process document"
+        message: processingResult.message || "Could not process document"
       });
     }
     
-    // Step 2: Create relationships from extracted entities
-    if (summary.entities.length > 0) {
-      for (const entity of summary.entities) {
-        // Only create relationships for high confidence entities
-        if (entity.confidence < 0.7) continue;
-        
-        if (entity.type === 'task' || entity.type === 'action_item') {
-          // Create task from entity
-          const task = await storage.createTask({
-            title: entity.name,
-            description: `Task extracted from document "${document.title}"`,
-            status: "pending",
-            projectId: document.projectId,
-            assigneeId: null,
-            dueDate: null,
-          });
-          
-          // Create relationship between document and task
-          await storage.createRelationship({
-            sourceType: "document",
-            sourceId: documentId,
-            targetType: "task",
-            targetId: task.id,
-            strength: Math.round(entity.confidence * 10),
-            description: "contains_task"
-          });
-        }
-      }
-    }
-    
-    // Record activity
-    await storage.createActivity({
-      type: "ai",
-      description: `Processed document: ${document.title}`,
-      userId: req.body.userId || 1,
-      projectId: document.projectId,
-      entityType: "document",
-      entityId: documentId
-    });
-    
-    res.json({
-      success: true,
-      summary,
-      entitiesProcessed: summary.entities.length
-    });
+    // Return the processing result
+    res.json(processingResult);
   } catch (error: any) {
     console.error("Document processing error:", error);
     res.status(500).json({
