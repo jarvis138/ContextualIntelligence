@@ -19,7 +19,14 @@ import {
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
-import { testSlackIntegration, sendProjectUpdate, sendProjectInsight } from "./services/slack";
+import { 
+  testSlackIntegration, 
+  sendProjectUpdate, 
+  sendProjectInsight, 
+  verifySlackToken, 
+  getSlackChannels,
+  extractProjectDataFromSlack
+} from "./services/slack";
 import * as openaiService from "./services/openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -432,6 +439,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const success = await storage.deleteIntegration(id);
     if (!success) return res.status(404).json({ message: "Integration not found" });
     res.status(204).send();
+  });
+  
+  // Slack integration specific routes
+  router.post("/integrations/slack/verify", async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ success: false, message: "Slack token is required" });
+      }
+      
+      const result = await verifySlackToken(token);
+      
+      if (!result.ok) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid Slack token",
+          error: result.error 
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to verify Slack token",
+        error: error.message
+      });
+    }
+  });
+  
+  router.post("/integrations/slack/channels", async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ success: false, message: "Slack token is required" });
+      }
+      
+      const channels = await getSlackChannels(token);
+      
+      if (!channels) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Failed to fetch Slack channels" 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        channels: channels.map(channel => ({
+          id: channel.id,
+          name: channel.name,
+          is_private: channel.is_private,
+          is_member: channel.is_member,
+          num_members: channel.num_members,
+        }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch Slack channels",
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/integrations/slack/extract", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { channelId } = req.body;
+      
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
+      if (!channelId) {
+        return res.status(400).json({ success: false, message: "Channel ID is required" });
+      }
+      
+      const result = await extractProjectDataFromSlack(req.user.id, projectId, channelId);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Failed to extract data from Slack",
+          error: result.error 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully processed ${result.count} messages from Slack`
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to extract data from Slack",
+        error: error.message 
+      });
+    }
   });
 
   // Insight routes
