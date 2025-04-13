@@ -1021,12 +1021,42 @@ export class DatabaseStorage implements IStorage {
 
   // Documents
   async getDocument(id: number): Promise<Document | undefined> {
-    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    const [document] = await db.select({
+        id: documents.id,
+        title: documents.title,
+        content: documents.content,
+        fileType: documents.fileType,
+        projectId: documents.projectId,
+        createdBy: documents.createdBy,
+        updatedBy: documents.updatedBy,
+        // sourceUrl column doesn't exist in the actual database
+        embeddings: documents.embeddings,
+        tags: documents.tags,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt
+    })
+    .from(documents)
+    .where(eq(documents.id, id));
     return document || undefined;
   }
 
   async getDocuments(projectId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.projectId, projectId));
+    return await db.select({
+        id: documents.id,
+        title: documents.title,
+        content: documents.content,
+        fileType: documents.fileType,
+        projectId: documents.projectId,
+        createdBy: documents.createdBy,
+        updatedBy: documents.updatedBy,
+        // sourceUrl column doesn't exist in the actual database
+        embeddings: documents.embeddings,
+        tags: documents.tags,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt
+    })
+    .from(documents)
+    .where(eq(documents.projectId, projectId));
   }
 
   async getRecentDocuments(limit: number): Promise<Document[]> {
@@ -1039,7 +1069,7 @@ export class DatabaseStorage implements IStorage {
         projectId: documents.projectId,
         createdBy: documents.createdBy,
         updatedBy: documents.updatedBy,
-        sourceUrl: documents.sourceUrl,
+        // sourceUrl column doesn't exist in the actual database
         embeddings: documents.embeddings,
         tags: documents.tags,
         createdAt: documents.createdAt,

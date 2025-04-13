@@ -258,8 +258,6 @@ export const documents = pgTable("documents", {
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   createdBy: integer("created_by").notNull().references(() => users.id),
   updatedBy: integer("updated_by").notNull().references(() => users.id),
-  // parentDocumentId column doesn't exist in the actual database
-  sourceUrl: text("source_url"),
   embeddings: jsonb("embeddings"), // For semantic search
   tags: text("tags").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
