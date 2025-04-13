@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as nlpService from "../services/nlp";
+import { processDocument as processDocumentService } from "../services/documentProcessor";
 import { storage } from "../storage";
 
 /**
