@@ -14,7 +14,7 @@ export const activityTypeEnum = pgEnum("activity_type", ["create", "update", "de
 export const integrationTypeEnum = pgEnum("integration_type", ["slack", "github", "jira", "google", "microsoft", "trello", "asana", "custom"]);
 export const insightTypeEnum = pgEnum("insight_type", ["warning", "info", "success", "alert"]);
 
-// User schema
+// User schema - modified to match actual database structure
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: varchar("username", { length: 50 }).notNull().unique(),
@@ -25,8 +25,7 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("user"),
   authMethod: authMethodEnum("auth_method").notNull().default("local"),
   externalId: varchar("external_id", { length: 255 }),  // External provider ID
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // createdAt and updatedAt columns don't exist in the actual database
 }, (table) => {
   return {
     emailIdx: index("user_email_idx").on(table.email),
@@ -126,13 +125,12 @@ export const teamsRelations = relations(teams, ({ many }) => ({
   // Leader relation removed because leaderId column doesn't exist in the actual database
 }));
 
-// Team members schema
+// Team members schema - updated to match actual database structure
 export const teamMembers = pgTable("team_members", {
   id: serial("id").primaryKey(),
   teamId: integer("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  role: varchar("role", { length: 50 }),
-  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  // 'role' and 'joined_at' columns don't exist in the actual database
 }, (table) => {
   return {
     teamUserIdx: uniqueIndex("team_user_idx").on(table.teamId, table.userId),
@@ -359,21 +357,20 @@ export const integrationsRelations = relations(integrations, ({ one }) => ({
 // AI Insights schema
 export const insights = pgTable("insights", {
   id: serial("id").primaryKey(),
-  type: insightTypeEnum("type").notNull(),
+  type: text("type").notNull(), // Changed from enum to text based on actual schema
   content: text("content").notNull(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  entityType: entityTypeEnum("entity_type"),
-  entityId: integer("entity_id"),
+  // entity_type and entity_id columns don't exist in the actual database
   confidence: integer("confidence").notNull().default(100),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // metadata doesn't exist in the actual database
+  timestamp: timestamp("timestamp").notNull().defaultNow(), // Using timestamp instead of createdAt/updatedAt
+  // createdAt and updatedAt don't exist in the actual database
 }, (table) => {
   return {
     projectIdx: index("insight_project_idx").on(table.projectId),
     typeIdx: index("insight_type_idx").on(table.type),
-    entityIdx: index("insight_entity_idx").on(table.entityType, table.entityId),
-    createdAtIdx: index("insight_created_at_idx").on(table.createdAt),
+    // entityIdx removed as these columns don't exist
+    timestampIdx: index("insight_timestamp_idx").on(table.timestamp),
   };
 });
 
@@ -458,8 +455,7 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 // Export insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  // No createdAt or updatedAt to omit because they don't exist in the schema
 });
 
 export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).omit({
@@ -482,7 +478,7 @@ export const insertTeamSchema = createInsertSchema(teams).omit({
 
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
   id: true,
-  joinedAt: true,
+  // No joinedAt field to omit since it doesn't exist in the actual schema
 });
 
 export const insertProjectTeamSchema = createInsertSchema(projectTeams).omit({
@@ -519,8 +515,7 @@ export const insertIntegrationSchema = createInsertSchema(integrations).omit({
 
 export const insertInsightSchema = createInsertSchema(insights).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  timestamp: true,
 });
 
 export const insertRelationshipSchema = createInsertSchema(relationships).omit({

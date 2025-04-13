@@ -1163,11 +1163,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInsights(projectId: number): Promise<Insight[]> {
-    return await db.select().from(insights).where(eq(insights.projectId, projectId));
+    return await db.select({
+      id: insights.id,
+      type: insights.type,
+      content: insights.content,
+      projectId: insights.projectId,
+      confidence: insights.confidence,
+      timestamp: insights.timestamp,
+      // entityType and entityId don't exist in the actual database
+    }).from(insights).where(eq(insights.projectId, projectId));
   }
 
   async createInsight(insertInsight: InsertInsight): Promise<Insight> {
-    const [insight] = await db.insert(insights).values(insertInsight).returning();
+    // Validate that insertInsight only contains fields that exist in the actual database
+    const validInsight = {
+      type: insertInsight.type,
+      content: insertInsight.content,
+      projectId: insertInsight.projectId,
+      confidence: insertInsight.confidence || 100,
+      // Don't include timestamp as it's handled by the default value
+    };
+    
+    const [insight] = await db.insert(insights).values(validInsight).returning();
     return insight;
   }
 

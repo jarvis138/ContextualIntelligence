@@ -467,7 +467,7 @@ export async function generateInsights(projectId: number): Promise<any[]> {
     
     // Activity insights
     const recentActivityCount = activities.filter(a => {
-      const activityDate = new Date(a.createdAt || a.timestamp); // Use timestamp if createdAt is not available
+      const activityDate = new Date(a.timestamp); // Activity uses timestamp, not createdAt
       const daysDiff = (Date.now() - activityDate.getTime()) / (1000 * 60 * 60 * 24);
       return daysDiff < 7;
     }).length;
@@ -526,7 +526,7 @@ export async function analyzeProjectData(projectId: number): Promise<any> {
     
     // Calculate activity trends
     const activityByDay = activities.reduce((acc, activity) => {
-      const date = new Date(activity.createdAt || activity.timestamp).toISOString().split('T')[0];
+      const date = new Date(activity.timestamp).toISOString().split('T')[0];
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
