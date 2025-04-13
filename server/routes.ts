@@ -679,6 +679,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OpenAI Integration routes
+  router.post("/integrations/openai/test", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      
+      if (!apiKey) {
+        return res.status(400).json({ 
+          valid: false, 
+          message: "API key is required" 
+        });
+      }
+      
+      const testResult = await openaiService.testApiKey(apiKey);
+      
+      if (testResult.valid) {
+        // If test is successful, create or update integration
+        if (req.body.userId) {
+          const userId = parseInt(req.body.userId);
+          const existingIntegrations = await storage.getIntegrations(userId);
+          const openaiIntegration = existingIntegrations.find(i => i.type === 'openai');
+          
+          if (openaiIntegration) {
+            // Update existing integration
+            await storage.updateIntegration(openaiIntegration.id, {
+              config: {
+                apiKey
+              },
+              active: true
+            });
+          } else {
+            // Create new integration
+            await storage.createIntegration({
+              name: "OpenAI Integration",
+              type: "openai",
+              active: true,
+              userId,
+              config: {
+                apiKey
+              }
+            });
+          }
+        }
+      }
+      
+      return res.json(testResult);
+    } catch (error: any) {
+      console.error("OpenAI API key test error:", error);
+      return res.status(500).json({ 
+        valid: false, 
+        message: "Error testing OpenAI API key", 
+        error: error?.message || 'Unknown error' 
+      });
+    }
+  });
+
+  router.post("/openai/summarize", authenticateToken, async (req, res) => {
+    try {
+      const { text, maxLength = 300 } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ success: false, message: "Text is required" });
+      }
+      
+      const summary = await openaiService.summarizeText(text, maxLength);
+      
+      res.json({ success: true, summary });
+    } catch (error: any) {
+      console.error("OpenAI summarize error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error summarizing text", 
+        error: error?.message || 'Unknown error'
+      });
+    }
+  });
+
+  router.post("/openai/analyze-sentiment", authenticateToken, async (req, res) => {
+    try {
+      const { text } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ success: false, message: "Text is required" });
+      }
+      
+      const sentiment = await openaiService.analyzeSentiment(text);
+      
+      res.json({ success: true, ...sentiment });
+    } catch (error: any) {
+      console.error("OpenAI sentiment analysis error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error analyzing sentiment", 
+        error: error?.message || 'Unknown error'
+      });
+    }
+  });
+
+  router.post("/projects/:projectId/openai/insights", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const project = await storage.getProject(projectId);
+      
+      if (!project) {
+        return res.status(404).json({ success: false, message: "Project not found" });
+      }
+      
+      // Get all relevant project data
+      const tasks = await storage.getTasks(projectId);
+      const documents = await storage.getDocuments(projectId);
+      const activities = await storage.getActivities(projectId, 20);
+      
+      // Generate insights
+      const insights = await openaiService.generateProjectInsights(
+        project,
+        tasks,
+        documents,
+        activities
+      );
+      
+      // Save insights to database
+      const savedInsights = await Promise.all(
+        insights.map(insight => storage.createInsight({
+          projectId,
+          type: insight.type,
+          content: insight.content,
+          confidence: insight.confidence,
+          source: insight.source || "AI Analysis",
+          createdAt: new Date()
+        }))
+      );
+      
+      // Record the activity
+      await storage.createActivity({
+        type: "ai",
+        description: "Generated AI insights for project",
+        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        projectId,
+        entityType: "project",
+        entityId: projectId
+      });
+      
+      res.json({ 
+        success: true,
+        insights: savedInsights 
+      });
+    } catch (error: any) {
+      console.error("OpenAI insights error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error generating insights", 
+        error: error?.message || 'Unknown error'
+      });
+    }
+  });
+
   // Dashboard data route - combined endpoint for dashboard data
   router.get("/projects/:projectId/dashboard", async (req, res) => {
     const projectId = parseInt(req.params.projectId);
