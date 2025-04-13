@@ -96,8 +96,13 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
   // Process document mutation
   const processDocumentMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/documents/${documentId}/process`);
-      return await res.json();
+      try {
+        const res = await apiRequest("POST", `/api/documents/${documentId}/process`);
+        return await res.json();
+      } catch (error) {
+        console.error("Error processing document:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -118,7 +123,7 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Processing failed",
         description: error.message || "An error occurred while processing the document",
