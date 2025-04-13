@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ type IntegrationLink = {
   name: string;
   icon: string;
   bgColor: string;
+  integrationPath?: string; // Optional specific path for this integration
 };
 
 const navigationLinks: SidebarLink[] = [
@@ -29,46 +30,45 @@ const navigationLinks: SidebarLink[] = [
 ];
 
 const integrationLinks: IntegrationLink[] = [
-  { name: "Trello", icon: "ri-trello-line", bgColor: "bg-blue-500" },
-  { name: "Jira", icon: "ri-jira-line", bgColor: "bg-blue-600" },
-  { name: "Slack", icon: "ri-slack-line", bgColor: "bg-purple-500" },
-  { name: "G Suite", icon: "ri-google-line", bgColor: "bg-yellow-500" },
+  { name: "Trello", icon: "ri-trello-line", bgColor: "bg-blue-500", integrationPath: "/integrations/trello" },
+  { name: "Jira", icon: "ri-jira-line", bgColor: "bg-blue-600", integrationPath: "/integrations/jira" },
+  { name: "Slack", icon: "ri-slack-line", bgColor: "bg-purple-500", integrationPath: "/integrations/slack" },
+  { name: "G Suite", icon: "ri-google-line", bgColor: "bg-yellow-500", integrationPath: "/integrations/gsuite" },
 ];
 
 export default function Sidebar({ user }: SidebarProps) {
   const [location] = useLocation();
 
-  const navigateTo = (path: string) => {
-    window.location.href = path;
-  };
-
   return (
     <aside className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-            <i className="ri-bubble-chart-fill text-white"></i>
-          </div>
-          <h1 className="text-lg font-semibold text-gray-800">CPI Hub</h1>
-        </div>
+        <Link href="/">
+          <a className="flex items-center space-x-2 cursor-pointer">
+            <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+              <i className="ri-bubble-chart-fill text-white"></i>
+            </div>
+            <h1 className="text-lg font-semibold text-gray-800">CPI Hub</h1>
+          </a>
+        </Link>
       </div>
       
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-1">
           {navigationLinks.map((link) => (
             <li key={link.href}>
-              <button
-                onClick={() => navigateTo(link.href)}
-                className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
-                  location === link.href 
-                    ? "bg-primary bg-opacity-10 text-primary" 
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-              >
-                <i className={cn(link.icon, "mr-3 text-lg")}></i>
-                {link.label}
-              </button>
+              <Link href={link.href}>
+                <a
+                  className={cn(
+                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer",
+                    location === link.href 
+                      ? "bg-primary bg-opacity-10 text-primary" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <i className={cn(link.icon, "mr-3 text-lg")}></i>
+                  {link.label}
+                </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -80,15 +80,17 @@ export default function Sidebar({ user }: SidebarProps) {
           <ul className="mt-2 space-y-1">
             {integrationLinks.map((integration) => (
               <li key={integration.name}>
-                <button
-                  onClick={() => navigateTo("/integrations")}
-                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer"
-                >
-                  <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
-                    <i className={cn(integration.icon, "text-sm")}></i>
-                  </span>
-                  {integration.name}
-                </button>
+                <Link href={integration.integrationPath || "/integrations"}>
+                  <a
+                    className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer"
+                    data-integration-name={integration.name.toLowerCase()}
+                  >
+                    <span className={cn("w-6 h-6 mr-3 rounded flex items-center justify-center text-white", integration.bgColor)}>
+                      <i className={cn(integration.icon, "text-sm")}></i>
+                    </span>
+                    {integration.name}
+                  </a>
+                </Link>
               </li>
             ))}
           </ul>

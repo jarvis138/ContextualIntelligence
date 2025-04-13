@@ -29,6 +29,10 @@ function Router() {
       <Route path="/conversations" component={Conversations} />
       <Route path="/search" component={Search} />
       <Route path="/integrations" component={Integrations} />
+      <Route path="/integrations/trello" component={Integrations} />
+      <Route path="/integrations/jira" component={Integrations} />
+      <Route path="/integrations/slack" component={Integrations} />
+      <Route path="/integrations/gsuite" component={Integrations} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
