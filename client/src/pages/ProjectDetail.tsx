@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, ArrowLeft, Calendar, Clock, Download, Users, Share } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, Clock, Download, Users, Share, Brain, Lightbulb } from 'lucide-react';
 import { SlackDataExtractor } from '@/components/integrations/SlackDataExtractor';
 import { SlackShareDialog } from '@/components/integrations/SlackShareDialog';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -192,6 +192,12 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
                 disabled={!slackIntegration}
               >
                 <Share className="mr-2 h-4 w-4" /> Share to Slack
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLocation(`/projects/${projectId}/insights`)}
+              >
+                <Lightbulb className="mr-2 h-4 w-4" /> Project Insights
               </Button>
               <Button>
                 <Users className="mr-2 h-4 w-4" /> Manage Team
