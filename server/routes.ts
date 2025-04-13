@@ -19,6 +19,102 @@ import { analyzeProjectData, generateInsights } from "./services/nlp";
 import { fetchExternalProjectData } from "./services/integrations";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Create initial demo data if the database is empty
+  const createInitialData = async () => {
+    const projects = await storage.getProjects();
+    
+    if (projects.length === 0) {
+      console.log("Creating initial demo data...");
+      
+      // Create demo user
+      const user = await storage.createUser({
+        username: "demo",
+        password: "password",
+        fullName: "Demo User",
+        email: "demo@example.com",
+        role: "admin",
+        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+      });
+      
+      // Create demo project
+      const project = await storage.createProject({
+        name: "Web Application Redesign",
+        description: "Redesign of the company's web application with improved UX/UI and functionality",
+        status: "active",
+        progress: 67
+      });
+      
+      // Create demo teams
+      const frontendTeam = await storage.createTeam({
+        name: "Frontend Team",
+        description: "Responsible for UI development",
+        icon: "ri-code-s-slash-line",
+        progress: 85
+      });
+      
+      const backendTeam = await storage.createTeam({
+        name: "Backend Team",
+        description: "Responsible for API and database",
+        icon: "ri-database-2-line",
+        progress: 43
+      });
+      
+      // Create demo tasks
+      await storage.createTask({
+        title: "Design system implementation",
+        description: "Implement the new design system components",
+        status: "in_progress",
+        assigneeId: user.id,
+        projectId: project.id,
+        teamId: frontendTeam.id,
+        dueDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000))
+      });
+      
+      await storage.createTask({
+        title: "API refactoring",
+        description: "Refactor API endpoints for better performance",
+        status: "pending",
+        assigneeId: user.id,
+        projectId: project.id,
+        teamId: backendTeam.id,
+        dueDate: new Date(Date.now() + (14 * 24 * 60 * 60 * 1000))
+      });
+      
+      // Create demo document
+      await storage.createDocument({
+        title: "Project Requirements",
+        content: "Detailed requirements for the web application redesign",
+        fileType: "text",
+        projectId: project.id,
+        createdBy: user.id,
+        updatedBy: user.id
+      });
+      
+      // Create demo activity
+      await storage.createActivity({
+        type: "create",
+        description: "Project created",
+        userId: user.id,
+        projectId: project.id,
+        entityType: "project",
+        entityId: project.id
+      });
+      
+      // Create demo insight
+      await storage.createInsight({
+        type: "info",
+        content: "Project on track for timely completion",
+        projectId: project.id,
+        confidence: 85
+      });
+      
+      console.log("Initial demo data created successfully");
+    }
+  };
+  
+  // Initialize demo data
+  await createInitialData();
+  
   const router = express.Router();
 
   // User routes

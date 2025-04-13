@@ -10,8 +10,16 @@ import {
   insights, type Insight, type InsertInsight,
   relationships, type Relationship, type InsertRelationship
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
+import connectPg from "connect-pg-simple";
+import session from "express-session";
+import { pool } from "./db";
 
 export interface IStorage {
+  // Session management
+  sessionStore: session.Store;
+  
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -76,6 +84,7 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  sessionStore: session.Store;
   private users: Map<number, User>;
   private projects: Map<number, Project>;
   private teams: Map<number, Team>;
@@ -101,6 +110,12 @@ export class MemStorage implements IStorage {
   };
 
   constructor() {
+    // Create an in-memory session store
+    const MemoryStore = require('memorystore')(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    });
+    
     this.users = new Map();
     this.projects = new Map();
     this.teams = new Map();
@@ -711,4 +726,261 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    const PostgresSessionStore = connectPg(session);
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // Users
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async getUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set(user)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
+  }
+
+  // Projects
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project || undefined;
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return db.select().from(projects);
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const [project] = await db.insert(projects).values(insertProject).returning();
+    return project;
+  }
+
+  async updateProject(id: number, project: Partial<InsertProject>): Promise<Project | undefined> {
+    const [updatedProject] = await db.update(projects)
+      .set(project)
+      .where(eq(projects.id, id))
+      .returning();
+    return updatedProject || undefined;
+  }
+
+  // Teams
+  async getTeam(id: number): Promise<Team | undefined> {
+    const [team] = await db.select().from(teams).where(eq(teams.id, id));
+    return team || undefined;
+  }
+
+  async getTeams(): Promise<Team[]> {
+    return db.select().from(teams);
+  }
+
+  async getTeamsByProject(projectId: number): Promise<Team[]> {
+    // In a real implementation, we would have a teams_projects relationship table
+    // For this demo, we'll just return all teams
+    return this.getTeams();
+  }
+
+  async createTeam(insertTeam: InsertTeam): Promise<Team> {
+    const [team] = await db.insert(teams).values(insertTeam).returning();
+    return team;
+  }
+
+  async updateTeam(id: number, team: Partial<InsertTeam>): Promise<Team | undefined> {
+    const [updatedTeam] = await db.update(teams)
+      .set(team)
+      .where(eq(teams.id, id))
+      .returning();
+    return updatedTeam || undefined;
+  }
+
+  // Team Members
+  async getTeamMember(id: number): Promise<TeamMember | undefined> {
+    const [teamMember] = await db.select().from(teamMembers).where(eq(teamMembers.id, id));
+    return teamMember || undefined;
+  }
+
+  async getTeamMembers(teamId: number): Promise<TeamMember[]> {
+    return db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+  }
+
+  async createTeamMember(insertTeamMember: InsertTeamMember): Promise<TeamMember> {
+    const [teamMember] = await db.insert(teamMembers).values(insertTeamMember).returning();
+    return teamMember;
+  }
+
+  async deleteTeamMember(id: number): Promise<boolean> {
+    const result = await db.delete(teamMembers).where(eq(teamMembers.id, id));
+    return true; // We don't actually get a boolean back from drizzle
+  }
+
+  // Tasks
+  async getTask(id: number): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task || undefined;
+  }
+
+  async getTasks(projectId: number): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+  }
+
+  async getTasksByTeam(teamId: number): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.teamId, teamId));
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const [task] = await db.insert(tasks).values(insertTask).returning();
+    return task;
+  }
+
+  async updateTask(id: number, task: Partial<InsertTask>): Promise<Task | undefined> {
+    const [updatedTask] = await db.update(tasks)
+      .set(task)
+      .where(eq(tasks.id, id))
+      .returning();
+    return updatedTask || undefined;
+  }
+
+  // Documents
+  async getDocument(id: number): Promise<Document | undefined> {
+    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    return document || undefined;
+  }
+
+  async getDocuments(projectId: number): Promise<Document[]> {
+    return db.select().from(documents).where(eq(documents.projectId, projectId));
+  }
+
+  async getRecentDocuments(limit: number): Promise<Document[]> {
+    return db
+      .select()
+      .from(documents)
+      .orderBy(desc(documents.updatedAt))
+      .limit(limit);
+  }
+
+  async createDocument(insertDocument: InsertDocument): Promise<Document> {
+    const [document] = await db.insert(documents).values(insertDocument).returning();
+    return document;
+  }
+
+  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
+    const [updatedDocument] = await db.update(documents)
+      .set(document)
+      .where(eq(documents.id, id))
+      .returning();
+    return updatedDocument || undefined;
+  }
+
+  // Activities
+  async getActivity(id: number): Promise<Activity | undefined> {
+    const [activity] = await db.select().from(activities).where(eq(activities.id, id));
+    return activity || undefined;
+  }
+
+  async getActivities(projectId: number, limit?: number): Promise<Activity[]> {
+    const query = db
+      .select()
+      .from(activities)
+      .where(eq(activities.projectId, projectId))
+      .orderBy(desc(activities.timestamp));
+    
+    if (limit) {
+      return query.limit(limit);
+    }
+    
+    return query;
+  }
+
+  async createActivity(insertActivity: InsertActivity): Promise<Activity> {
+    const [activity] = await db.insert(activities).values(insertActivity).returning();
+    return activity;
+  }
+
+  // Integrations
+  async getIntegration(id: number): Promise<Integration | undefined> {
+    const [integration] = await db.select().from(integrations).where(eq(integrations.id, id));
+    return integration || undefined;
+  }
+
+  async getIntegrations(userId: number): Promise<Integration[]> {
+    return db.select().from(integrations).where(eq(integrations.userId, userId));
+  }
+
+  async createIntegration(insertIntegration: InsertIntegration): Promise<Integration> {
+    const [integration] = await db.insert(integrations).values(insertIntegration).returning();
+    return integration;
+  }
+
+  async updateIntegration(id: number, integration: Partial<InsertIntegration>): Promise<Integration | undefined> {
+    const [updatedIntegration] = await db.update(integrations)
+      .set(integration)
+      .where(eq(integrations.id, id))
+      .returning();
+    return updatedIntegration || undefined;
+  }
+
+  async deleteIntegration(id: number): Promise<boolean> {
+    const result = await db.delete(integrations).where(eq(integrations.id, id));
+    return true;
+  }
+
+  // Insights
+  async getInsight(id: number): Promise<Insight | undefined> {
+    const [insight] = await db.select().from(insights).where(eq(insights.id, id));
+    return insight || undefined;
+  }
+
+  async getInsights(projectId: number): Promise<Insight[]> {
+    return db.select().from(insights).where(eq(insights.projectId, projectId));
+  }
+
+  async createInsight(insertInsight: InsertInsight): Promise<Insight> {
+    const [insight] = await db.insert(insights).values(insertInsight).returning();
+    return insight;
+  }
+
+  // Relationships
+  async getRelationship(id: number): Promise<Relationship | undefined> {
+    const [relationship] = await db.select().from(relationships).where(eq(relationships.id, id));
+    return relationship || undefined;
+  }
+
+  async getRelationships(projectId: number): Promise<Relationship[]> {
+    return db
+      .select()
+      .from(relationships)
+      .where(eq(relationships.sourceId, projectId));
+  }
+
+  async createRelationship(insertRelationship: InsertRelationship): Promise<Relationship> {
+    const [relationship] = await db.insert(relationships).values(insertRelationship).returning();
+    return relationship;
+  }
+}
+
+// Use DatabaseStorage instead of MemStorage
+export const storage = new DatabaseStorage();

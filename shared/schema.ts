@@ -128,6 +128,7 @@ export const insertActivitySchema = createInsertSchema(activities).pick({
   projectId: true,
   entityType: true,
   entityId: true,
+  timestamp: true,
 });
 
 // Integrations schema
