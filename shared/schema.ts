@@ -6,11 +6,26 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),  // Making password optional to support OAuth
   fullName: text("full_name").notNull(),
   email: text("email").notNull(),
   avatar: text("avatar"),
   role: text("role").notNull().default("user"),
+  authMethod: text("auth_method").notNull().default("local"),  // 'local', 'google', 'microsoft', 'slack'
+  externalId: text("external_id"),  // External provider ID
+});
+
+// OAuth provider tokens
+export const oauthTokens = pgTable("oauth_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  provider: text("provider").notNull(),  // 'google', 'microsoft', 'slack'
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  tokenData: jsonb("token_data"),  // Additional token data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -20,6 +35,17 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   avatar: true,
   role: true,
+  authMethod: true,
+  externalId: true,
+});
+
+export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).pick({
+  userId: true,
+  provider: true,
+  accessToken: true,
+  refreshToken: true,
+  expiresAt: true,
+  tokenData: true,
 });
 
 // Project schema

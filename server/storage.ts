@@ -1,5 +1,7 @@
+import { z } from 'zod';
 import {
   users, type User, type InsertUser,
+  oauthTokens, insertOAuthTokenSchema,
   projects, type Project, type InsertProject,
   teams, type Team, type InsertTeam,
   teamMembers, type TeamMember, type InsertTeamMember,
@@ -23,9 +25,15 @@ export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByExternalId(externalId: string, provider: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  
+  // OAuth Tokens
+  saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any>;
+  getOAuthToken(userId: number, provider: string): Promise<any | undefined>;
+  deleteOAuthToken(userId: number, provider: string): Promise<boolean>;
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
