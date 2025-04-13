@@ -1,13 +1,31 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trello, ListChecks, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 
 interface JiraIntegrationDialogProps {
   isOpen: boolean;
@@ -16,217 +34,273 @@ interface JiraIntegrationDialogProps {
   onSuccess?: () => void;
 }
 
+const jiraFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  type: z.enum(["jira", "trello"]),
+  apiKey: z.string().min(1, "API key is required"),
+  apiToken: z.string().min(1, "API token is required"),
+  domain: z.string().min(1, "Domain is required"),
+  projectKey: z.string().optional(),
+});
+
+type JiraFormValues = z.infer<typeof jiraFormSchema>;
+
 export function JiraIntegrationDialog({
   isOpen,
   onClose,
   userId,
-  onSuccess
+  onSuccess,
 }: JiraIntegrationDialogProps) {
-  const [token, setToken] = useState("");
-  const [domain, setDomain] = useState("");
-  const [email, setEmail] = useState("");
-  const [projectKey, setProjectKey] = useState("");
-  const [serviceType, setServiceType] = useState<"jira" | "trello">("jira");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [serviceType, setServiceType] = useState<"jira" | "trello">("jira");
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/integrations/project-management/test", {
-        token,
-        domain,
-        email: serviceType === "jira" ? email : undefined,
-        projectKey,
-        serviceType,
-        userId
-      });
-      return await res.json();
+  const form = useForm<JiraFormValues>({
+    resolver: zodResolver(jiraFormSchema),
+    defaultValues: {
+      name: "",
+      type: "jira",
+      apiKey: "",
+      apiToken: "",
+      domain: "",
+      projectKey: "",
     },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Integration successful",
-          description: `${serviceType === "jira" ? "Jira" : "Trello"} integration has been successfully configured`,
-          variant: "default",
-        });
-        onSuccess?.();
-        onClose();
-      } else {
-        toast({
-          title: "Integration failed",
-          description: data.message || `Please check your ${serviceType === "jira" ? "Jira" : "Trello"} credentials and settings`,
-          variant: "destructive",
-        });
-      }
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (values: JiraFormValues) => {
+      const res = await apiRequest("POST", `/api/users/${userId}/integrations`, {
+        name: values.name,
+        type: values.type,
+        config: {
+          apiKey: values.apiKey,
+          apiToken: values.apiToken,
+          domain: values.domain,
+          projectKey: values.projectKey || "",
+        },
+        active: true,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Integration added",
+        description: `${serviceType === "jira" ? "Jira" : "Trello"} integration has been successfully added`,
+      });
+      onSuccess?.();
+      onClose();
+      form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Integration failed",
-        description: error.message || `Please check your ${serviceType === "jira" ? "Jira" : "Trello"} credentials and settings`,
+        title: "Error adding integration",
+        description: error.message || "Failed to add integration",
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!token || !domain) {
-      toast({
-        title: "Missing information",
-        description: `Please provide all required ${serviceType === "jira" ? "Jira" : "Trello"} integration details`,
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (serviceType === "jira" && !email) {
-      toast({
-        title: "Missing information",
-        description: "Please provide your Jira email address",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    mutate();
-  };
+  function onSubmit(values: JiraFormValues) {
+    values.type = serviceType;
+    mutation.mutate(values);
+  }
+
+  function handleTabChange(value: string) {
+    setServiceType(value as "jira" | "trello");
+    form.setValue("type", value as "jira" | "trello");
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Connect Project Management Tool</DialogTitle>
+          <DialogTitle>Add Project Management Integration</DialogTitle>
           <DialogDescription>
-            Integrate with Jira or Trello to sync tasks and track work progress.
+            Connect your project management tools to sync tasks and track progress.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-          <div className="grid gap-2">
-            <Label>Service Type</Label>
-            <RadioGroup 
-              value={serviceType} 
-              onValueChange={(value) => setServiceType(value as "jira" | "trello")}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="jira" id="jira" />
-                <Label htmlFor="jira">Jira</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="trello" id="trello" />
-                <Label htmlFor="trello">Trello</Label>
-              </div>
-            </RadioGroup>
-          </div>
+        <Tabs defaultValue="jira" onValueChange={handleTabChange}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="jira">
+              <ListChecks className="mr-2 h-4 w-4" /> Jira
+            </TabsTrigger>
+            <TabsTrigger value="trello">
+              <Trello className="mr-2 h-4 w-4" /> Trello
+            </TabsTrigger>
+          </TabsList>
 
-          {serviceType === "jira" && (
-            <div className="grid gap-2">
-              <Label htmlFor="jira-email" className="text-left">
-                Jira Email Address
-              </Label>
-              <Input
-                id="jira-email"
-                placeholder="your-email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-              />
-              <p className="text-xs text-muted-foreground">
-                The email address used for your Jira account.
-              </p>
-            </div>
-          )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              <TabsContent value="jira">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Integration Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="My Jira Integration" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        A friendly name for this integration
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="grid gap-2">
-            <Label htmlFor="domain" className="text-left">
-              {serviceType === "jira" ? "Jira Domain" : "Trello Team/Board ID"}
-            </Label>
-            <Input
-              id="domain"
-              placeholder={serviceType === "jira" ? "your-company.atlassian.net" : "board-id or team-name"}
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              {serviceType === "jira" 
-                ? "The domain where your Jira instance is hosted." 
-                : "The ID of your Trello board or team name."}
-            </p>
-          </div>
+                <FormField
+                  control={form.control}
+                  name="domain"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Jira Domain</FormLabel>
+                      <FormControl>
+                        <Input placeholder="mycompany.atlassian.net" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Your Jira instance domain (without https://)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="grid gap-2">
-            <Label htmlFor="token" className="text-left">
-              {serviceType === "jira" ? "Jira API Token" : "Trello API Key"}
-            </Label>
-            <Input
-              id="token"
-              placeholder={serviceType === "jira" ? "API token..." : "API key..."}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              type="password"
-              autoComplete="off"
-            />
-            <p className="text-xs text-muted-foreground">
-              {serviceType === "jira" ? (
-                <>
-                  Create a token in 
-                  <a 
-                    href="https://id.atlassian.com/manage/api-tokens" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="ml-1 text-primary hover:underline"
-                  >
-                    Atlassian Account Settings
-                  </a>
-                </>
-              ) : (
-                <>
-                  Get your API key from 
-                  <a 
-                    href="https://trello.com/app-key" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="ml-1 text-primary hover:underline"
-                  >
-                    Trello Developer API Keys
-                  </a>
-                </>
-              )}
-            </p>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="apiKey"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input placeholder="user@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          <div className="grid gap-2">
-            <Label htmlFor="project-key" className="text-left">
-              {serviceType === "jira" ? "Jira Project Key (Optional)" : "Trello Board ID (Optional)"}
-            </Label>
-            <Input
-              id="project-key"
-              placeholder={serviceType === "jira" ? "PROJ" : "board-id"}
-              value={projectKey}
-              onChange={(e) => setProjectKey(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave empty to sync all projects. Specify to limit to a single project.
-            </p>
-          </div>
+                  <FormField
+                    control={form.control}
+                    name="apiToken"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>API Token</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="API Token" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
-                </>
-              ) : (
-                "Connect"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+                <FormField
+                  control={form.control}
+                  name="projectKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Key (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="MYPROJECT" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Leave empty to access all projects you have permission to
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              <TabsContent value="trello">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Integration Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="My Trello Integration" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        A friendly name for this integration
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="apiKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Key</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Trello API Key" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Get your API key from your Trello account settings
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="apiToken"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Token</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Trello API Token" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Generate a token using your API key
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="domain"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Board ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="trello-board-id" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The ID of the Trello board you want to connect
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

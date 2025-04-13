@@ -1,13 +1,32 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Github, GitMerge, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 
 interface GitHubIntegrationDialogProps {
   isOpen: boolean;
@@ -16,179 +35,366 @@ interface GitHubIntegrationDialogProps {
   onSuccess?: () => void;
 }
 
+const gitHubFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  accessToken: z.string().min(1, "Personal access token is required"),
+  repository: z.string().min(1, "Repository is required"),
+  owner: z.string().min(1, "Owner is required"),
+  includeIssues: z.boolean().default(true),
+  includePullRequests: z.boolean().default(true),
+  includeCommits: z.boolean().default(true),
+  type: z.enum(["github", "gitlab"]),
+});
+
+type GitHubFormValues = z.infer<typeof gitHubFormSchema>;
+
 export function GitHubIntegrationDialog({
   isOpen,
   onClose,
   userId,
-  onSuccess
+  onSuccess,
 }: GitHubIntegrationDialogProps) {
-  const [token, setToken] = useState("");
-  const [organization, setOrganization] = useState("");
-  const [repoVisibility, setRepoVisibility] = useState("all");
-  const [serviceType, setServiceType] = useState<"github" | "gitlab">("github");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [serviceType, setServiceType] = useState<"github" | "gitlab">("github");
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/integrations/git/test", {
-        token,
-        organization,
-        serviceType,
-        repoVisibility,
-        userId
-      });
-      return await res.json();
+  const form = useForm<GitHubFormValues>({
+    resolver: zodResolver(gitHubFormSchema),
+    defaultValues: {
+      name: "",
+      accessToken: "",
+      repository: "",
+      owner: "",
+      includeIssues: true,
+      includePullRequests: true,
+      includeCommits: true,
+      type: "github",
     },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Integration successful",
-          description: `${serviceType === "github" ? "GitHub" : "GitLab"} integration has been successfully configured`,
-          variant: "default",
-        });
-        onSuccess?.();
-        onClose();
-      } else {
-        toast({
-          title: "Integration failed",
-          description: data.message || `Please check your ${serviceType === "github" ? "GitHub" : "GitLab"} token and settings`,
-          variant: "destructive",
-        });
-      }
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (values: GitHubFormValues) => {
+      const res = await apiRequest("POST", `/api/users/${userId}/integrations`, {
+        name: values.name,
+        type: values.type,
+        config: {
+          accessToken: values.accessToken,
+          repository: values.repository,
+          owner: values.owner,
+          includeIssues: values.includeIssues,
+          includePullRequests: values.includePullRequests,
+          includeCommits: values.includeCommits,
+        },
+        active: true,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Integration added",
+        description: `${serviceType === "github" ? "GitHub" : "GitLab"} integration has been successfully added`,
+      });
+      onSuccess?.();
+      onClose();
+      form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Integration failed",
-        description: error.message || `Please check your ${serviceType === "github" ? "GitHub" : "GitLab"} token and settings`,
+        title: "Error adding integration",
+        description: error.message || "Failed to add integration",
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!token) {
-      toast({
-        title: "Missing information",
-        description: `Please provide a ${serviceType === "github" ? "GitHub" : "GitLab"} personal access token`,
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    mutate();
-  };
+  function onSubmit(values: GitHubFormValues) {
+    values.type = serviceType;
+    mutation.mutate(values);
+  }
+
+  function handleTabChange(value: string) {
+    setServiceType(value as "github" | "gitlab");
+    form.setValue("type", value as "github" | "gitlab");
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Connect Git Repository</DialogTitle>
+          <DialogTitle>Add Git Repository Integration</DialogTitle>
           <DialogDescription>
-            Link your GitHub or GitLab repositories to track project code and development progress.
+            Connect your code repositories to track activity and gain insights.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-          <div className="grid gap-2">
-            <Label>Service Type</Label>
-            <RadioGroup 
-              value={serviceType} 
-              onValueChange={(value) => setServiceType(value as "github" | "gitlab")}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="github" id="github" />
-                <Label htmlFor="github">GitHub</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="gitlab" id="gitlab" />
-                <Label htmlFor="gitlab">GitLab</Label>
-              </div>
-            </RadioGroup>
-          </div>
+        <Tabs defaultValue="github" onValueChange={handleTabChange}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="github">
+              <Github className="mr-2 h-4 w-4" /> GitHub
+            </TabsTrigger>
+            <TabsTrigger value="gitlab">
+              <GitMerge className="mr-2 h-4 w-4" /> GitLab
+            </TabsTrigger>
+          </TabsList>
 
-          <div className="grid gap-2">
-            <Label htmlFor="git-token" className="text-left">
-              {serviceType === "github" ? "GitHub" : "GitLab"} Personal Access Token
-            </Label>
-            <Input
-              id="git-token"
-              placeholder={serviceType === "github" ? "ghp_..." : "glpat-..."}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              type="password"
-              autoComplete="off"
-            />
-            <p className="text-xs text-muted-foreground">
-              Token requires read access to repositories and webhooks. 
-              <a 
-                href={serviceType === "github" 
-                  ? "https://github.com/settings/tokens" 
-                  : "https://gitlab.com/-/profile/personal_access_tokens"} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="ml-1 text-primary hover:underline"
-              >
-                Create token
-              </a>
-            </p>
-          </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              <TabsContent value="github">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Integration Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="My GitHub Integration" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        A friendly name for this integration
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="grid gap-2">
-            <Label htmlFor="organization" className="text-left">
-              Organization/Username (Optional)
-            </Label>
-            <Input
-              id="organization"
-              placeholder={serviceType === "github" ? "your-org" : "your-group"}
-              value={organization}
-              onChange={(e) => setOrganization(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave empty to access all your repositories.
-            </p>
-          </div>
+                <FormField
+                  control={form.control}
+                  name="accessToken"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Personal Access Token</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="ghp_xxxxxxxxxxxx" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Create a token with 'repo' scope from GitHub Settings &gt; Developer Settings
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="grid gap-2">
-            <Label className="text-left">Repository Visibility</Label>
-            <RadioGroup 
-              value={repoVisibility} 
-              onValueChange={(value) => setRepoVisibility(value)}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="all" id="all" />
-                <Label htmlFor="all">All</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="public" id="public" />
-                <Label htmlFor="public">Public Only</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="private" id="private" />
-                <Label htmlFor="private">Private Only</Label>
-              </div>
-            </RadioGroup>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="owner"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Owner/Organization</FormLabel>
+                        <FormControl>
+                          <Input placeholder="octocat" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
-                </>
-              ) : (
-                "Connect"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+                  <FormField
+                    control={form.control}
+                    name="repository"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Repository</FormLabel>
+                        <FormControl>
+                          <Input placeholder="my-project" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="includeIssues"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Issues</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="includePullRequests"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Pull Requests</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="includeCommits"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Commits</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="gitlab">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Integration Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="My GitLab Integration" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        A friendly name for this integration
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accessToken"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Personal Access Token</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="glpat-xxxxxxxxxxxx" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Create a token with 'read_api' scope from GitLab Settings &gt; Access Tokens
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="owner"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Group/Namespace</FormLabel>
+                        <FormControl>
+                          <Input placeholder="mygroup" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="repository"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project</FormLabel>
+                        <FormControl>
+                          <Input placeholder="my-project" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="includeIssues"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Issues</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="includePullRequests"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Merge Requests</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="includeCommits"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Commits</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

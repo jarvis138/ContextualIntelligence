@@ -51,6 +51,10 @@ interface IntegrationsPanelProps {
 export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
   const [openAIDialogOpen, setOpenAIDialogOpen] = useState(false);
+  const [gitHubDialogOpen, setGitHubDialogOpen] = useState(false);
+  const [jiraDialogOpen, setJiraDialogOpen] = useState(false);
+  const [bitbucketDialogOpen, setBitbucketDialogOpen] = useState(false);
+  const [browserStackDialogOpen, setBrowserStackDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
@@ -94,10 +98,18 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
     switch (type) {
       case "slack":
         return <Slack className="h-6 w-6" />;
+      case "openai":
+        return <Sparkles className="h-6 w-6 text-violet-500" />;
       case "github":
+      case "gitlab":
         return <Github className="h-6 w-6" />;
       case "jira":
+      case "trello":
         return <MessageSquare className="h-6 w-6" />;
+      case "bitbucket":
+        return <GitFork className="h-6 w-6" />;
+      case "browserstack":
+        return <LayoutGrid className="h-6 w-6" />;
       default:
         return <MessageSquare className="h-6 w-6" />;
     }
@@ -194,7 +206,7 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
                   </CardFooter>
                 </Card>
 
-                {/* GitHub Integration Card (Coming soon) */}
+                {/* GitHub Integration Card */}
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
@@ -203,19 +215,23 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
                         Code Repository
                       </Badge>
                     </div>
-                    <CardTitle className="text-lg mt-2">GitHub</CardTitle>
+                    <CardTitle className="text-lg mt-2">GitHub / GitLab</CardTitle>
                     <CardDescription>
-                      Connect your GitHub repositories to track code activity and issues.
+                      Connect your repositories to track code activity, issues, and commits.
                     </CardDescription>
                   </CardHeader>
                   <CardFooter>
-                    <Button className="w-full" variant="outline" disabled>
-                      Coming Soon
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => setGitHubDialogOpen(true)}
+                    >
+                      Connect
                     </Button>
                   </CardFooter>
                 </Card>
 
-                {/* Jira Integration Card (Coming soon) */}
+                {/* Jira Integration Card */}
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
@@ -224,14 +240,68 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
                         Project Management
                       </Badge>
                     </div>
-                    <CardTitle className="text-lg mt-2">Jira</CardTitle>
+                    <CardTitle className="text-lg mt-2">Jira / Trello</CardTitle>
                     <CardDescription>
-                      Connect Jira to sync tasks and track project progress.
+                      Connect project management tools to sync tasks and track progress.
                     </CardDescription>
                   </CardHeader>
                   <CardFooter>
-                    <Button className="w-full" variant="outline" disabled>
-                      Coming Soon
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => setJiraDialogOpen(true)}
+                    >
+                      Connect
+                    </Button>
+                  </CardFooter>
+                </Card>
+                
+                {/* Bitbucket Integration Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <GitFork className="h-6 w-6" />
+                      <Badge variant="outline" className="text-xs">
+                        Version Control
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-lg mt-2">Bitbucket</CardTitle>
+                    <CardDescription>
+                      Connect Bitbucket to track repositories, pull requests, and pipelines.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => setBitbucketDialogOpen(true)}
+                    >
+                      Connect
+                    </Button>
+                  </CardFooter>
+                </Card>
+                
+                {/* BrowserStack Integration Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <LayoutGrid className="h-6 w-6" />
+                      <Badge variant="outline" className="text-xs">
+                        Testing Platform
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-lg mt-2">BrowserStack</CardTitle>
+                    <CardDescription>
+                      Connect BrowserStack to integrate cross-browser testing insights.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => setBrowserStackDialogOpen(true)}
+                    >
+                      Connect
                     </Button>
                   </CardFooter>
                 </Card>
@@ -282,9 +352,34 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
                           size="sm"
                           className="flex-1"
                           onClick={() => {
-                            // For slack, reopen the dialog to update settings
-                            if (integration.type === "slack") {
-                              setSlackDialogOpen(true);
+                            // Reopen the appropriate dialog based on integration type
+                            switch (integration.type) {
+                              case "slack":
+                                setSlackDialogOpen(true);
+                                break;
+                              case "openai":
+                                setOpenAIDialogOpen(true);
+                                break;
+                              case "github":
+                              case "gitlab":
+                                setGitHubDialogOpen(true);
+                                break;
+                              case "jira":
+                              case "trello":
+                                setJiraDialogOpen(true);
+                                break;
+                              case "bitbucket":
+                                setBitbucketDialogOpen(true);
+                                break;
+                              case "browserstack":
+                                setBrowserStackDialogOpen(true);
+                                break;
+                              default:
+                                toast({
+                                  title: "Update not available",
+                                  description: `Updates for ${integration.type} integrations are not supported yet`,
+                                  variant: "default",
+                                });
                             }
                           }}
                         >
@@ -317,6 +412,38 @@ export function IntegrationsPanel({ userId }: IntegrationsPanelProps) {
         open={openAIDialogOpen}
         onOpenChange={setOpenAIDialogOpen}
         userId={userId}
+      />
+      
+      {/* GitHub/GitLab Integration Dialog */}
+      <GitHubIntegrationDialog
+        isOpen={gitHubDialogOpen}
+        onClose={() => setGitHubDialogOpen(false)}
+        userId={userId}
+        onSuccess={handleIntegrationSuccess}
+      />
+      
+      {/* Jira/Trello Integration Dialog */}
+      <JiraIntegrationDialog
+        isOpen={jiraDialogOpen}
+        onClose={() => setJiraDialogOpen(false)}
+        userId={userId}
+        onSuccess={handleIntegrationSuccess}
+      />
+      
+      {/* Bitbucket Integration Dialog */}
+      <BitbucketIntegrationDialog
+        isOpen={bitbucketDialogOpen}
+        onClose={() => setBitbucketDialogOpen(false)}
+        userId={userId}
+        onSuccess={handleIntegrationSuccess}
+      />
+      
+      {/* BrowserStack Integration Dialog */}
+      <BrowserStackIntegrationDialog
+        isOpen={browserStackDialogOpen}
+        onClose={() => setBrowserStackDialogOpen(false)}
+        userId={userId}
+        onSuccess={handleIntegrationSuccess}
       />
 
       {/* Delete Confirmation Dialog */}
