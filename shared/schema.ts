@@ -111,25 +111,19 @@ export const teams = pgTable("teams", {
   description: text("description"),
   icon: text("icon"),
   progress: integer("progress").notNull().default(0),
-  leaderId: integer("leader_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // No leaderId, createdAt, or updatedAt fields in the actual database
 }, (table) => {
   return {
     nameIdx: index("team_name_idx").on(table.name),
-    leaderIdx: index("team_leader_idx").on(table.leaderId),
   };
 });
 
 // Team relations
-export const teamsRelations = relations(teams, ({ many, one }) => ({
+export const teamsRelations = relations(teams, ({ many }) => ({
   members: many(teamMembers),
   tasks: many(tasks),
-  leader: one(users, {
-    fields: [teams.leaderId],
-    references: [users.id],
-  }),
   projectTeams: many(projectTeams),
+  // Leader relation removed because leaderId column doesn't exist in the actual database
 }));
 
 // Team members schema
@@ -264,7 +258,7 @@ export const documents = pgTable("documents", {
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   createdBy: integer("created_by").notNull().references(() => users.id),
   updatedBy: integer("updated_by").notNull().references(() => users.id),
-  parentDocumentId: integer("parent_document_id").references(() => documents.id),
+  // parentDocumentId column doesn't exist in the actual database
   sourceUrl: text("source_url"),
   embeddings: jsonb("embeddings"), // For semantic search
   tags: text("tags").array(),
@@ -297,11 +291,8 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
     references: [users.id],
     relationName: "updater",
   }),
-  parentDocument: one(documents, {
-    fields: [documents.parentDocumentId],
-    references: [documents.id],
-  }),
-  childDocuments: many(documents, { relationName: "childDocuments" }),
+  // parentDocument relation removed since parentDocumentId doesn't exist in database
+  // childDocuments: many(documents, { relationName: "childDocuments" }),
   comments: many(comments, { relationName: "documentComments" }),
   activities: many(activities, { relationName: "documentActivities" }),
 }));

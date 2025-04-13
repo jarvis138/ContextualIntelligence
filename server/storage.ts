@@ -911,12 +911,28 @@ export class DatabaseStorage implements IStorage {
 
   // Teams
   async getTeam(id: number): Promise<Team | undefined> {
-    const [team] = await db.select().from(teams).where(eq(teams.id, id));
+    // Select only columns that exist in the actual database table
+    const [team] = await db.select({
+      id: teams.id,
+      name: teams.name,
+      description: teams.description,
+      icon: teams.icon,
+      progress: teams.progress
+      // No timestamp fields in the actual database
+    }).from(teams).where(eq(teams.id, id));
     return team || undefined;
   }
 
   async getTeams(): Promise<Team[]> {
-    return await db.select().from(teams);
+    // Select only columns that exist in the actual database table
+    return await db.select({
+      id: teams.id,
+      name: teams.name,
+      description: teams.description,
+      icon: teams.icon,
+      progress: teams.progress
+      // No timestamp fields in the actual database
+    }).from(teams);
   }
 
   async getTeamsByProject(projectId: number): Promise<Team[]> {
@@ -926,15 +942,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTeam(insertTeam: InsertTeam): Promise<Team> {
-    const [team] = await db.insert(teams).values(insertTeam).returning();
+    // Make sure we're only inserting fields that actually exist in the database
+    const { leaderId, ...validTeamData } = insertTeam as any; 
+    const [team] = await db.insert(teams).values(validTeamData).returning({
+      id: teams.id,
+      name: teams.name,
+      description: teams.description,
+      icon: teams.icon,
+      progress: teams.progress
+      // No timestamp fields in the actual database
+    });
     return team;
   }
 
-  async updateTeam(id: number, team: Partial<InsertTeam>): Promise<Team | undefined> {
+  async updateTeam(id: number, updateTeam: Partial<InsertTeam>): Promise<Team | undefined> {
+    // Make sure we're only updating fields that actually exist in the database
+    const { leaderId, ...validTeamData } = updateTeam as any;
     const [updatedTeam] = await db.update(teams)
-      .set(team)
+      .set(validTeamData)
       .where(eq(teams.id, id))
-      .returning();
+      .returning({
+        id: teams.id,
+        name: teams.name,
+        description: teams.description,
+        icon: teams.icon,
+        progress: teams.progress
+        // No timestamp fields in the actual database
+      });
     return updatedTeam || undefined;
   }
 
@@ -997,7 +1031,21 @@ export class DatabaseStorage implements IStorage {
 
   async getRecentDocuments(limit: number): Promise<Document[]> {
     return await db
-      .select()
+      .select({
+        id: documents.id,
+        title: documents.title,
+        content: documents.content,
+        fileType: documents.fileType,
+        projectId: documents.projectId,
+        createdBy: documents.createdBy,
+        updatedBy: documents.updatedBy,
+        sourceUrl: documents.sourceUrl,
+        embeddings: documents.embeddings,
+        tags: documents.tags,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt
+        // Explicitly exclude parentDocumentId which doesn't exist in the database
+      })
       .from(documents)
       .orderBy(desc(documents.updatedAt))
       .limit(limit);
