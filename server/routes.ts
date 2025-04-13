@@ -542,6 +542,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Slack Project Sharing
+  router.post("/projects/:projectId/integrations/slack/share", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { channelId, message, userId } = req.body;
+      
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
+      if (!channelId || !message) {
+        return res.status(400).json({ success: false, message: "Channel ID and message are required" });
+      }
+      
+      // Get the project
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Project not found" 
+        });
+      }
+      
+      // Get the user's Slack integration
+      const integrations = await storage.getIntegrations(userId);
+      const slackIntegration = integrations.find(i => i.type === 'slack' && i.active);
+      
+      if (!slackIntegration) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Slack integration not found or not active"
+        });
+      }
+      
+      const token = slackIntegration.config?.token;
+      
+      if (!token) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Slack integration missing token"
+        });
+      }
+      
+      const messageTs = await sendProjectUpdate(
+        projectId,
+        project.name,
+        message,
+        channelId,
+        token as string
+      );
+      
+      // Record the activity
+      await storage.createActivity({
+        type: "integration",
+        description: "Sent project update to Slack",
+        userId: userId || req.user.id,
+        projectId,
+        entityType: "project",
+        entityId: projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Project update sent to Slack", 
+        messageTs 
+      });
+    } catch (error: any) {
+      console.error("Slack update error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error sending project update to Slack", 
+        error: error?.message || 'Unknown error' 
+      });
+    }
+  });
+
   // Insight routes
   router.get("/projects/:projectId/insights", async (req, res) => {
     const projectId = parseInt(req.params.projectId);

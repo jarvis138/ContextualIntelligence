@@ -1,13 +1,21 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Project, User } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Bell, ChevronDown, Settings, User } from "lucide-react";
 
-type TopBarProps = {
-  project: Project;
-  teamMembers: User[];
+interface TopBarProps {
+  project: {
+    id: number;
+    name: string;
+  };
+  teamMembers: {
+    id: number;
+    fullName: string;
+    avatar: string | null;
+  }[];
   onSearch: (query: string) => void;
-};
+}
 
 export default function TopBar({ project, teamMembers, onSearch }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,25 +57,43 @@ export default function TopBar({ project, teamMembers, onSearch }: TopBarProps) 
               />
             ))}
             {teamMembers.length > 3 && (
-              <div 
-                key="more-members-count"
-                className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-white bg-gray-200 text-xs font-medium text-gray-500"
-              >
+              <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-sm text-gray-600">
                 +{teamMembers.length - 3}
               </div>
             )}
           </div>
           
-          <Button 
-            className="text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-600"
-            onClick={() => {
-              const resourceTypes = ['Document', 'Task', 'Team Member'];
-              const randomType = resourceTypes[Math.floor(Math.random() * resourceTypes.length)];
-              window.alert(`Adding new ${randomType}. This would open a form to create a new ${randomType}.`);
-            }}
-          >
-            <i className="ri-add-line mr-1"></i> Add Resource
+          <Button variant="ghost" size="icon">
+            <Bell className="h-5 w-5" />
           </Button>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" className="flex items-center">
+                <User className="mr-2 h-4 w-4" />
+                <span>Account</span>
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer">
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </div>
+                <div className="pt-2 border-t">
+                  <div className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer text-red-500">
+                    <i className="ri-logout-box-line"></i>
+                    <span>Log out</span>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>

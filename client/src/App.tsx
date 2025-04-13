@@ -1,8 +1,9 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useRoute } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
+import ProjectDetail from "@/pages/ProjectDetail";
 import Team from "@/pages/Team";
 import Documents from "@/pages/Documents";
 import Conversations from "@/pages/Conversations";
@@ -18,6 +19,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/projects" component={Projects} />
+      <Route path="/projects/:id">
+        {params => <ProjectDetail params={params} />}
+      </Route>
       <Route path="/team" component={Team} />
       <Route path="/documents" component={Documents} />
       <Route path="/conversations" component={Conversations} />

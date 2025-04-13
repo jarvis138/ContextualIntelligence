@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { getProjects } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import Sidebar from '@/components/Sidebar';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 
 export default function Projects() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   
   const { data: projects, isLoading } = useQuery({
@@ -118,10 +120,11 @@ export default function Projects() {
                     </div>
                   </CardContent>
                   <CardFooter className="border-t pt-4 flex justify-between">
-                    <Button variant="outline" size="sm" onClick={() => toast({ 
-                      title: "Project Details", 
-                      description: `View details for ${project.name}`
-                    })}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setLocation(`/projects/${project.id}`)}
+                    >
                       <i className="ri-eye-line mr-1"></i> View
                     </Button>
                     <div className="flex space-x-2">
