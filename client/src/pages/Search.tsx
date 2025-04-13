@@ -328,7 +328,14 @@ export default function Search() {
                                             <h4 className="text-md font-medium text-gray-800">{person.name}</h4>
                                             <p className="text-sm text-gray-500">{person.role}</p>
                                           </div>
-                                          <Button variant="outline" size="sm" className="ml-auto">
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="ml-auto"
+                                            onClick={() => {
+                                              window.alert(`Viewing ${person.name}'s profile. This would navigate to the team member's profile page.`);
+                                            }}
+                                          >
                                             View Profile
                                           </Button>
                                         </div>
