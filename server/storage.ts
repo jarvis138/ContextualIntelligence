@@ -1175,6 +1175,40 @@ export class DatabaseStorage implements IStorage {
     return updatedDocument || undefined;
   }
 
+  async deleteDocument(id: number): Promise<boolean> {
+    await db.delete(documents).where(eq(documents.id, id));
+    return true; // We don't actually get a boolean back from drizzle
+  }
+
+  // Document Versions
+  async getDocumentVersion(id: number): Promise<DocumentVersion | undefined> {
+    const [version] = await db.select().from(documentVersions).where(eq(documentVersions.id, id));
+    return version || undefined;
+  }
+
+  async getDocumentVersions(documentId: number): Promise<DocumentVersion[]> {
+    return await db.select()
+      .from(documentVersions)
+      .where(eq(documentVersions.documentId, documentId))
+      .orderBy(desc(documentVersions.createdAt));
+  }
+
+  async getDocumentVersionByVersionId(documentId: number, versionId: string): Promise<DocumentVersion | undefined> {
+    const [version] = await db.select()
+      .from(documentVersions)
+      .where(
+        sql`${documentVersions.documentId} = ${documentId} AND ${documentVersions.versionId} = ${versionId}`
+      );
+    return version || undefined;
+  }
+
+  async createDocumentVersion(insertVersion: InsertDocumentVersion): Promise<DocumentVersion> {
+    const [version] = await db.insert(documentVersions)
+      .values(insertVersion)
+      .returning();
+    return version;
+  }
+
   // Activities
   async getActivity(id: number): Promise<Activity | undefined> {
     const [activity] = await db.select().from(activities).where(eq(activities.id, id));
