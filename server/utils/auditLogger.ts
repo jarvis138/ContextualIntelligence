@@ -45,6 +45,21 @@ export enum AuditEventType {
   DOCUMENT_STATE_CHANGED = 'document.state.changed',
   DOCUMENT_METADATA_UPDATED = 'document.metadata.updated',
   
+  // Email specific events
+  EMAIL_PROCESSED = 'email.processed',
+  EMAIL_THREAD_DETECTED = 'email.thread.detected',
+  EMAIL_ATTACHMENT_EXTRACTED = 'email.attachment.extracted',
+  EMAIL_ATTACHMENT_PROCESSED = 'email.attachment.processed',
+  EMAIL_ATTACHMENT_FAILED = 'email.attachment.failed',
+  EMAIL_THREAD_LINKED = 'email.thread.linked',
+  
+  // Correlation events
+  ENTITY_CORRELATION_STARTED = 'entity.correlation.started',
+  ENTITY_CORRELATION_COMPLETED = 'entity.correlation.completed',
+  ENTITY_RELATIONSHIP_CREATED = 'entity.relationship.created',
+  ENTITY_RELATIONSHIP_UPDATED = 'entity.relationship.updated',
+  ENTITY_CORRELATION_FAILED = 'entity.correlation.failed',
+  
   // Integration events
   INTEGRATION_CONNECTED = 'integration.connected',
   INTEGRATION_DISCONNECTED = 'integration.disconnected',
@@ -58,6 +73,9 @@ export enum AuditEventType {
   SYSTEM_CONFIG_CHANGED = 'system.config.changed',
   SYSTEM_MAINTENANCE_STARTED = 'system.maintenance.started',
   SYSTEM_MAINTENANCE_COMPLETED = 'system.maintenance.completed',
+  SYSTEM_CORRELATION_STARTED = 'system.correlation.started',
+  SYSTEM_CORRELATION_COMPLETE = 'system.correlation.complete',
+  SYSTEM_CORRELATION_FAILED = 'system.correlation.failed',
   
   // Data events
   DATA_EXPORT_STARTED = 'data.export.started',
@@ -66,6 +84,9 @@ export enum AuditEventType {
   DATA_IMPORT_STARTED = 'data.import.started',
   DATA_IMPORT_COMPLETED = 'data.import.completed',
   DATA_IMPORT_FAILED = 'data.import.failed',
+  DATA_NORMALIZATION_STARTED = 'data.normalization.started',
+  DATA_NORMALIZATION_COMPLETED = 'data.normalization.completed',
+  DATA_NORMALIZATION_FAILED = 'data.normalization.failed',
   
   // AI processing events
   AI_ANALYSIS_STARTED = 'ai.analysis.started',

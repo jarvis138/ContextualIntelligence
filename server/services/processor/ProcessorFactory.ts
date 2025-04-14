@@ -9,6 +9,7 @@ import path from 'path';
 import { ProcessorBase, ProcessingOptions, ProcessingResult } from './ProcessorBase';
 import { PdfProcessor } from './PdfProcessor';
 import { OfficeProcessor } from './OfficeProcessor';
+import { EmailProcessor } from './EmailProcessor';
 
 // Import other processor types as they are implemented
 // import { ImageProcessor } from './ImageProcessor';
