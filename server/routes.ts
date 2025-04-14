@@ -1053,6 +1053,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract entities from text
   router.post("/nlp/extract-entities", authenticateToken, nlpController.extractEntities);
   
+  // Test endpoint for text preprocessing without authentication
+  router.post("/nlp/test-preprocessing", async (req, res) => {
+    try {
+      if (!req.body.text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+      
+      const { text } = req.body;
+      
+      // Create a simplified version using NLPService directly
+      // This avoids any import issues
+      if (!nlpController) {
+        return res.status(500).json({ error: 'NLP service not available' });
+      }
+      
+      // Process the text
+      const result = await nlpService.processText(text);
+      
+      // Return results
+      res.status(200).json({
+        original: text,
+        processed: text, // For demonstration purposes
+        language: result.language,
+        entities: result.entities,
+        keywords: result.keywords,
+        sentiment: result.sentiment,
+        processingTime: result.processingMetadata?.processingTime
+      });
+    } catch (error) {
+      console.error('Error in test-preprocessing:', error);
+      res.status(500).json({
+        error: 'Failed to process text',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
   // Document summarization
   router.get("/documents/:documentId/summarize", authenticateToken, nlpController.summarizeDocument);
   
