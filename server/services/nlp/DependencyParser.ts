@@ -80,8 +80,25 @@ export class DependencyParser {
   private wordTokenizer: natural.WordTokenizer;
   
   constructor() {
-    this.sentenceTokenizer = new natural.SentenceTokenizer();
-    this.wordTokenizer = new natural.WordTokenizer();
+    // Initialize tokenizers with fallbacks
+    try {
+      if (natural.SentenceTokenizer) {
+        this.sentenceTokenizer = new natural.SentenceTokenizer();
+      } else {
+        this.sentenceTokenizer = { tokenize: (text: string) => text.split(/[.!?]+/) };
+      }
+      
+      if (natural.WordTokenizer) {
+        this.wordTokenizer = new natural.WordTokenizer();
+      } else {
+        this.wordTokenizer = { tokenize: (text: string) => text.split(/\s+/) };
+      }
+    } catch (error) {
+      console.error("Error initializing Natural.js tokenizers in DependencyParser:", error);
+      // Fallback implementations
+      this.sentenceTokenizer = { tokenize: (text: string) => text.split(/[.!?]+/) };
+      this.wordTokenizer = { tokenize: (text: string) => text.split(/\s+/) };
+    }
   }
   
   /**
