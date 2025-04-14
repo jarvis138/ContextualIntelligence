@@ -18,6 +18,7 @@ import {
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import * as nlpController from "./controllers/nlpController";
+import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
@@ -1053,7 +1054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract entities from text
   router.post("/nlp/extract-entities", authenticateToken, nlpController.extractEntities);
   
-  // Test endpoint for text preprocessing without authentication
+  // Simple test endpoint for text preprocessing without authentication
   router.post("/nlp/test-preprocessing", async (req, res) => {
     try {
       if (!req.body.text) {
@@ -1062,24 +1063,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { text } = req.body;
       
-      // Create a simplified version using NLPService directly
-      // This avoids any import issues
-      if (!nlpController) {
-        return res.status(500).json({ error: 'NLP service not available' });
-      }
+      // Use utility functions directly for simple processing
+      const { identifyLanguage, textAnalyzers } = require('./utils/textProcessing');
       
-      // Process the text
-      const result = await nlpService.processText(text);
+      // Detect language
+      const languageInfo = identifyLanguage(text);
+      
+      // Get sentiment
+      const sentiment = textAnalyzers.sentiment(text);
+      
+      // Mock entities extraction with simple regex for demonstration
+      const entities = [];
+      // Look for dates
+      const dateRegex = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{2,4}\b/gi;
+      const dates = text.match(dateRegex) || [];
+      dates.forEach(date => {
+        entities.push({
+          type: 'DATE',
+          text: date,
+          start: text.indexOf(date),
+          end: text.indexOf(date) + date.length,
+          confidence: 0.9
+        });
+      });
+      
+      // Look for emails
+      const emailRegex = /\b[\w.-]+@[\w.-]+\.\w+\b/gi;
+      const emails = text.match(emailRegex) || [];
+      emails.forEach(email => {
+        entities.push({
+          type: 'EMAIL',
+          text: email,
+          start: text.indexOf(email),
+          end: text.indexOf(email) + email.length,
+          confidence: 0.95
+        });
+      });
+      
+      // Look for potential names (capitalized words)
+      const nameRegex = /\b[A-Z][a-z]+\b/g;
+      const potentialNames = text.match(nameRegex) || [];
+      potentialNames.forEach(name => {
+        // Exclude common words that start with capitals but aren't names
+        const commonWords = ['The', 'This', 'That', 'It', 'I', 'A', 'An'];
+        if (!commonWords.includes(name)) {
+          entities.push({
+            type: 'PERSON',
+            text: name,
+            start: text.indexOf(name),
+            end: text.indexOf(name) + name.length,
+            confidence: 0.6 // Lower confidence since this is a simple heuristic
+          });
+        }
+      });
+      
+      // Get keywords (simple implementation - just the most frequent meaningful words)
+      const words = text.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
+      const stopWords = ['the', 'and', 'that', 'have', 'for', 'not', 'with', 'this', 'but', 'from'];
+      const wordFreq = {};
+      
+      words.forEach(word => {
+        if (!stopWords.includes(word)) {
+          wordFreq[word] = (wordFreq[word] || 0) + 1;
+        }
+      });
+      
+      const keywords = Object.entries(wordFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([word, count]) => ({ word, score: count / words.length }));
       
       // Return results
       res.status(200).json({
         original: text,
-        processed: text, // For demonstration purposes
-        language: result.language,
-        entities: result.entities,
-        keywords: result.keywords,
-        sentiment: result.sentiment,
-        processingTime: result.processingMetadata?.processingTime
+        language: {
+          languageCode: languageInfo.language,
+          confidence: languageInfo.confidence
+        },
+        entities,
+        keywords,
+        sentiment: {
+          label: sentiment.score > 0.05 ? 'positive' : (sentiment.score < -0.05 ? 'negative' : 'neutral'),
+          score: sentiment.score
+        },
+        processingTimeMs: Date.now() - req.timestamp // Assuming you have a timestamp middleware
       });
     } catch (error) {
       console.error('Error in test-preprocessing:', error);
