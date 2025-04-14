@@ -7,7 +7,10 @@
 
 import { storage } from '../../storage';
 import { logger } from '../../utils/logger';
-import { EntityTypeEnum, Relationship, entityTypeEnum } from '@shared/schema';
+import { Relationship, entityTypeEnum } from '@shared/schema';
+
+// Create a type for entity types based on the PostgreSQL enum values
+type EntityType = typeof entityTypeEnum.enumValues[number];
 import { logAuditEvent, AuditEventType } from '../../utils/auditLogger';
 
 // Types of matches for entity correlation
@@ -33,12 +36,12 @@ export enum CorrelationStrategy {
 // Entity correlation result
 export interface CorrelationResult {
   sourceEntity: {
-    type: EntityTypeEnum;
+    type: EntityType;
     id: number;
     name?: string;
   };
   matchedEntity: {
-    type: EntityTypeEnum;
+    type: EntityType;
     id: number;
     name?: string;
   };
@@ -54,7 +57,7 @@ export interface CorrelationOptions {
   minConfidence: number;
   maxResults?: number;
   restrictToProject?: number;
-  restrictToEntityTypes?: EntityTypeEnum[];
+  restrictToEntityTypes?: EntityType[];
   includeExistingRelationships?: boolean;
 }
 
@@ -92,7 +95,7 @@ export class EntityCorrelator {
    * @returns Promise resolving to array of correlation results
    */
   async findCorrelations(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number
   ): Promise<CorrelationResult[]> {
     try {
@@ -210,7 +213,7 @@ export class EntityCorrelator {
    */
   private async applyCorrelationStrategy(
     strategy: CorrelationStrategy,
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
