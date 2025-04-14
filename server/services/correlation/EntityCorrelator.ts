@@ -265,7 +265,7 @@ export class EntityCorrelator {
    * Find text-based similarities between entities
    */
   private async findTextSimilarities(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -350,7 +350,7 @@ export class EntityCorrelator {
    * Find reference matches (explicit mentions of IDs, names, etc.)
    */
   private async findReferenceMatches(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -414,7 +414,7 @@ export class EntityCorrelator {
    * Find entities that are temporally close (created around same time)
    */
   private async findTemporalProximities(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -503,7 +503,7 @@ export class EntityCorrelator {
    * Find contact matches (email addresses, usernames, etc.)
    */
   private async findContactMatches(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -566,7 +566,7 @@ export class EntityCorrelator {
    * Find correlations based on project context
    */
   private async findProjectContextCorrelations(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -652,7 +652,7 @@ export class EntityCorrelator {
    * Note: This requires embedding vectors and semantic search capabilities
    */
   private async findSemanticSimilarities(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number,
     entityData: any
   ): Promise<CorrelationResult[]> {
@@ -665,30 +665,30 @@ export class EntityCorrelator {
    * Get entity data based on type and ID
    */
   private async getEntityData(
-    entityType: EntityTypeEnum,
+    entityType: EntityType,
     entityId: number
   ): Promise<any> {
     try {
       switch (entityType) {
-        case EntityTypeEnum.PROJECT:
+        case 'project':
           return await storage.getProject(entityId);
           
-        case EntityTypeEnum.TASK:
+        case 'task':
           return await storage.getTask(entityId);
           
-        case EntityTypeEnum.DOCUMENT:
+        case 'document':
           return await storage.getDocument(entityId);
           
-        case EntityTypeEnum.USER:
+        case 'user':
           return await storage.getUser(entityId);
           
-        case EntityTypeEnum.TEAM:
+        case 'team':
           return await storage.getTeam(entityId);
           
-        case EntityTypeEnum.INTEGRATION:
+        case 'integration':
           return await storage.getIntegration(entityId);
           
-        case EntityTypeEnum.INSIGHT:
+        case 'insight':
           return await storage.getInsight(entityId);
           
         default:
