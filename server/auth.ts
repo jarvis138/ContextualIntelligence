@@ -181,8 +181,9 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   // Configure passport serialization/deserialization
-  passport.serializeUser((user: User, done) => {
-    done(null, user.id);
+  passport.serializeUser((user: Express.User, done) => {
+    const typedUser = user as User;
+    done(null, typedUser.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
@@ -198,28 +199,32 @@ export function setupAuth(app: Express) {
   configureOAuthStrategies(passport);
 
   // Local Strategy
-  passport.use('local', {
-    usernameField: 'username',
-    passwordField: 'password'
-  }, async (username: string, password: string, done: any) => {
-    try {
-      // Find user by username
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return done(null, false, { message: 'Invalid credentials' });
+  const LocalStrategy = require('passport-local').Strategy;
+  passport.use(new LocalStrategy(
+    {
+      usernameField: 'username',
+      passwordField: 'password'
+    }, 
+    async (username: string, password: string, done: any) => {
+      try {
+        // Find user by username
+        const user = await storage.getUserByUsername(username);
+        if (!user) {
+          return done(null, false, { message: 'Invalid credentials' });
+        }
+        
+        // Verify password
+        const isPasswordValid = await comparePasswords(password, user.password || '');
+        if (!isPasswordValid) {
+          return done(null, false, { message: 'Invalid credentials' });
+        }
+        
+        return done(null, user);
+      } catch (error) {
+        return done(error);
       }
-      
-      // Verify password
-      const isPasswordValid = await comparePasswords(password, user.password);
-      if (!isPasswordValid) {
-        return done(null, false, { message: 'Invalid credentials' });
-      }
-      
-      return done(null, user);
-    } catch (error) {
-      return done(error);
     }
-  });
+  ));
 
   // Setup authentication routes
   setupAuthRoutes(app);

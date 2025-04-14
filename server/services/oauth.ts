@@ -105,7 +105,7 @@ export function configureOAuthStrategies(passport: any) {
       clientSecret: oauthConfig.google.clientSecret,
       callbackURL: oauthConfig.google.callbackURL,
       scope: oauthConfig.google.scope
-    }, async (accessToken, refreshToken, profile, done) => {
+    }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
       try {
         // Get token expiration from response
         const tokenData = profile._json;
@@ -132,7 +132,7 @@ export function configureOAuthStrategies(passport: any) {
       clientSecret: oauthConfig.microsoft.clientSecret,
       callbackURL: oauthConfig.microsoft.callbackURL,
       scope: oauthConfig.microsoft.scope
-    }, async (accessToken, refreshToken, profile, done) => {
+    }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
       try {
         // Microsoft token typically expires in 1 hour
         const expiresIn = 3600;
@@ -158,7 +158,7 @@ export function configureOAuthStrategies(passport: any) {
       clientSecret: oauthConfig.slack.clientSecret,
       callbackURL: oauthConfig.slack.callbackURL,
       scope: oauthConfig.slack.scope
-    }, async (accessToken, refreshToken, profile, done) => {
+    }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
       try {
         // Slack doesn't provide expiresIn in standard OAuth response
         const expiresIn = 43200; // Default 12 hours

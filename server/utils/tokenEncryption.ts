@@ -6,7 +6,7 @@
  */
 
 import crypto from 'crypto';
-import { tokenEncryption } from '../config/oauth';
+import { tokenEncryption, tokenRefresh } from '../config/oauth';
 
 // Secret key for encryption (should be set via environment variable in production)
 const SECRET_KEY = process.env.TOKEN_ENCRYPTION_KEY || 'development-token-encryption-key-not-for-production';
@@ -26,7 +26,7 @@ function deriveKey(secret: string): Buffer {
 export function encryptToken(text: string): string {
   const key = deriveKey(SECRET_KEY);
   const iv = crypto.randomBytes(tokenEncryption.ivLength);
-  const cipher = crypto.createCipheriv(tokenEncryption.algorithm, key, iv);
+  const cipher = crypto.createCipheriv(tokenEncryption.algorithm as crypto.CipherGCMTypes, key, iv);
   
   let encrypted = cipher.update(text, 'utf8', 'base64');
   encrypted += cipher.final('base64');
@@ -52,7 +52,7 @@ export function decryptToken(encryptedText: string): string {
   const authTag = Buffer.from(parts[1], 'base64');
   const encryptedData = parts[2];
   
-  const decipher = crypto.createDecipheriv(tokenEncryption.algorithm, key, iv);
+  const decipher = crypto.createDecipheriv(tokenEncryption.algorithm as crypto.CipherGCMTypes, key, iv);
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
@@ -67,7 +67,7 @@ export function decryptToken(encryptedText: string): string {
 export function shouldRefreshToken(expiresAt: Date): boolean {
   const now = Date.now();
   const expiry = expiresAt.getTime();
-  return (expiry - now) < tokenEncryption.refreshBeforeExpiry;
+  return (expiry - now) < tokenRefresh.refreshBeforeExpiry;
 }
 
 /**
@@ -76,5 +76,5 @@ export function shouldRefreshToken(expiresAt: Date): boolean {
 export function isTokenExpired(createdAt: Date): boolean {
   const now = Date.now();
   const created = createdAt.getTime();
-  return (now - created) > tokenEncryption.maxTokenAge;
+  return (now - created) > tokenRefresh.maxTokenAge;
 }

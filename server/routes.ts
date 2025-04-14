@@ -20,7 +20,7 @@ import { analyzeProjectData, generateInsights } from "./services/nlp";
 import * as nlpController from "./controllers/nlpController";
 import * as searchController from "./controllers/searchController";
 import { fetchExternalProjectData } from "./services/integrations";
-import { authService, authenticateToken, authorizeRoles, hashPassword } from "./auth";
+import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
 import { 
   testSlackIntegration, 
   sendProjectUpdate, 
