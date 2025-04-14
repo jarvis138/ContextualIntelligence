@@ -33,6 +33,9 @@ export class ProcessorFactory {
     else if (['doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'odp'].includes(extension)) {
       return new OfficeProcessor(options);
     }
+    else if (['eml', 'msg', 'email'].includes(extension)) {
+      return new EmailProcessor(options);
+    }
     // Add other processor types here as they're implemented
     // else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'].includes(extension)) {
     //   return new ImageProcessor(options);
@@ -49,6 +52,8 @@ export class ProcessorFactory {
       return new PdfProcessor(options);
     } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)) {
       return new OfficeProcessor(options);
+    } else if (['eml', 'msg', 'email'].includes(extension)) {
+      return new EmailProcessor(options);
     }
     
     // Fall back to the PDF processor for unsupported file types
@@ -80,6 +85,9 @@ export class ProcessorFactory {
     else if (['doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'odp'].includes(extension)) {
       processor = new OfficeProcessor(options);
     }
+    else if (['eml', 'msg', 'email'].includes(extension)) {
+      processor = new EmailProcessor(options);
+    }
     // Add other processor types here as they're implemented
     else {
       // Use a default processor based on content type
@@ -90,6 +98,10 @@ export class ProcessorFactory {
                 contentType.includes('ms-excel') || 
                 contentType.includes('ms-powerpoint')) {
         processor = new OfficeProcessor(options);
+      } else if (contentType.includes('message/rfc822') ||
+                contentType.includes('application/vnd.ms-outlook') ||
+                contentType.includes('application/vnd.ms-email')) {
+        processor = new EmailProcessor(options);
       } else {
         console.warn(`No specific processor found for content type: ${contentType}. Using PDF processor as fallback.`);
         processor = new PdfProcessor(options);
@@ -116,10 +128,35 @@ export class ProcessorFactory {
     else if (['doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'odp'].includes(extension)) {
       processor = new OfficeProcessor(options);
     }
+    else if (['eml', 'msg', 'email'].includes(extension)) {
+      processor = new EmailProcessor(options);
+    }
     // Add other processor types here as they're implemented
     else {
-      // Default to PDF processor
-      processor = new PdfProcessor(options);
+      // Try to determine processor based on content-type header
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        const contentType = response.headers.get('content-type') || '';
+        
+        if (contentType.includes('pdf')) {
+          processor = new PdfProcessor(options);
+        } else if (contentType.includes('officedocument') || 
+                 contentType.includes('msword') || 
+                 contentType.includes('ms-excel') || 
+                 contentType.includes('ms-powerpoint')) {
+          processor = new OfficeProcessor(options);
+        } else if (contentType.includes('message/rfc822') ||
+                 contentType.includes('application/vnd.ms-outlook') ||
+                 contentType.includes('application/vnd.ms-email')) {
+          processor = new EmailProcessor(options);
+        } else {
+          // Default to PDF processor
+          processor = new PdfProcessor(options);
+        }
+      } catch (error) {
+        console.warn(`Error determining content type from URL headers: ${error}. Using PDF processor as fallback.`);
+        processor = new PdfProcessor(options);
+      }
     }
     
     return await processor.processFromUrl(url, { filename });
@@ -136,6 +173,8 @@ export class ProcessorFactory {
       'doc', 'docx', 'odt',
       'xls', 'xlsx', 'ods',
       'ppt', 'pptx', 'odp',
+      // Email formats
+      'eml', 'msg', 'email',
       // Images (when implemented)
       // 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp',
       // Text/markup (when implemented)
