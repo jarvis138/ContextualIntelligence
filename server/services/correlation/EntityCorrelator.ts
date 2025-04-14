@@ -704,26 +704,26 @@ export class EntityCorrelator {
   /**
    * Extract text content from entity data
    */
-  private extractTextContent(entityType: EntityTypeEnum, entityData: any): string {
+  private extractTextContent(entityType: EntityType, entityData: any): string {
     if (!entityData) return '';
     
     switch (entityType) {
-      case EntityTypeEnum.DOCUMENT:
+      case 'document':
         return entityData.content || '';
         
-      case EntityTypeEnum.TASK:
+      case 'task':
         return `${entityData.title} ${entityData.description || ''}`;
         
-      case EntityTypeEnum.PROJECT:
+      case 'project':
         return `${entityData.name} ${entityData.description || ''}`;
         
-      case EntityTypeEnum.INSIGHT:
+      case 'insight':
         return entityData.content || '';
         
-      case EntityTypeEnum.USER:
+      case 'user':
         return `${entityData.fullName} ${entityData.username}`;
         
-      case EntityTypeEnum.TEAM:
+      case 'team':
         return `${entityData.name} ${entityData.description || ''}`;
         
       default:
@@ -734,29 +734,29 @@ export class EntityCorrelator {
   /**
    * Get entity name for display
    */
-  private getEntityName(entityType: EntityTypeEnum, entityData: any): string {
+  private getEntityName(entityType: EntityType, entityData: any): string {
     if (!entityData) return 'Unknown';
     
     switch (entityType) {
-      case EntityTypeEnum.DOCUMENT:
+      case 'document':
         return entityData.title || 'Untitled Document';
         
-      case EntityTypeEnum.TASK:
+      case 'task':
         return entityData.title || 'Untitled Task';
         
-      case EntityTypeEnum.PROJECT:
+      case 'project':
         return entityData.name || 'Untitled Project';
         
-      case EntityTypeEnum.USER:
+      case 'user':
         return entityData.fullName || entityData.username || 'Unknown User';
         
-      case EntityTypeEnum.TEAM:
+      case 'team':
         return entityData.name || 'Untitled Team';
         
-      case EntityTypeEnum.INTEGRATION:
+      case 'integration':
         return entityData.name || 'Unnamed Integration';
         
-      case EntityTypeEnum.INSIGHT:
+      case 'insight':
         return 'Insight';
         
       default:
