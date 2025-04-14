@@ -6,6 +6,7 @@ import express from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import connectPg from 'connect-pg-simple';
+import { Strategy as LocalStrategy } from 'passport-local';
 import { User, InsertUser } from '@shared/schema';
 import { storage } from './storage';
 import { configureOAuthStrategies } from './services/oauth';
@@ -143,8 +144,17 @@ export const authService = {
 // Extend Express Request interface to include user
 declare global {
   namespace Express {
+    // Extend the User interface for Passport
+    interface User {
+      id: number;
+      username: string;
+      role: string;
+      authMethod?: string;
+      [key: string]: any;
+    }
+    // Extend the Request interface
     interface Request {
-      user?: AuthUser;
+      user?: Express.User | AuthUser;
     }
   }
 }
@@ -199,7 +209,6 @@ export function setupAuth(app: Express) {
   configureOAuthStrategies(passport);
 
   // Local Strategy
-  const LocalStrategy = require('passport-local').Strategy;
   passport.use(new LocalStrategy(
     {
       usernameField: 'username',

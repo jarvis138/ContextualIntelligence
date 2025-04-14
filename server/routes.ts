@@ -35,6 +35,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
   app.use(cookieParser());
   
+  // Setup OAuth Authentication (with Passport)
+  setupAuth(app);
+  
   // Create initial demo data if the database is empty
   const createInitialData = async () => {
     const projects = await storage.getProjects();
