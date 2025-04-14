@@ -11,6 +11,7 @@
 
 import * as natural from 'natural';
 import * as stopword from 'stopword';
+import * as langdetect from 'langdetect';
 
 // Text preprocessing pipeline types
 export type TextTransformer = (text: string) => string;
