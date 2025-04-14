@@ -278,19 +278,29 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
   replies: many(comments, { relationName: "replies" }),
 }));
 
-// Documents schema
+// Documents schema - extended with processing fields
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 200 }).notNull(),
   content: text("content"),
-  fileType: documentTypeEnum("file_type").notNull().default("text"),
+  fileType: varchar("file_type", { length: 50 }).notNull(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   createdBy: integer("created_by").notNull().references(() => users.id),
   updatedBy: integer("updated_by").notNull().references(() => users.id),
-  // embeddings column doesn't exist in the actual database
-  // tags column doesn't exist in the actual database
-  // createdAt column doesn't exist in the actual database
-  // updatedAt column doesn't exist in the actual database
+  description: text("description"),
+  metadata: jsonb("metadata"),
+  fileSize: integer("file_size"),
+  pageCount: integer("page_count"),
+  wordCount: integer("word_count"),
+  language: varchar("language", { length: 10 }),
+  tags: jsonb("tags"),
+  thumbnailPath: text("thumbnail_path"),
+  previewPath: text("preview_path"),
+  processingStatus: processingStatusEnum("processing_status").default("completed"),
+  lifecycleState: documentLifecycleStateEnum("lifecycle_state").default("active"),
+  accessLevel: documentAccessLevelEnum("access_level").default("private"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => {
   return {
     projectIdx: index("document_project_idx").on(table.projectId),
@@ -299,8 +309,44 @@ export const documents = pgTable("documents", {
     fileTypeIdx: index("document_type_idx").on(table.fileType),
     titleIdx: index("document_title_idx").on(table.title),
     contentIdx: index("document_content_idx").on(table.content),
+    statusIdx: index("document_status_idx").on(table.processingStatus),
+    lifecycleIdx: index("document_lifecycle_idx").on(table.lifecycleState),
   };
 });
+
+// Document Versions schema
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  versionId: varchar("version_id", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  contentHash: text("content_hash").notNull(),
+  changes: text("changes"),
+  source: documentSourceEnum("source").notNull(),
+  sourceReference: text("source_reference"),
+  fileSize: integer("file_size").notNull(),
+  metadata: jsonb("metadata").notNull(),
+}, (table) => {
+  return {
+    documentVersionIdx: uniqueIndex("document_version_idx").on(table.documentId, table.versionId),
+    documentIdIdx: index("version_document_idx").on(table.documentId),
+    createdByIdx: index("version_created_by_idx").on(table.createdBy),
+    createdAtIdx: index("version_created_at_idx").on(table.createdAt)
+  };
+});
+
+// Document versions relations
+export const documentVersionsRelations = relations(documentVersions, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentVersions.documentId],
+    references: [documents.id],
+  }),
+  creator: one(users, {
+    fields: [documentVersions.createdBy],
+    references: [users.id],
+  }),
+}));
 
 // Documents relations
 export const documentsRelations = relations(documents, ({ one, many }) => ({
@@ -318,8 +364,7 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
     references: [users.id],
     relationName: "updater",
   }),
-  // parentDocument relation removed since parentDocumentId doesn't exist in database
-  // childDocuments: many(documents, { relationName: "childDocuments" }),
+  versions: many(documentVersions),
   comments: many(comments, { relationName: "documentComments" }),
   activities: many(activities, { relationName: "documentActivities" }),
 }));
@@ -529,6 +574,11 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   updatedAt: true,
 });
 
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   timestamp: true,
@@ -581,18 +631,13 @@ export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 
-// Explicitly define the Document type to match the actual database schema
-// instead of inferring it from the schema definition
-export type Document = {
-  id: number;
-  title: string;
-  content: string | null;
-  fileType: "text" | "requirements" | "design" | "code" | "meeting" | "summary" | "report";
-  projectId: number;
-  createdBy: number;
-  updatedBy: number;
-};
+// Updated Document type to match the enhanced schema
+export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+
+// Document version type
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;

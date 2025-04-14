@@ -7,6 +7,7 @@ import {
   teamMembers, type TeamMember, type InsertTeamMember,
   tasks, type Task, type InsertTask,
   documents, type Document, type InsertDocument,
+  documentVersions, type DocumentVersion, type InsertDocumentVersion,
   activities, type Activity, type InsertActivity,
   integrations, type Integration, type InsertIntegration,
   insights, type Insight, type InsertInsight,
@@ -68,6 +69,13 @@ export interface IStorage {
   getRecentDocuments(limit: number): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
+  deleteDocument(id: number): Promise<boolean>;
+  
+  // Document Versions
+  getDocumentVersion(id: number): Promise<DocumentVersion | undefined>;
+  getDocumentVersions(documentId: number): Promise<DocumentVersion[]>;
+  getDocumentVersionByVersionId(documentId: number, versionId: string): Promise<DocumentVersion | undefined>;
+  createDocumentVersion(version: InsertDocumentVersion): Promise<DocumentVersion>;
 
   // Activities
   getActivity(id: number): Promise<Activity | undefined>;
