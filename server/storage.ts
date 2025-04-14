@@ -504,6 +504,34 @@ export class MemStorage implements IStorage {
     return this.oauthTokens.get(key);
   }
   
+  async updateOAuthToken(tokenId: number, updates: Partial<any>): Promise<any> {
+    // Find the token by ID
+    let foundKey: string | undefined;
+    let foundToken: any | undefined;
+    
+    for (const [key, token] of this.oauthTokens.entries()) {
+      if (token.id === tokenId) {
+        foundKey = key;
+        foundToken = token;
+        break;
+      }
+    }
+    
+    if (!foundKey || !foundToken) {
+      throw new Error(`Token with ID ${tokenId} not found`);
+    }
+    
+    // Update the token
+    const updatedToken = {
+      ...foundToken,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    this.oauthTokens.set(foundKey, updatedToken);
+    return updatedToken;
+  }
+  
   async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
     const key = `${userId}:${provider}`;
     return this.oauthTokens.delete(key);

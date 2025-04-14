@@ -11,7 +11,16 @@ import { Strategy as SlackStrategy } from 'passport-slack-oauth2';
 import { oauthConfig } from '../config/oauth';
 import { storage } from '../storage';
 import { User, insertOAuthTokenSchema } from '@shared/schema';
-import { encryptToken, decryptToken, shouldRefreshToken } from '../utils/tokenEncryption';
+import { 
+  encryptToken, 
+  decryptToken, 
+  shouldRefreshToken, 
+  shouldRotateToken,
+  rotateToken,
+  validateTokenFingerprint
+} from '../utils/tokenEncryption';
+import { tokenBlacklist, isTokenValid } from './tokenRevocation';
+import { AuditEventType, logAuditEvent } from '../utils/auditLogger';
 import { z } from 'zod';
 
 // OAuth Profile interfaces
@@ -192,20 +201,108 @@ export async function getOAuthAccessToken(userId: number, provider: string): Pro
     const token = await storage.getOAuthToken(userId, provider);
     
     if (!token) {
+      // Log attempted access with no token
+      await logAuditEvent({
+        userId,
+        eventType: AuditEventType.ACCESS_DENIED,
+        description: `OAuth token access denied - token not found for provider: ${provider}`,
+        metadata: { provider }
+      });
       return null;
+    }
+    
+    // Check if token is blacklisted/revoked
+    if (!isTokenValid(userId, token.id, (token.tokenData as any)?.rotationFingerprint)) {
+      await logAuditEvent({
+        userId,
+        eventType: AuditEventType.ACCESS_DENIED,
+        description: `OAuth token access denied - token has been revoked for provider: ${provider}`,
+        metadata: { provider, tokenId: token.id }
+      });
+      return null;
+    }
+    
+    // Check if token should be rotated
+    const tokenData = token.tokenData as any || {};
+    const lastRotatedAt = tokenData.rotatedAt ? new Date(tokenData.rotatedAt) : new Date(0);
+    
+    // Perform token rotation if needed
+    if (shouldRotateToken(lastRotatedAt)) {
+      // Rotate the token
+      const { rotatedToken, fingerprint, rotatedAt } = rotateToken(
+        token.accessToken, 
+        userId, 
+        token.id
+      );
+      
+      // Update the token in storage with rotation information
+      await storage.updateOAuthToken(token.id, {
+        accessToken: rotatedToken,
+        tokenData: {
+          ...tokenData,
+          rotationFingerprint: fingerprint,
+          rotatedAt: rotatedAt.toISOString(),
+          previousRotationFingerprint: tokenData.rotationFingerprint || null
+        }
+      });
+      
+      // Decrypt and return the rotated token
+      return decryptToken(rotatedToken);
     }
     
     // Check if token needs to be refreshed
     if (token.expiresAt && shouldRefreshToken(token.expiresAt)) {
-      // Implement token refresh logic here
-      // This would require provider-specific refresh token logic
-      console.log('Token needs refreshing, but refresh not implemented yet');
+      // Get the refresh token
+      if (!token.refreshToken) {
+        console.warn(`No refresh token available for user ${userId} and provider ${provider}`);
+      } else {
+        try {
+          // Decrypt the refresh token
+          const refreshToken = decryptToken(token.refreshToken);
+          
+          // Implement provider-specific token refresh logic here
+          // This would typically make an API call to the OAuth provider
+          // For now, log that refresh would be happening
+          console.log(`Token refresh needed for user ${userId} and provider ${provider}`);
+          
+          // Log the token refresh attempt
+          await logAuditEvent({
+            userId,
+            eventType: AuditEventType.TOKEN_REFRESH,
+            description: `OAuth token refresh attempted for provider: ${provider}`,
+            metadata: { provider, tokenId: token.id }
+          });
+          
+          // Future implementation:
+          // const { newAccessToken, newRefreshToken, newExpiresIn } = await refreshOAuthToken(provider, refreshToken);
+          // ... update token in storage
+        } catch (refreshError) {
+          console.error('Error refreshing token:', refreshError);
+        }
+      }
     }
     
-    // Decrypt the access token
+    // Log successful token access
+    await logAuditEvent({
+      userId,
+      eventType: AuditEventType.ACCESS_GRANTED,
+      description: `OAuth token accessed for provider: ${provider}`,
+      metadata: { provider, tokenId: token.id }
+    });
+    
+    // Decrypt and return the access token
     return decryptToken(token.accessToken);
   } catch (error) {
     console.error('Error getting OAuth access token:', error);
+    
+    // Log the error
+    await logAuditEvent({
+      userId,
+      eventType: AuditEventType.ACCESS_DENIED,
+      description: `OAuth token access error for provider: ${provider}`,
+      metadata: { provider, error: (error as Error).message }
+    });
+    
     return null;
   }
 }
