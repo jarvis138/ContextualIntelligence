@@ -4,7 +4,7 @@ import { formatBytes } from '../../utils/formatHelpers';
 import { decodeUnicodeEntities, formatEmailDate } from '../../utils/textProcessing';
 import { nanoid } from 'nanoid';
 import { EmailAttachment, EmailHeader, EmailThread, EmailThreadRelationship } from './EmailTypes';
-import { EntityTypeEnum } from '@shared/schema';
+import { entityTypeEnum } from '@shared/schema';
 import path from 'path';
 import fs from 'fs/promises';
 import { storage } from '../../storage';
@@ -500,9 +500,9 @@ export class EmailProcessor extends ProcessorBase {
       // If we have a parent message ID, create a relationship
       if (this.threadInfo.parentMessageId) {
         relationships.push({
-          sourceType: EntityTypeEnum.DOCUMENT,
+          sourceType: "document", // Using entityTypeEnum value directly
           sourceId: 0, // Will be updated when document is saved
-          targetType: EntityTypeEnum.DOCUMENT,
+          targetType: "document", // Using entityTypeEnum value directly
           targetId: 0, // Needs to be resolved by looking up the parent message
           strength: 100,
           description: 'Reply to email',
@@ -518,9 +518,9 @@ export class EmailProcessor extends ProcessorBase {
       for (const refMessageId of this.threadInfo.references) {
         if (refMessageId !== this.threadInfo.parentMessageId) {
           relationships.push({
-            sourceType: EntityTypeEnum.DOCUMENT,
+            sourceType: "document", // Using entityTypeEnum value directly
             sourceId: 0, // Will be updated when document is saved
-            targetType: EntityTypeEnum.DOCUMENT,
+            targetType: "document", // Using entityTypeEnum value directly
             targetId: 0, // Needs to be resolved by looking up the referenced message
             strength: 80,
             description: 'Part of email thread',
@@ -537,9 +537,9 @@ export class EmailProcessor extends ProcessorBase {
     // Add relationships for attachments if they were saved as separate documents
     for (let i = 0; i < this.attachments.length; i++) {
       relationships.push({
-        sourceType: EntityTypeEnum.DOCUMENT,
+        sourceType: "document", // Using entityTypeEnum value directly
         sourceId: 0, // Will be updated when document is saved
-        targetType: EntityTypeEnum.DOCUMENT,
+        targetType: "document", // Using entityTypeEnum value directly
         targetId: 0, // Will be updated when attachment is saved
         strength: 100,
         description: `Email attachment: ${this.attachments[i].filename}`,

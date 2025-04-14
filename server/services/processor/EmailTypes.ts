@@ -1,4 +1,4 @@
-import { EntityTypeEnum } from "@shared/schema";
+import { entityTypeEnum } from "@shared/schema";
 
 /**
  * Email Header type
@@ -36,9 +36,9 @@ export interface EmailThread {
  * Defines relationships between emails in the same thread
  */
 export interface EmailThreadRelationship {
-  sourceType: EntityTypeEnum;
+  sourceType: typeof entityTypeEnum.enumValues[number];
   sourceId: number;
-  targetType: EntityTypeEnum;
+  targetType: typeof entityTypeEnum.enumValues[number];
   targetId: number;
   strength: number;
   description: string;
