@@ -108,6 +108,7 @@ export class MemStorage implements IStorage {
   private teamMembers: Map<number, TeamMember>;
   private tasks: Map<number, Task>;
   private documents: Map<number, Document>;
+  private documentVersions: Map<number, DocumentVersion>;
   private activities: Map<number, Activity>;
   private integrations: Map<number, Integration>;
   private insights: Map<number, Insight>;
@@ -120,6 +121,7 @@ export class MemStorage implements IStorage {
     teamMembers: number;
     tasks: number;
     documents: number;
+    documentVersions: number;
     activities: number;
     integrations: number;
     insights: number;
@@ -139,6 +141,7 @@ export class MemStorage implements IStorage {
     this.teamMembers = new Map();
     this.tasks = new Map();
     this.documents = new Map();
+    this.documentVersions = new Map();
     this.activities = new Map();
     this.integrations = new Map();
     this.insights = new Map();
@@ -151,6 +154,7 @@ export class MemStorage implements IStorage {
       teamMembers: 1,
       tasks: 1,
       documents: 1,
+      documentVersions: 1,
       activities: 1,
       integrations: 1,
       insights: 1,
@@ -705,6 +709,38 @@ export class MemStorage implements IStorage {
     };
     this.documents.set(id, updatedDoc);
     return updatedDoc;
+  }
+
+  async deleteDocument(id: number): Promise<boolean> {
+    return this.documents.delete(id);
+  }
+
+  // Document Versions
+  async getDocumentVersion(id: number): Promise<DocumentVersion | undefined> {
+    return this.documentVersions.get(id);
+  }
+
+  async getDocumentVersions(documentId: number): Promise<DocumentVersion[]> {
+    return Array.from(this.documentVersions.values()).filter(
+      version => version.documentId === documentId
+    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getDocumentVersionByVersionId(documentId: number, versionId: string): Promise<DocumentVersion | undefined> {
+    return Array.from(this.documentVersions.values()).find(
+      version => version.documentId === documentId && version.versionId === versionId
+    );
+  }
+
+  async createDocumentVersion(insertVersion: InsertDocumentVersion): Promise<DocumentVersion> {
+    const id = this.currentIds.documentVersions++;
+    const version: DocumentVersion = {
+      ...insertVersion,
+      id,
+      createdAt: new Date()
+    };
+    this.documentVersions.set(id, version);
+    return version;
   }
 
   // Activities
