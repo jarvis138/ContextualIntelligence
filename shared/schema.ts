@@ -14,6 +14,37 @@ export const activityTypeEnum = pgEnum("activity_type", ["create", "update", "de
 export const integrationTypeEnum = pgEnum("integration_type", ["slack", "github", "jira", "google", "microsoft", "trello", "asana", "custom"]);
 export const insightTypeEnum = pgEnum("insight_type", ["warning", "info", "success", "alert"]);
 
+// Document processing related enums
+export const documentSourceEnum = pgEnum("document_source", [
+  "google_drive", 
+  "sharepoint", 
+  "email_attachment", 
+  "local_upload", 
+  "external_url"
+]);
+
+export const documentLifecycleStateEnum = pgEnum("document_lifecycle_state", [
+  "draft",
+  "active",
+  "archived",
+  "deleted"
+]);
+
+export const documentAccessLevelEnum = pgEnum("document_access_level", [
+  "public",
+  "internal",
+  "restricted",
+  "private"
+]);
+
+export const processingStatusEnum = pgEnum("processing_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+  "pending_revision"
+]);
+
 // User schema - modified to match actual database structure
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
