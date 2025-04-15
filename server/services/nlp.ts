@@ -431,21 +431,14 @@ ${documentChunks.map((chunk, i) => `[${i}] ${chunk.chunk.substring(0, 500)}...`)
  */
 export async function generateInsights(project: any, tasks: any[], documents: any[], activities: any[]): Promise<any[]> {
   try {
-    // Get project data
-    const project = await storage.getProject(projectId);
     if (!project) {
-      console.error(`Project not found: ${projectId}`);
+      console.error(`Invalid project data`);
       return [];
     }
     
-    // Get tasks
-    const tasks = await storage.getTasks(projectId);
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
     const totalTasks = tasks.length;
     const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) : 0;
-    
-    // Get recent activities
-    const activities = await storage.getActivities(projectId, 20);
     
     // Generate insights based on task completion and activities
     const insights = [];
@@ -490,7 +483,7 @@ export async function generateInsights(project: any, tasks: any[], documents: an
     const formattedInsights = insights.map(insight => ({
       type: insight.type,
       content: insight.content,
-      projectId,
+      projectId: project.id,
       confidence: insight.confidence * 100
     }));
     

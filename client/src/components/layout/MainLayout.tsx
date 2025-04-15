@@ -165,31 +165,31 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile">
+                <Link href="/profile" className="w-full">
+                  <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/settings" className="w-full">
+                  <DropdownMenuItem>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                </Link>
                 {/* Admin-only menu items */}
-                <DropdownMenuItem asChild>
-                  <Link href="/admin">
+                <Link href="/admin" className="w-full">
+                  <DropdownMenuItem>
                     <Shield className="mr-2 h-4 w-4" />
                     <span>Admin Dashboard</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/system">
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/system" className="w-full">
+                  <DropdownMenuItem>
                     <Monitor className="mr-2 h-4 w-4" />
                     <span>System Monitoring</span>
-                  </Link>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                </Link>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <span>Log out</span>
