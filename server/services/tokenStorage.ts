@@ -227,4 +227,29 @@ export class TokenStorage {
     
     return result.rowCount || 0;
   }
+  
+  /**
+   * Get all OAuth tokens for a user
+   * 
+   * @param userId The user ID
+   * @returns A list of tokens (without the actual token values for security)
+   */
+  static async getUserOAuthTokens(userId: number) {
+    const tokens = await db
+      .select()
+      .from(oauthTokens)
+      .where(eq(oauthTokens.userId, userId));
+    
+    // Return tokens without exposing the actual token values
+    return tokens.map(token => ({
+      id: token.id,
+      userId: token.userId,
+      provider: token.provider,
+      expiresAt: token.expiresAt,
+      hasRefreshToken: !!token.refreshToken,
+      isExpired: token.expiresAt ? token.expiresAt < new Date() : true,
+      createdAt: token.createdAt,
+      updatedAt: token.updatedAt,
+    }));
+  }
 }
