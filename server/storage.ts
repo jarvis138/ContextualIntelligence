@@ -133,6 +133,7 @@ export class MemStorage implements IStorage {
   private insights: Map<number, Insight>;
   private relationships: Map<number, Relationship>;
   private refreshTokens: Map<number, RefreshToken>;
+  private pkceCodeVerifiers: Map<number, PkceCodeVerifier>;
 
   private currentIds: {
     users: number;
@@ -168,6 +169,7 @@ export class MemStorage implements IStorage {
     this.insights = new Map();
     this.relationships = new Map();
     this.refreshTokens = new Map();
+    this.pkceCodeVerifiers = new Map();
 
     this.currentIds = {
       users: 1,
@@ -181,7 +183,8 @@ export class MemStorage implements IStorage {
       integrations: 1,
       insights: 1,
       relationships: 1,
-      refreshTokens: 1
+      refreshTokens: 1,
+      pkceCodeVerifiers: 1
     };
 
     // Initialize with demo data
@@ -938,6 +941,65 @@ export class MemStorage implements IStorage {
     
     return count;
   }
+
+  // PKCE Code Verifiers
+  async createPkceCodeVerifier(verifier: InsertPkceCodeVerifier): Promise<PkceCodeVerifier> {
+    const id = this.currentIds.pkceCodeVerifiers++;
+    const newVerifier: PkceCodeVerifier = {
+      id,
+      userId: verifier.userId,
+      codeChallenge: verifier.codeChallenge,
+      codeVerifier: verifier.codeVerifier,
+      state: verifier.state,
+      provider: verifier.provider,
+      redirectUri: verifier.redirectUri,
+      scope: verifier.scope,
+      createdAt: new Date(),
+      expiresAt: verifier.expiresAt,
+      used: verifier.used || false
+    };
+    
+    this.pkceCodeVerifiers.set(id, newVerifier);
+    return newVerifier;
+  }
+  
+  async getPkceCodeVerifierByState(state: string): Promise<PkceCodeVerifier | undefined> {
+    for (const verifier of this.pkceCodeVerifiers.values()) {
+      if (verifier.state === state) {
+        return verifier;
+      }
+    }
+    return undefined;
+  }
+  
+  async updatePkceCodeVerifier(id: number, data: Partial<InsertPkceCodeVerifier>): Promise<PkceCodeVerifier | undefined> {
+    const verifier = this.pkceCodeVerifiers.get(id);
+    if (!verifier) {
+      return undefined;
+    }
+    
+    const updatedVerifier = {
+      ...verifier,
+      ...data
+    };
+    
+    this.pkceCodeVerifiers.set(id, updatedVerifier);
+    return updatedVerifier;
+  }
+  
+  async deleteExpiredPkceCodeVerifiers(): Promise<number> {
+    const now = new Date();
+    let count = 0;
+    
+    for (const [id, verifier] of this.pkceCodeVerifiers.entries()) {
+      if (verifier.expiresAt < now) {
+        this.pkceCodeVerifiers.delete(id);
+        count++;
+      }
+    }
+    
+    return count;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1005,6 +1067,41 @@ export class DatabaseStorage implements IStorage {
     const now = new Date();
     const result = await db.delete(refreshTokens)
       .where(lt(refreshTokens.expiresAt, now));
+    
+    // Count is not directly available from delete operation
+    // This is an approximation
+    return 1; // Return at least 1 if operation was successful
+  }
+
+  // PKCE Code Verifiers
+  async createPkceCodeVerifier(verifier: InsertPkceCodeVerifier): Promise<PkceCodeVerifier> {
+    const [newVerifier] = await db.insert(pkceCodeVerifiers).values({
+      ...verifier,
+      createdAt: new Date(),
+      used: verifier.used || false
+    }).returning();
+    return newVerifier;
+  }
+  
+  async getPkceCodeVerifierByState(state: string): Promise<PkceCodeVerifier | undefined> {
+    const [verifier] = await db.select()
+      .from(pkceCodeVerifiers)
+      .where(eq(pkceCodeVerifiers.state, state));
+    return verifier || undefined;
+  }
+  
+  async updatePkceCodeVerifier(id: number, data: Partial<InsertPkceCodeVerifier>): Promise<PkceCodeVerifier | undefined> {
+    const [updatedVerifier] = await db.update(pkceCodeVerifiers)
+      .set(data)
+      .where(eq(pkceCodeVerifiers.id, id))
+      .returning();
+    return updatedVerifier || undefined;
+  }
+  
+  async deleteExpiredPkceCodeVerifiers(): Promise<number> {
+    const now = new Date();
+    const result = await db.delete(pkceCodeVerifiers)
+      .where(lt(pkceCodeVerifiers.expiresAt, now));
     
     // Count is not directly available from delete operation
     // This is an approximation
