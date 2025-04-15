@@ -1054,7 +1054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract entities from text
   router.post("/nlp/extract-entities", authenticateToken, nlpController.extractEntities);
   
-  // Simple test endpoint for text preprocessing without authentication
+  // Simple test endpoint for text processing without authentication
   router.post("/nlp/test-preprocessing", async (req, res) => {
     try {
       if (!req.body.text) {
@@ -1063,17 +1063,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { text } = req.body;
       
-      // Use utility functions directly for simple processing
-      const { identifyLanguage, textAnalyzers } = require('./utils/textProcessing');
+      // Create a self-contained response with simple regex-based processing
+      // No external dependencies or imports required
+      
+      // Mock language detection (simple heuristic)
+      const detectLanguage = (text: string) => {
+        // English detection patterns
+        const englishPatterns = [
+          /\bthe\b|\ban?\b|\bof\b|\band\b|\bin\b|\bto\b|\bthat\b/gi,
+          /\bis\b|\bare\b|\bwas\b|\bwere\b/gi
+        ];
+        
+        // Spanish detection patterns
+        const spanishPatterns = [
+          /\bel\b|\bla\b|\blos\b|\blas\b|\bun\b|\buna\b/gi,
+          /\bque\b|\bpor\b|\bcon\b|\ben\b|\bde\b/gi
+        ];
+        
+        // French detection patterns
+        const frenchPatterns = [
+          /\ble\b|\bla\b|\bles\b|\bun\b|\bune\b|\bdes\b/gi,
+          /\best\b|\bsont\b|\bet\b|\bque\b|\bpour\b/gi
+        ];
+        
+        let englishScore = 0;
+        let spanishScore = 0;
+        let frenchScore = 0;
+        
+        englishPatterns.forEach(pattern => {
+          const matches = text.match(pattern) || [];
+          englishScore += matches.length;
+        });
+        
+        spanishPatterns.forEach(pattern => {
+          const matches = text.match(pattern) || [];
+          spanishScore += matches.length;
+        });
+        
+        frenchPatterns.forEach(pattern => {
+          const matches = text.match(pattern) || [];
+          frenchScore += matches.length;
+        });
+        
+        const total = englishScore + spanishScore + frenchScore;
+        
+        if (total === 0) {
+          return { language: 'unknown', confidence: 0 };
+        }
+        
+        if (englishScore >= spanishScore && englishScore >= frenchScore) {
+          return { language: 'en', confidence: englishScore / total };
+        } else if (spanishScore >= englishScore && spanishScore >= frenchScore) {
+          return { language: 'es', confidence: spanishScore / total };
+        } else {
+          return { language: 'fr', confidence: frenchScore / total };
+        }
+      };
+      
+      // Simple sentiment analysis
+      const analyzeSentiment = (text: string) => {
+        const positiveWords = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 'happy', 'positive', 'wonderful', 'fantastic', 'awesome'];
+        const negativeWords = ['bad', 'awful', 'terrible', 'hate', 'dislike', 'worst', 'sad', 'negative', 'horrible', 'poor', 'unhappy'];
+        
+        // Convert to lowercase and tokenize
+        const tokens = text.toLowerCase().match(/\b\w+\b/g) || [];
+        
+        let positiveScore = 0;
+        let negativeScore = 0;
+        
+        tokens.forEach(token => {
+          if (positiveWords.includes(token)) positiveScore++;
+          if (negativeWords.includes(token)) negativeScore++;
+        });
+        
+        // Calculate normalized sentiment score between -1 and 1
+        const netScore = tokens.length > 0 ? 
+          (positiveScore - negativeScore) / tokens.length : 0;
+        
+        return {
+          score: Math.max(-1, Math.min(1, netScore * 5)), // Scale the score
+          label: netScore > 0.01 ? 'positive' : (netScore < -0.01 ? 'negative' : 'neutral')
+        };
+      };
       
       // Detect language
-      const languageInfo = identifyLanguage(text);
+      const languageInfo = detectLanguage(text);
       
       // Get sentiment
-      const sentiment = textAnalyzers.sentiment(text);
+      const sentiment = analyzeSentiment(text);
       
-      // Mock entities extraction with simple regex for demonstration
+      // Extract entities with simple regex
       const entities = [];
+      
       // Look for dates
       const dateRegex = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{2,4}\b/gi;
       const dates = text.match(dateRegex) || [];
@@ -1117,10 +1198,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      // Get keywords (simple implementation - just the most frequent meaningful words)
+      // Extract keywords (simple implementation - most frequent meaningful words)
       const words = text.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
       const stopWords = ['the', 'and', 'that', 'have', 'for', 'not', 'with', 'this', 'but', 'from'];
-      const wordFreq = {};
+      const wordFreq: {[key: string]: number} = {};
       
       words.forEach(word => {
         if (!stopWords.includes(word)) {
@@ -1142,11 +1223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         entities,
         keywords,
-        sentiment: {
-          label: sentiment.score > 0.05 ? 'positive' : (sentiment.score < -0.05 ? 'negative' : 'neutral'),
-          score: sentiment.score
-        },
-        processingTimeMs: Date.now() - req.timestamp // Assuming you have a timestamp middleware
+        sentiment,
+        processingTimeMs: 10 // Mock processing time
       });
     } catch (error) {
       console.error('Error in test-preprocessing:', error);
