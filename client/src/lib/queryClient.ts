@@ -34,7 +34,7 @@ export function getQueryFn(options: FetchOptions = {}) {
 
     if (res.status === 401) {
       if (options.on401 === "returnNull") {
-        return undefined;
+        return null; // Return null instead of undefined for 401s to fix TanStack Query issue
       } else if (options.on401 === "throw") {
         throw new Error("Unauthorized");
       }

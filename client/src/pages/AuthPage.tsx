@@ -76,6 +76,7 @@ export default function AuthPage() {
   const [registerForm, setRegisterForm] = useState({
     username: '',
     email: '',
+    fullName: '',
     password: '',
     confirmPassword: ''
   });
@@ -167,6 +168,7 @@ export default function AuthPage() {
       const userData = {
         username: registerForm.username,
         email: registerForm.email,
+        fullName: registerForm.fullName,
         password: registerForm.password
       };
       
@@ -354,6 +356,24 @@ export default function AuthPage() {
                           className="pl-10"
                           placeholder="Choose a username"
                           value={registerForm.username}
+                          onChange={handleRegisterChange}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="register-fullname">Full Name</Label>
+                      <div className="relative">
+                        <UserIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="register-fullname"
+                          name="fullName"
+                          type="text"
+                          required
+                          className="pl-10"
+                          placeholder="Your full name"
+                          value={registerForm.fullName}
                           onChange={handleRegisterChange}
                           disabled={isLoading}
                         />
