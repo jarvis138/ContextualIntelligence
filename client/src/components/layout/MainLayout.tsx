@@ -38,7 +38,7 @@ type MainLayoutProps = {
   children: React.ReactNode;
 };
 
-// Navigation items based on PRD features
+// Navigation items based on the provided design
 const navItems = [
   { name: 'Dashboard', href: '/', icon: <Home className="mr-2 h-4 w-4" /> },
   { name: 'Projects', href: '/projects', icon: <Briefcase className="mr-2 h-4 w-4" /> },

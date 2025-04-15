@@ -21,6 +21,7 @@ import SystemMonitoring from "@/pages/SystemMonitoring";
 import Settings from "@/pages/Settings";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Workspace from "@/pages/Workspace";
+import Insights from "@/pages/Insights";
 import TokenRefreshTestPage from "@/pages/TokenRefreshTestPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -59,6 +60,7 @@ function ProtectedContent() {
         <Route path="/workspace/:id">
           {params => <Workspace />}
         </Route>
+        <Route path="/insights" component={Insights} />
         <Route path="/integrations" component={Integrations} />
         <Route path="/integrations/trello" component={Integrations} />
         <Route path="/integrations/jira" component={Integrations} />
