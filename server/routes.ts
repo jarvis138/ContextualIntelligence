@@ -186,7 +186,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ message: "Logged out successfully" });
   });
 
-  router.get("/me", authenticateToken, (req, res) => {
+  router.get("/me", (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
     res.json(req.user);
   });
 

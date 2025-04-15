@@ -10,7 +10,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
-  user: User | null;
+  user: User | null | undefined;
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<User, Error, LoginData>;
@@ -28,9 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
-  } = useQuery<User | undefined, Error>({
+  } = useQuery<User | null | undefined, Error>({
     queryKey: ["/api/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: false,
+    // Prevent 'undefined' data which causes TanStack Query errors
+    placeholderData: null
   });
 
   const loginMutation = useMutation<User, Error, LoginData>({
@@ -95,10 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+
   return (
     <AuthContext.Provider
       value={{
-        user: user ?? null,
+        user: user,
         isLoading,
         error,
         loginMutation,
