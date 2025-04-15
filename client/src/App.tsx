@@ -20,6 +20,7 @@ import SystemMonitoring from "@/pages/SystemMonitoring";
 import Settings from "@/pages/Settings";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Workspace from "@/pages/Workspace";
+import TokenRefreshTestPage from "@/pages/TokenRefreshTestPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -62,6 +63,7 @@ function ProtectedContent() {
         <Route path="/integrations/jira" component={Integrations} />
         <Route path="/integrations/slack" component={Integrations} />
         <Route path="/integrations/gsuite" component={Integrations} />
+        <Route path="/token-refresh-test" component={TokenRefreshTestPage} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>
