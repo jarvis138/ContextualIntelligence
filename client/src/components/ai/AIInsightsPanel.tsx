@@ -398,7 +398,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
                   </Button>
                   <Button 
                     onClick={() => generatePredictiveInsightsMutation.mutate('risks')}
-                    disabled={generatePredictiveInsightsMutation.isPending}
+                    disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
                     variant="outline"
                   >
                     Risk Analysis
@@ -450,7 +450,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
                 </p>
                 <Button 
                   onClick={() => detectAnomaliesMutation.mutate()}
-                  disabled={detectAnomaliesMutation.isPending}
+                  disabled={detectAnomaliesMutation.isPending || !isOpenAIAvailable}
                 >
                   Detect Anomalies
                 </Button>
@@ -495,7 +495,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
             variant="ghost" 
             size="sm" 
             onClick={() => generateInsightsMutation.mutate()}
-            disabled={generateInsightsMutation.isPending}
+            disabled={generateInsightsMutation.isPending || !isOpenAIAvailable}
           >
             Refresh Insights
           </Button>
@@ -504,7 +504,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
             variant="ghost" 
             size="sm" 
             onClick={() => generateTopicsMutation.mutate()}
-            disabled={generateTopicsMutation.isPending}
+            disabled={generateTopicsMutation.isPending || !isOpenAIAvailable}
           >
             Refresh Topics
           </Button>
@@ -514,7 +514,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
               variant="ghost" 
               size="sm" 
               onClick={() => generatePredictiveInsightsMutation.mutate('timeline')}
-              disabled={generatePredictiveInsightsMutation.isPending}
+              disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
             >
               Timeline
             </Button>
@@ -522,7 +522,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
               variant="ghost" 
               size="sm" 
               onClick={() => generatePredictiveInsightsMutation.mutate('resources')}
-              disabled={generatePredictiveInsightsMutation.isPending}
+              disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
             >
               Resources
             </Button>
@@ -530,7 +530,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
               variant="ghost" 
               size="sm" 
               onClick={() => generatePredictiveInsightsMutation.mutate('risks')}
-              disabled={generatePredictiveInsightsMutation.isPending}
+              disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
             >
               Risks
             </Button>
@@ -540,7 +540,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
             variant="ghost" 
             size="sm" 
             onClick={() => detectAnomaliesMutation.mutate()}
-            disabled={detectAnomaliesMutation.isPending}
+            disabled={detectAnomaliesMutation.isPending || !isOpenAIAvailable}
           >
             Refresh Anomalies
           </Button>
