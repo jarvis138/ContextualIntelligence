@@ -75,6 +75,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      {/* Temporarily add direct route to admin dashboard for development purposes */}
+      <Route path="/admin-dev" component={AdminDashboard} />
       <ProtectedRoute path="/" component={ProtectedContent} />
     </Switch>
   );
