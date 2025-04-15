@@ -196,8 +196,8 @@ export default function Dashboard() {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href="/projects">
-                    <a className="w-full">View All Projects</a>
+                  <Link href="/projects" className="w-full">
+                    View All Projects
                   </Link>
                 </Button>
               </CardFooter>
@@ -351,8 +351,8 @@ export default function Dashboard() {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href="/insights">
-                    <a className="w-full">View All Insights</a>
+                  <Link href="/insights" className="w-full">
+                    View All Insights
                   </Link>
                 </Button>
               </CardFooter>
@@ -440,8 +440,8 @@ export default function Dashboard() {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href="/teams">
-                    <a className="w-full">View All Team Members</a>
+                  <Link href="/teams" className="w-full">
+                    View All Team Members
                   </Link>
                 </Button>
               </CardFooter>

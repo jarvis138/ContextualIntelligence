@@ -1,0 +1,46 @@
+[vite] connecting...
+DOMException {}
+stack: "SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=6QzlYpFvi7lr' is invalid.↵ at new t (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218737)↵ at setupWebSocket (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@vite/client:536:19)↵ at fallback (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@vite/client:509:16)↵ at WebSocket.<anonymous> (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@vite/client:555:7)"
+get stack: ƒ ()
+set stack: ƒ ()
+[[Prototype]]: DOMException
+
+Warning: validateDOMNesting(...): <a> cannot appear as a descendant of &lt;a&gt;.
+    at a
+    at a
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f84176de:337:18
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=f84176de:52:11
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=f84176de:33:11
+    at _c (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/ui/button.tsx:47:11)
+    at div
+    at _c11 (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/ui/card.tsx:123:13)
+    at div
+    at _c (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=f84176de:41:13
+    at Presence (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AZCBCMZO.js?v=f84176de:24:11)
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=f84176de:175:13
+    at _c5 (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/ui/tabs.tsx:72:12)
+    at div
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=f84176de:41:13
+    at Provider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LSQNWB54.js?v=f84176de:38:15)
+    at https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=f84176de:53:7
+    at div
+    at Dashboard (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/pages/Dashboard.tsx:46:37)
+    at Route (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f84176de:323:16)
+    at Switch (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f84176de:379:17)
+    at main
+    at div
+    at div
+    at MainLayout (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/layout/MainLayout.tsx?t=1744719947824:114:38)
+    at ProtectedContent
+    at Route (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f84176de:323:16)
+    at ProtectedRoute (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/lib/protected-route.tsx:22:3)
+    at Switch (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f84176de:379:17)
+    at Router
+    at AuthProvider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/hooks/use-auth.tsx:26:32)
+    at QueryClientProvider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=f84176de:2805:3)
+    at ErrorBoundary (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/components/ErrorBoundary.tsx:10:5)
+    at App (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/src/App.tsx?t=1744719947824&v=ap5sddK_dOH-w-YVTmxgt:231:3)
+    at QueryClientProvider (https://20d89843-91cc-4b68-99c0-9fed1e64b048-00-1b8037gb3p7fk.worf.repl.co/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=f84176de:2805:3)
