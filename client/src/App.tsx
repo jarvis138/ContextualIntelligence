@@ -16,6 +16,11 @@ import Search from "@/pages/Search";
 import Integrations from "@/pages/Integrations";
 import AuthPage from "@/pages/AuthPage";
 import UserProfile from "@/pages/UserProfile";
+import AdminDashboard from "@/pages/AdminDashboard";
+import SystemMonitoring from "@/pages/SystemMonitoring";
+import Settings from "@/pages/Settings";
+import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
+import Workspace from "@/pages/Workspace";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -44,6 +49,14 @@ function ProtectedContent() {
         <Route path="/conversations" component={Conversations} />
         <Route path="/search" component={Search} />
         <Route path="/profile" component={UserProfile} />
+        <Route path="/settings" component={Settings} />
+        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/system" component={SystemMonitoring} />
+        <Route path="/analytics" component={AdvancedAnalytics} />
+        <Route path="/workspace" component={Workspace} />
+        <Route path="/workspace/:id">
+          {params => <Workspace />}
+        </Route>
         <Route path="/integrations" component={Integrations} />
         <Route path="/integrations/trello" component={Integrations} />
         <Route path="/integrations/jira" component={Integrations} />

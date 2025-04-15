@@ -14,7 +14,11 @@ import {
   Zap,
   Grid,
   Wrench,
-  Home
+  Home,
+  Shield,
+  Monitor,
+  LineChart,
+  Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,10 +44,14 @@ const navItems = [
   { name: 'Projects', href: '/projects', icon: <Briefcase className="mr-2 h-4 w-4" /> },
   { name: 'Documents', href: '/documents', icon: <FileText className="mr-2 h-4 w-4" /> },
   { name: 'Teams', href: '/teams', icon: <Users className="mr-2 h-4 w-4" /> },
+  { name: 'Workspace', href: '/workspace', icon: <Layers className="mr-2 h-4 w-4" /> },
+  { name: 'Analytics', href: '/analytics', icon: <LineChart className="mr-2 h-4 w-4" /> },
   { name: 'Insights', href: '/insights', icon: <BarChart2 className="mr-2 h-4 w-4" /> },
   { name: 'Integrations', href: '/integrations', icon: <Zap className="mr-2 h-4 w-4" /> },
   { name: 'Search', href: '/search', icon: <Search className="mr-2 h-4 w-4" /> },
   { name: 'Settings', href: '/settings', icon: <Settings className="mr-2 h-4 w-4" /> },
+  { name: 'Admin', href: '/admin', icon: <Shield className="mr-2 h-4 w-4" /> },
+  { name: 'System', href: '/system', icon: <Monitor className="mr-2 h-4 w-4" /> },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -157,13 +165,30 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                {/* Admin-only menu items */}
+                <DropdownMenuItem asChild>
+                  <Link href="/admin">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/system">
+                    <Monitor className="mr-2 h-4 w-4" />
+                    <span>System Monitoring</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
