@@ -29,32 +29,34 @@ import {
   AlertTriangleIcon,
   LoaderIcon
 } from 'lucide-react';
+import { FcGoogle } from 'react-icons/fc';
+import { BsGithub, BsMicrosoft, BsSlack } from 'react-icons/bs';
 
 // Authentication providers 
 const providers = [
   {
     id: 'google',
     name: 'Google',
-    icon: 'ri-google-fill',
-    color: 'bg-red-500 hover:bg-red-600'
+    icon: FcGoogle,
+    color: 'hover:bg-gray-100'
   },
   {
     id: 'microsoft',
     name: 'Microsoft',
-    icon: 'ri-microsoft-fill',
-    color: 'bg-blue-500 hover:bg-blue-600'
+    icon: BsMicrosoft,
+    color: 'hover:bg-gray-100'
   },
   {
     id: 'slack',
     name: 'Slack',
-    icon: 'ri-slack-fill',
-    color: 'bg-purple-500 hover:bg-purple-600'
+    icon: BsSlack,
+    color: 'hover:bg-gray-100'
   },
   {
     id: 'github',
     name: 'GitHub',
-    icon: 'ri-github-fill',
-    color: 'bg-gray-800 hover:bg-gray-900'
+    icon: BsGithub,
+    color: 'hover:bg-gray-100'
   }
 ];
 
@@ -302,18 +304,21 @@ export default function AuthPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    {providers.map(provider => (
-                      <Button
-                        key={provider.id}
-                        variant="outline"
-                        className="flex items-center justify-center gap-2"
-                        onClick={() => handleOAuthLogin(provider.id)}
-                        disabled={!providersData?.providers?.[provider.id]}
-                      >
-                        <i className={provider.icon}></i>
-                        {provider.name}
-                      </Button>
-                    ))}
+                    {providers.map(provider => {
+                      const Icon = provider.icon;
+                      return (
+                        <Button
+                          key={provider.id}
+                          variant="outline"
+                          className="flex items-center justify-center gap-2"
+                          onClick={() => handleOAuthLogin(provider.id)}
+                          disabled={!providersData?.providers?.[provider.id]}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {provider.name}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </CardFooter>
               </Card>
