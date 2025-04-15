@@ -243,7 +243,7 @@ function InsightCard({ insight }: InsightProps) {
       </CardContent>
       <CardFooter className="pt-1">
         <div className="flex justify-between items-center w-full">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => console.log('Marked as read')}>
             Mark as read
           </Button>
           <div className="flex gap-2">
@@ -254,12 +254,18 @@ function InsightCard({ insight }: InsightProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>Create task</DropdownMenuItem>
-                <DropdownMenuItem>Share with team</DropdownMenuItem>
-                <DropdownMenuItem>Generate report</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => console.log('Create task')}>
+                  Create task
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => console.log('Share with team')}>
+                  Share with team
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => console.log('Generate report')}>
+                  Generate report
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => console.log('Download')}>
               <Download className="h-4 w-4" />
             </Button>
           </div>

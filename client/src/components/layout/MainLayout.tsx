@@ -165,33 +165,33 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <Link href="/profile" className="w-full">
-                  <DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="flex w-full items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
-                  </DropdownMenuItem>
-                </Link>
-                <Link href="/settings" className="w-full">
-                  <DropdownMenuItem>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex w-full items-center">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
-                  </DropdownMenuItem>
-                </Link>
+                  </Link>
+                </DropdownMenuItem>
                 {/* Admin-only menu items */}
-                <Link href="/admin" className="w-full">
-                  <DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin" className="flex w-full items-center">
                     <Shield className="mr-2 h-4 w-4" />
                     <span>Admin Dashboard</span>
-                  </DropdownMenuItem>
-                </Link>
-                <Link href="/system" className="w-full">
-                  <DropdownMenuItem>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/system" className="flex w-full items-center">
                     <Monitor className="mr-2 h-4 w-4" />
                     <span>System Monitoring</span>
-                  </DropdownMenuItem>
-                </Link>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => console.log('Logged out')}>
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
