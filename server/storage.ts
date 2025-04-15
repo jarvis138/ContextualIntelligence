@@ -140,6 +140,7 @@ export class MemStorage implements IStorage {
   private relationships: Map<number, Relationship>;
   private refreshTokens: Map<number, RefreshToken>;
   private pkceCodeVerifiers: Map<number, PkceCodeVerifier>;
+  private oauthProviderSettings: Map<number, OAuthProviderSetting>;
 
   private currentIds: {
     users: number;
@@ -155,6 +156,7 @@ export class MemStorage implements IStorage {
     relationships: number;
     refreshTokens: number;
     pkceCodeVerifiers: number;
+    oauthProviderSettings: number;
   };
 
   constructor() {
@@ -177,6 +179,7 @@ export class MemStorage implements IStorage {
     this.relationships = new Map();
     this.refreshTokens = new Map();
     this.pkceCodeVerifiers = new Map();
+    this.oauthProviderSettings = new Map();
 
     this.currentIds = {
       users: 1,
@@ -191,7 +194,8 @@ export class MemStorage implements IStorage {
       insights: 1,
       relationships: 1,
       refreshTokens: 1,
-      pkceCodeVerifiers: 1
+      pkceCodeVerifiers: 1,
+      oauthProviderSettings: 1
     };
 
     // Initialize with demo data
