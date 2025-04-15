@@ -9,18 +9,23 @@ export class Encryption {
   private static readonly ivLength = 16; // 128 bits
   private static readonly authTagLength = 16; // 128 bits
   
-  // Encryption key (derived from environment or a secure source)
+  /**
+   * Get encryption key from environment or generate a new one
+   * In production, this should always be from environment
+   */
   private static getEncryptionKey(): Buffer {
     const envKey = process.env.ENCRYPTION_KEY;
     
-    if (envKey && envKey.length >= this.keyLength) {
-      return Buffer.from(envKey.slice(0, this.keyLength));
+    if (envKey) {
+      return Buffer.from(envKey, 'hex');
+    } else {
+      // For development only - in production, always use an environment variable
+      console.warn('WARNING: Using fallback encryption key. Set ENCRYPTION_KEY environment variable in production.');
+      
+      // Use a deterministic key for development to avoid losing access to encrypted data
+      // on application restart
+      return crypto.scryptSync('development-encryption-key-do-not-use-in-production', 'salt', this.keyLength);
     }
-    
-    // If no key in environment, derive one from server secret
-    // NOTE: In production, you should always provide a strong encryption key
-    const serverSecret = process.env.SESSION_SECRET || 'default-session-secret-do-not-use-in-production';
-    return crypto.scryptSync(serverSecret, 'cpi-hub-salt', this.keyLength);
   }
   
   /**
@@ -29,26 +34,26 @@ export class Encryption {
    * @returns Encrypted text in format: iv:authTag:encryptedData (base64)
    */
   public static encrypt(text: string): string {
-    // Generate random initialization vector
+    // Generate a random initialization vector
     const iv = crypto.randomBytes(this.ivLength);
     
-    // Create cipher using key and IV
+    // Get the encryption key
     const key = this.getEncryptionKey();
+    
+    // Create cipher
     const cipher = crypto.createCipheriv(this.algorithm, key, iv);
     
-    // Encrypt the text
-    let encrypted = cipher.update(text, 'utf8', 'base64');
-    encrypted += cipher.final('base64');
+    // Encrypt the data
+    const encrypted = Buffer.concat([
+      cipher.update(text, 'utf8'),
+      cipher.final()
+    ]);
     
-    // Get the authentication tag
+    // Get the auth tag
     const authTag = cipher.getAuthTag();
     
-    // Return IV, auth tag, and encrypted data as a single string
-    return Buffer.concat([
-      iv, 
-      authTag, 
-      Buffer.from(encrypted, 'base64')
-    ]).toString('base64');
+    // Format as iv:authTag:encryptedData and encode to base64
+    return Buffer.concat([iv, authTag, encrypted]).toString('base64');
   }
   
   /**
@@ -58,27 +63,31 @@ export class Encryption {
    */
   public static decrypt(encryptedText: string): string {
     try {
-      // Convert from base64 to buffer
+      // Parse the parts from the base64 string
       const buffer = Buffer.from(encryptedText, 'base64');
       
-      // Extract IV, auth tag, and encrypted data
+      // Extract the different parts
       const iv = buffer.subarray(0, this.ivLength);
       const authTag = buffer.subarray(this.ivLength, this.ivLength + this.authTagLength);
-      const encrypted = buffer.subarray(this.ivLength + this.authTagLength).toString('base64');
+      const encrypted = buffer.subarray(this.ivLength + this.authTagLength);
+      
+      // Get the decryption key
+      const key = this.getEncryptionKey();
       
       // Create decipher
-      const key = this.getEncryptionKey();
       const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
       decipher.setAuthTag(authTag);
       
       // Decrypt the data
-      let decrypted = decipher.update(encrypted, 'base64', 'utf8');
-      decrypted += decipher.final('utf8');
+      const decrypted = Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final()
+      ]);
       
-      return decrypted;
+      return decrypted.toString('utf8');
     } catch (error) {
       console.error('Decryption error:', error);
-      throw new Error('Failed to decrypt data');
+      throw new Error('Failed to decrypt data: The data may be corrupted or tampered with');
     }
   }
 }

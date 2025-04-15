@@ -44,9 +44,12 @@ export interface IStorage {
   
   // Refresh Tokens
   saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken>;
   getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined>;
   getRefreshTokenByToken(token: string): Promise<RefreshToken | undefined>;
+  getRefreshTokenByTokenId(tokenId: string): Promise<RefreshToken | undefined>;
   deleteRefreshToken(userId: number, tokenId: string): Promise<boolean>;
+  revokeRefreshToken(tokenId: string): Promise<boolean>;
   deleteAllRefreshTokens(userId: number): Promise<number>;
   deleteExpiredRefreshTokens(): Promise<number>;
   
@@ -911,6 +914,12 @@ export class MemStorage implements IStorage {
   async getRefreshTokenByToken(token: string): Promise<RefreshToken | undefined> {
     return Array.from(this.refreshTokens.values()).find(
       refreshToken => refreshToken.token === token
+    );
+  }
+  
+  async getRefreshTokenByTokenId(tokenId: string): Promise<RefreshToken | undefined> {
+    return Array.from(this.refreshTokens.values()).find(
+      refreshToken => refreshToken.tokenId === tokenId
     );
   }
 

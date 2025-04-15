@@ -1,5 +1,6 @@
-import { storage } from "../storage";
-import { Encryption } from "../utils/encryption";
+import { storage } from '../storage';
+import { Encryption } from '../utils/encryption';
+import { InsertOAuthToken, InsertRefreshToken } from '@shared/schema';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -20,34 +21,32 @@ export class TokenStorage {
     userId: number,
     provider: string,
     accessToken: string,
-    refreshToken?: string,
-    expiresIn?: number
+    refreshToken?: string | null,
+    expiresIn?: number | null,
+    tokenData?: any
   ): Promise<number> {
     try {
-      // Encrypt tokens before storage
+      // Encrypt sensitive token data
       const encryptedAccessToken = Encryption.encrypt(accessToken);
       const encryptedRefreshToken = refreshToken ? Encryption.encrypt(refreshToken) : null;
       
       // Calculate expiration date if expiresIn is provided
-      const expiresAt = expiresIn 
-        ? new Date(Date.now() + (expiresIn * 1000)) 
-        : new Date(Date.now() + (3600 * 24 * 30 * 1000)); // Default 30 days
+      const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null;
       
-      // Store token in database
+      // Save the token to the database
       const token = await storage.saveOAuthToken({
         userId,
         provider,
         accessToken: encryptedAccessToken,
         refreshToken: encryptedRefreshToken,
         expiresAt,
-        issuedAt: new Date(),
-        tokenId: uuidv4()
+        tokenData: tokenData || null
       });
       
       return token.id;
     } catch (error) {
-      console.error('Error storing OAuth token:', error);
-      throw new Error('Failed to store OAuth token');
+      console.error('Failed to store OAuth token:', error);
+      throw new Error('Failed to securely store OAuth tokens');
     }
   }
   
@@ -59,6 +58,7 @@ export class TokenStorage {
    */
   public static async getAccessToken(userId: number, provider: string): Promise<string | null> {
     try {
+      // Get the most recent token for this user and provider
       const token = await storage.getLatestOAuthToken(userId, provider);
       
       if (!token || !token.accessToken) {
@@ -66,16 +66,15 @@ export class TokenStorage {
       }
       
       // Check if token is expired
-      if (token.expiresAt && token.expiresAt < new Date()) {
-        // TODO: Implement token refresh using the refresh token
-        console.warn('Token expired, refresh not yet implemented');
+      if (token.expiresAt && new Date(token.expiresAt) < new Date()) {
+        console.warn(`Access token for user ${userId} and provider ${provider} is expired`);
         return null;
       }
       
-      // Decrypt and return the token
+      // Decrypt and return the access token
       return Encryption.decrypt(token.accessToken);
     } catch (error) {
-      console.error('Error retrieving access token:', error);
+      console.error('Failed to retrieve OAuth access token:', error);
       return null;
     }
   }
@@ -88,16 +87,17 @@ export class TokenStorage {
    */
   public static async getRefreshToken(userId: number, provider: string): Promise<string | null> {
     try {
+      // Get the token for this user and provider
       const token = await storage.getLatestOAuthToken(userId, provider);
       
       if (!token || !token.refreshToken) {
         return null;
       }
       
-      // Decrypt and return the token
+      // Decrypt and return the refresh token
       return Encryption.decrypt(token.refreshToken);
     } catch (error) {
-      console.error('Error retrieving refresh token:', error);
+      console.error('Failed to retrieve OAuth refresh token:', error);
       return null;
     }
   }
@@ -110,10 +110,9 @@ export class TokenStorage {
    */
   public static async revokeToken(userId: number, provider: string): Promise<boolean> {
     try {
-      await storage.revokeOAuthToken(userId, provider);
-      return true;
+      return await storage.revokeOAuthToken(userId, provider);
     } catch (error) {
-      console.error('Error revoking token:', error);
+      console.error('Failed to revoke OAuth token:', error);
       return false;
     }
   }
@@ -128,24 +127,23 @@ export class TokenStorage {
    */
   public static async storeRefreshToken(
     userId: number,
-    tokenId: string,
     token: string,
     expiresAt: Date
-  ) {
+  ): Promise<string> {
     try {
-      // Encrypt the refresh token
+      // Generate a unique token ID
+      const tokenId = uuidv4();
+      
+      // Encrypt the token
       const encryptedToken = Encryption.encrypt(token);
       
-      return await storage.createRefreshToken({
-        userId,
-        tokenId,
-        token: encryptedToken,
-        expiresAt,
-        createdAt: new Date()
-      });
+      // Store the token
+      await storage.storeRefreshToken(userId, tokenId, encryptedToken, expiresAt);
+      
+      return tokenId;
     } catch (error) {
-      console.error('Error storing refresh token:', error);
-      throw new Error('Failed to store refresh token');
+      console.error('Failed to store refresh token:', error);
+      throw new Error('Failed to securely store refresh token');
     }
   }
   
@@ -156,21 +154,21 @@ export class TokenStorage {
    */
   public static async getRefreshTokenById(tokenId: string): Promise<string | null> {
     try {
-      const tokenRecord = await storage.getRefreshTokenByTokenId(tokenId);
+      const token = await storage.getRefreshTokenByTokenId(tokenId);
       
-      if (!tokenRecord) {
+      if (!token || !token.token) {
         return null;
       }
       
       // Check if token is expired or revoked
-      if (tokenRecord.expiresAt < new Date() || tokenRecord.revokedAt) {
+      if (token.expiresAt < new Date() || token.revokedAt) {
         return null;
       }
       
       // Decrypt and return the token
-      return Encryption.decrypt(tokenRecord.token);
+      return Encryption.decrypt(token.token);
     } catch (error) {
-      console.error('Error retrieving refresh token by ID:', error);
+      console.error('Failed to retrieve refresh token:', error);
       return null;
     }
   }
@@ -182,11 +180,23 @@ export class TokenStorage {
    */
   public static async revokeRefreshToken(tokenId: string): Promise<boolean> {
     try {
-      await storage.revokeRefreshToken(tokenId);
-      return true;
+      return await storage.revokeRefreshToken(tokenId);
     } catch (error) {
-      console.error('Error revoking refresh token:', error);
+      console.error('Failed to revoke refresh token:', error);
       return false;
+    }
+  }
+  
+  /**
+   * Cleans up expired refresh tokens
+   * @returns The number of tokens deleted
+   */
+  public static async cleanupExpiredRefreshTokens(): Promise<number> {
+    try {
+      return await storage.deleteExpiredRefreshTokens();
+    } catch (error) {
+      console.error('Failed to clean up expired refresh tokens:', error);
+      return 0;
     }
   }
 }
