@@ -12,6 +12,7 @@ import { storage } from './storage';
 import { configureOAuthStrategies } from './services/oauth';
 import { pool } from './db';
 import { refreshAccessToken } from './services/tokenService';
+import { randomBytes } from 'crypto';
 
 // Environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-for-development-only';
@@ -27,15 +28,18 @@ export interface AuthUser {
 }
 
 // JWT token generation
-export const generateToken = (user: AuthUser): string => {
+export const generateToken = (user: AuthUser, type: 'access' | 'refresh' = 'access'): string => {
+  const expiresIn = type === 'access' ? JWT_EXPIRES_IN : '7d'; // Access token: 24h, Refresh token: 7 days
+  
   return jwt.sign(
     { 
       id: user.id,
       username: user.username,
-      role: user.role 
+      role: user.role,
+      type // Include token type in payload
     }, 
     JWT_SECRET, 
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn }
   );
 };
 

@@ -39,6 +39,7 @@ export interface IStorage {
   
   // Refresh Tokens
   saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken>;
   getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined>;
   getRefreshTokenByToken(token: string): Promise<RefreshToken | undefined>;
   deleteRefreshToken(userId: number, tokenId: string): Promise<boolean>;
@@ -861,6 +862,17 @@ export class MemStorage implements IStorage {
     this.refreshTokens.set(id, refreshToken);
     return refreshToken;
   }
+  
+  async storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken> {
+    return this.saveRefreshToken({
+      userId,
+      tokenId,
+      token,
+      expiresAt,
+      createdAt: new Date(),
+      revokedAt: null
+    });
+  }
 
   async getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined> {
     return Array.from(this.refreshTokens.values()).find(
@@ -934,6 +946,17 @@ export class DatabaseStorage implements IStorage {
   async saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken> {
     const [refreshToken] = await db.insert(refreshTokens).values(token).returning();
     return refreshToken;
+  }
+  
+  async storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken> {
+    return this.saveRefreshToken({
+      userId,
+      tokenId,
+      token,
+      expiresAt,
+      createdAt: new Date(),
+      revokedAt: null
+    });
   }
 
   async getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined> {
