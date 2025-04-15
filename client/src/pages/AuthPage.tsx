@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import {
   GithubIcon,
   MailIcon,
@@ -77,26 +78,15 @@ export default function AuthPage() {
     confirmPassword: ''
   });
 
-  // Check if user is already logged in
-  const { data: userData, isLoading: isUserLoading } = useQuery({
-    queryKey: ['/api/user'],
-    queryFn: async () => {
-      try {
-        const res = await fetch('/api/user');
-        if (!res.ok) return null;
-        return await res.json();
-      } catch (error) {
-        return null;
-      }
-    }
-  });
+  // Use the auth hook for authentication state
+  const { user, isLoading: isUserLoading } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
-    if (userData && !isUserLoading) {
+    if (user) {
       setLocation('/');
     }
-  }, [userData, isUserLoading, setLocation]);
+  }, [user, setLocation]);
 
   // Get available auth providers
   const { data: providersData } = useQuery({
