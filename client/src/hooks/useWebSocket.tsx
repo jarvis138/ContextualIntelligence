@@ -16,6 +16,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const heartbeatIntervalRef = useRef<number | null>(null);
+  const pingTimeoutRef = useRef<number | null>(null);
   
   const { 
     onMessage,
@@ -24,7 +26,55 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     debugMode = true // Enable debug mode by default during development
   } = options;
 
+  // Setup a heartbeat mechanism to keep the connection alive
+  const setupHeartbeat = useCallback((socket: WebSocket) => {
+    // Clear any existing interval/timeout
+    if (heartbeatIntervalRef.current) {
+      window.clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    if (pingTimeoutRef.current) {
+      window.clearTimeout(pingTimeoutRef.current);
+      pingTimeoutRef.current = null;
+    }
+    
+    // Set up a heartbeat every 30 seconds
+    const heartbeatInterval = window.setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        if (debugMode) console.log('[WebSocket] Sending heartbeat ping');
+        
+        // Send a ping to the server
+        socket.send(JSON.stringify({ type: 'ping', data: { timestamp: Date.now() } }));
+        
+        // Set a timeout for the pong response
+        pingTimeoutRef.current = window.setTimeout(() => {
+          if (debugMode) console.log('[WebSocket] No heartbeat response received, reconnecting');
+          
+          // If we don't get a pong back, close the connection and reconnect
+          if (socket) {
+            socket.close();
+            connect();
+          }
+        }, 5000); // Wait 5 seconds for a response
+      }
+    }, 30000); // Send a heartbeat every 30 seconds
+    
+    heartbeatIntervalRef.current = heartbeatInterval;
+  }, [debugMode]);
+  
   const connect = useCallback(() => {
+    // Clean up any existing intervals or timeouts
+    if (heartbeatIntervalRef.current) {
+      window.clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    if (pingTimeoutRef.current) {
+      window.clearTimeout(pingTimeoutRef.current);
+      pingTimeoutRef.current = null;
+    }
+    
     // Close existing socket if it exists
     if (socketRef.current) {
       socketRef.current.close();
@@ -56,6 +106,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         setError(null);
         setReconnectCount(0);
         setConnectionStatus('connected');
+        
+        // Setup the heartbeat once connected
+        setupHeartbeat(socket);
       };
 
       socket.onclose = (event) => {
@@ -65,6 +118,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
         
         setIsConnected(false);
+        
+        // Clear heartbeat interval/timeout on close
+        if (heartbeatIntervalRef.current) {
+          window.clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+        }
+        
+        if (pingTimeoutRef.current) {
+          window.clearTimeout(pingTimeoutRef.current);
+          pingTimeoutRef.current = null;
+        }
         
         // If connection was closed abnormally and we haven't exceeded reconnect attempts
         if (!event.wasClean && reconnectCount < reconnectAttempts) {
@@ -94,7 +158,32 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
       socket.onmessage = (event) => {
         try {
+          // Handle special case for pong response
+          if (event.data === 'pong' || event.data === '"pong"') {
+            if (debugMode) console.log('[WebSocket] Received heartbeat pong');
+            
+            // Clear the ping timeout since we got a response
+            if (pingTimeoutRef.current) {
+              window.clearTimeout(pingTimeoutRef.current);
+              pingTimeoutRef.current = null;
+            }
+            return;
+          }
+          
           const data = JSON.parse(event.data) as WebSocketMessage;
+          
+          // Check if message is a pong response
+          if (data.type === 'pong') {
+            if (debugMode) console.log('[WebSocket] Received heartbeat pong');
+            
+            // Clear the ping timeout since we got a response
+            if (pingTimeoutRef.current) {
+              window.clearTimeout(pingTimeoutRef.current);
+              pingTimeoutRef.current = null;
+            }
+            return;
+          }
+          
           if (debugMode) console.log('[WebSocket] Message received:', data);
           
           if (onMessage) {
@@ -111,7 +200,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       setError(error);
       setConnectionStatus('failed');
     }
-  }, [reconnectCount, reconnectAttempts, reconnectInterval, onMessage, debugMode]);
+  }, [reconnectCount, reconnectAttempts, reconnectInterval, onMessage, debugMode, setupHeartbeat]);
 
   const sendMessage = useCallback((type: string, data: any) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -125,9 +214,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }, [options.debugMode]);
 
   const disconnect = useCallback(() => {
+    // Clear any pending timeouts or intervals
     if (reconnectTimeoutRef.current) {
       window.clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    
+    if (heartbeatIntervalRef.current) {
+      window.clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    if (pingTimeoutRef.current) {
+      window.clearTimeout(pingTimeoutRef.current);
+      pingTimeoutRef.current = null;
     }
     
     if (socketRef.current) {
@@ -135,6 +235,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       socketRef.current.close();
       socketRef.current = null;
       setConnectionStatus('disconnected');
+      setIsConnected(false);
     }
   }, [debugMode]);
 

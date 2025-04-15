@@ -29,6 +29,7 @@ import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
+import { TokenRefresh } from "./services/tokenRefresh";
 import { 
   testSlackIntegration, 
   sendProjectUpdate, 
@@ -54,6 +55,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup OAuth Authentication (with Passport)
   setupAuth(app);
+  
+  // Add token refresh middleware
+  app.use(TokenRefresh.createTokenRefreshMiddleware());
   
   // Create initial demo data if the database is empty
   const createInitialData = async () => {
