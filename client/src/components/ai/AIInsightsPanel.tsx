@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb, AlertTriangle, Sparkles, LineChart, Zap, BarChart4 } from 'lucide-react';
+import { useAIServices } from '@/hooks/useAIServices';
+import { Loader2, Lightbulb, AlertTriangle, Sparkles, LineChart, Zap, BarChart4, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface AIInsightsPanelProps {
   projectId: number;
@@ -30,6 +32,7 @@ interface Insight {
 const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>('insights');
+  const { isOpenAIAvailable, isLoading: aiServiceCheckLoading } = useAIServices();
 
   // Fetch existing insights
   const { data: insights, isLoading: insightsLoading } = useQuery({
@@ -216,7 +219,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
               variant="outline"
               size="sm"
               onClick={() => generateInsightsMutation.mutate()}
-              disabled={generateInsightsMutation.isPending}
+              disabled={generateInsightsMutation.isPending || !isOpenAIAvailable}
             >
               {generateInsightsMutation.isPending ? (
                 <>
@@ -234,6 +237,24 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {aiServiceCheckLoading ? (
+          <div className="flex items-center justify-center h-20 p-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+            <p>Checking AI service availability...</p>
+          </div>
+        ) : !isOpenAIAvailable ? (
+          <Alert variant="destructive" className="m-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>AI Service Unavailable</AlertTitle>
+            <AlertDescription>
+              OpenAI API key is not configured. AI-powered insights are currently unavailable.
+              <div className="mt-2 flex items-center">
+                <KeyRound className="h-4 w-4 mr-2" />
+                <span className="text-sm">Contact your administrator to set up the OpenAI API key.</span>
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <Tabs defaultValue="insights" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full justify-start border-b rounded-none h-12 px-6">
             <TabsTrigger value="insights">Insights</TabsTrigger>
@@ -263,7 +284,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
                 </p>
                 <Button 
                   onClick={() => generateInsightsMutation.mutate()}
-                  disabled={generateInsightsMutation.isPending}
+                  disabled={generateInsightsMutation.isPending || !isOpenAIAvailable}
                 >
                   {generateInsightsMutation.isPending ? (
                     <>
@@ -314,7 +335,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
                 </p>
                 <Button 
                   onClick={() => generateTopicsMutation.mutate()}
-                  disabled={generateTopicsMutation.isPending}
+                  disabled={generateTopicsMutation.isPending || !isOpenAIAvailable}
                 >
                   Generate Topic Models
                 </Button>
@@ -363,14 +384,14 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ projectId }) => {
                 <div className="flex gap-2 justify-center">
                   <Button 
                     onClick={() => generatePredictiveInsightsMutation.mutate('timeline')}
-                    disabled={generatePredictiveInsightsMutation.isPending}
+                    disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
                     variant="outline"
                   >
                     Timeline Analysis
                   </Button>
                   <Button 
                     onClick={() => generatePredictiveInsightsMutation.mutate('resources')}
-                    disabled={generatePredictiveInsightsMutation.isPending}
+                    disabled={generatePredictiveInsightsMutation.isPending || !isOpenAIAvailable}
                     variant="outline"
                   >
                     Resource Analysis
