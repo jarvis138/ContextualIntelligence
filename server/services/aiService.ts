@@ -2,10 +2,20 @@ import OpenAI from "openai";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 
+// Check for OpenAI API key
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("OPENAI_API_KEY environment variable is not set. AI features will be limited.");
+}
+
 // Initialize OpenAI client
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || '' // Provide empty string as fallback to avoid null
 });
+
+// Utility to check if the OpenAI client is properly configured
+function isOpenAIConfigured(): boolean {
+  return !!process.env.OPENAI_API_KEY;
+}
 
 // Type definitions
 interface InsightResult {
@@ -52,6 +62,12 @@ interface TopicModelingResult {
  */
 export async function generateAIInsights(params: AnalysisRequest): Promise<InsightResult[]> {
   try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot generate AI insights.");
+      return [];
+    }
+    
     const { projectId, context, options = {} } = params;
     
     // Gather project data
@@ -98,6 +114,12 @@ export async function generateAIInsights(params: AnalysisRequest): Promise<Insig
  */
 export async function generateTopicModels(projectId: number): Promise<TopicModelingResult> {
   try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot generate topic models.");
+      return { topics: [], documentTopics: [] };
+    }
+    
     // Get documents related to project
     const documents = await getProjectDocuments(projectId);
     
@@ -290,9 +312,13 @@ export async function generatePredictiveInsights(projectId: number, focusArea: '
     const result = JSON.parse(content);
     
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error generating predictive insights:", error);
-    throw new Error(`Failed to generate predictive insights: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate predictive insights: ${error.message}`);
+    } else {
+      throw new Error("Failed to generate predictive insights: Unknown error");
+    }
   }
 }
 
@@ -353,9 +379,13 @@ export async function detectAnomalies(projectId: number): Promise<any> {
     const result = JSON.parse(content);
     
     return result.anomalies || [];
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error detecting anomalies:", error);
-    throw new Error(`Failed to detect anomalies: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to detect anomalies: ${error.message}`);
+    } else {
+      throw new Error("Failed to detect anomalies: Unknown error");
+    }
   }
 }
 
@@ -408,9 +438,13 @@ async function getProjectDataForAnalysis(projectId: number, options: AnalysisReq
     }
     
     return projectData;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error getting project data for analysis:", error);
-    throw new Error(`Failed to get project data: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to get project data: ${error.message}`);
+    } else {
+      throw new Error("Failed to get project data: Unknown error");
+    }
   }
 }
 
@@ -424,7 +458,7 @@ async function getProjectDocuments(projectId: number): Promise<any[]> {
     });
     
     return documents;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error getting project documents:", error);
     return [];
   }
@@ -444,7 +478,7 @@ async function getDocumentsByIds(documentIds: number[]): Promise<any[]> {
     });
     
     return documents;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error getting documents by IDs:", error);
     return [];
   }
