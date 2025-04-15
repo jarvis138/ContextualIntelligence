@@ -1380,6 +1380,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // AI-powered insights routes
+  router.post("/projects/:projectId/ai-insights", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      
+      // Validate project ID
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ success: false, message: "Project not found" });
+      }
+      
+      // Check for OpenAI API key
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+        });
+      }
+      
+      // Generate insights using our AI service
+      const analysisRequest = {
+        projectId,
+        context: req.body.context,
+        options: req.body.options || {}
+      };
+      
+      const insights = await generateAIInsights(analysisRequest);
+      
+      // Log activity
+      await storage.createActivity({
+        type: "ai_analysis",
+        description: "Generated AI-powered insights for project",
+        userId: req.user?.id || 1, // Default to system user if not authenticated
+        projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        insights
+      });
+    } catch (error: any) {
+      console.error("AI insights error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error generating AI insights", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/topic-modeling", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      
+      // Validate project ID
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ success: false, message: "Project not found" });
+      }
+      
+      // Check for OpenAI API key
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+        });
+      }
+      
+      const topicModel = await generateTopicModels(projectId);
+      
+      // Log activity
+      await storage.createActivity({
+        type: "ai_analysis",
+        description: "Generated topic model for project documents",
+        userId: req.user?.id || 1,
+        projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        topicModel
+      });
+    } catch (error: any) {
+      console.error("Topic modeling error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error generating topic model", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/coreference-resolution", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const documentIds = req.body.documentIds;
+      
+      // Validate document IDs
+      if (!Array.isArray(documentIds) || documentIds.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Document IDs array is required" 
+        });
+      }
+      
+      // Check for OpenAI API key
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+        });
+      }
+      
+      const coreferences = await resolveCoreferences(documentIds);
+      
+      res.json({ 
+        success: true, 
+        coreferences
+      });
+    } catch (error: any) {
+      console.error("Coreference resolution error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error resolving coreferences", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/predictive-insights/:focusArea?", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const focusArea = (req.params.focusArea || 'timeline') as 'timeline' | 'resources' | 'risks';
+      
+      // Validate focus area
+      const validFocusAreas = ['timeline', 'resources', 'risks'];
+      if (!validFocusAreas.includes(focusArea)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Invalid focus area. Valid options are: ${validFocusAreas.join(', ')}` 
+        });
+      }
+      
+      // Check for OpenAI API key
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+        });
+      }
+      
+      const predictiveInsights = await generatePredictiveInsights(projectId, focusArea);
+      
+      // Log activity
+      await storage.createActivity({
+        type: "ai_analysis",
+        description: `Generated predictive insights for project (${focusArea})`,
+        userId: req.user?.id || 1,
+        projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        focusArea,
+        insights: predictiveInsights
+      });
+    } catch (error: any) {
+      console.error("Predictive insights error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error generating predictive insights", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/projects/:projectId/anomaly-detection", authenticateToken, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      
+      // Validate project ID
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ success: false, message: "Project not found" });
+      }
+      
+      // Check for OpenAI API key
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+        });
+      }
+      
+      const anomalies = await detectAnomalies(projectId);
+      
+      // Log activity
+      await storage.createActivity({
+        type: "ai_analysis",
+        description: "Detected anomalies in project data",
+        userId: req.user?.id || 1,
+        projectId
+      });
+      
+      res.json({ 
+        success: true, 
+        anomalies
+      });
+    } catch (error: any) {
+      console.error("Anomaly detection error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error detecting anomalies", 
+        error: error.message 
+      });
+    }
+  });
+
   // Register the router with /api prefix
   app.use("/api", router);
 

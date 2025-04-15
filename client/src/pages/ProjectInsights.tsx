@@ -6,9 +6,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, AlertCircle, Search, FileText, Network, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, Search, FileText, Network, RefreshCw, Lightbulb } from "lucide-react";
 import { ContextGraph } from "@/components/visualization/ContextGraph";
 import DocumentSummary, { DocumentSummaryData } from "@/components/nlp/DocumentSummary";
+import { AIInsightsPanel } from "@/components/ai";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/queryClient";
 import * as nlpService from "@/lib/nlpService";
@@ -163,8 +164,12 @@ const ProjectInsights = () => {
         </Button>
       </div>
       
-      <Tabs defaultValue="graph">
+      <Tabs defaultValue="ai-insights">
         <TabsList className="mb-4">
+          <TabsTrigger value="ai-insights">
+            <Lightbulb className="h-4 w-4 mr-2" />
+            AI Insights
+          </TabsTrigger>
           <TabsTrigger value="graph">
             <Network className="h-4 w-4 mr-2" />
             Context Graph
@@ -178,6 +183,11 @@ const ProjectInsights = () => {
             Semantic Search
           </TabsTrigger>
         </TabsList>
+        
+        {/* AI Insights Tab */}
+        <TabsContent value="ai-insights" className="space-y-4">
+          <AIInsightsPanel projectId={id} />
+        </TabsContent>
         
         {/* Context Graph Tab */}
         <TabsContent value="graph" className="space-y-4">
