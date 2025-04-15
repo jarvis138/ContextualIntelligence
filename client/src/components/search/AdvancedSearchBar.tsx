@@ -32,12 +32,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface SearchFilter {
-  field: string;
-  operator: 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'not' | 'before' | 'after';
-  value: string;
-}
+import { SearchFilter } from '@shared/schema';
 
 const availableFields = [
   { value: 'content', label: 'Content' },
@@ -51,24 +46,24 @@ const availableFields = [
 ];
 
 const operators = {
-  content: ['contains', 'not'],
-  title: ['contains', 'equals', 'startsWith', 'endsWith', 'not'],
-  author: ['equals', 'not'],
-  date: ['before', 'after', 'equals'],
-  type: ['equals', 'not'],
-  entity: ['contains', 'equals', 'not'],
-  sentiment: ['equals', 'not'],
-  topic: ['equals', 'contains', 'not'],
+  content: ['contains', 'equals', 'startsWith', 'endsWith'],
+  title: ['contains', 'equals', 'startsWith', 'endsWith'],
+  author: ['equals', 'contains'],
+  date: ['greaterThan', 'lessThan', 'equals', 'between'],
+  type: ['equals', 'contains'],
+  entity: ['contains', 'equals'],
+  sentiment: ['equals', 'greaterThan', 'lessThan'],
+  topic: ['equals', 'contains'],
 };
 
-const operatorLabels = {
+const operatorLabels: Record<string, string> = {
   contains: 'contains',
   equals: 'equals',
   startsWith: 'starts with',
   endsWith: 'ends with',
-  not: 'does not contain',
-  before: 'before',
-  after: 'after',
+  greaterThan: 'greater than',
+  lessThan: 'less than',
+  between: 'between',
 };
 
 interface AdvancedSearchBarProps {
@@ -215,7 +210,7 @@ export function AdvancedSearchBar({
                     <SelectContent>
                       {operators[currentField as keyof typeof operators]?.map((op) => (
                         <SelectItem key={op} value={op}>
-                          {operatorLabels[op as keyof typeof operatorLabels]}
+                          {operatorLabels[op] || op}
                         </SelectItem>
                       ))}
                     </SelectContent>

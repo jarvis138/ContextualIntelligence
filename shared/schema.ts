@@ -3,6 +3,41 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Search filter schema for frontend to backend communication
+export const searchFilterSchema = z.object({
+  field: z.string(),
+  operator: z.enum(["equals", "contains", "startsWith", "endsWith", "greaterThan", "lessThan", "between"]),
+  value: z.union([z.string(), z.number(), z.array(z.string()), z.array(z.number())])
+});
+
+export type SearchFilter = z.infer<typeof searchFilterSchema>;
+
+// Search result types for consistent type checking
+export const searchResultSchema = z.object({
+  id: z.string(),
+  documentId: z.number().optional(),
+  title: z.string(),
+  type: z.enum(["document", "comment", "task", "user", "project"]),
+  snippet: z.string(),
+  relevance: z.number(),
+  date: z.string().optional(),
+  author: z.string().optional(),
+  fileType: z.string().optional(),
+  url: z.string().optional(),
+  entities: z.array(z.object({
+    id: z.string(),
+    type: z.string(),
+    name: z.string(),
+    confidence: z.number()
+  })).optional(),
+  highlights: z.array(z.object({
+    field: z.string(),
+    snippet: z.string()
+  })).optional()
+});
+
+export type SearchResult = z.infer<typeof searchResultSchema>;
+
 // Enums for consistent values across the application
 export const userRoleEnum = pgEnum("user_role", ["admin", "manager", "user", "viewer"]);
 export const authMethodEnum = pgEnum("auth_method", ["local", "google", "microsoft", "slack", "github"]);
