@@ -249,20 +249,33 @@ function setupAuthRoutes(app: Express) {
   // Local authentication routes
   app.post('/auth/login', passport.authenticate('local'), (req, res) => {
     const user = req.user as User;
-    const token = generateToken({
+    const authUser = {
       id: user.id,
       username: user.username,
       role: user.role,
       authMethod: user.authMethod
-    });
+    };
     
-    res.cookie('token', token, {
+    // Generate access token
+    const accessToken = generateToken(authUser);
+    
+    // Generate refresh token
+    const refreshToken = generateToken(authUser, 'refresh');
+    
+    // Store refresh token in database
+    const tokenId = randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    storage.storeRefreshToken(user.id, tokenId, refreshToken, expiresAt);
+    
+    // Set token as cookie
+    res.cookie('token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 60 * 60 * 1000 // 1 hour
     });
     
-    res.json({ user, token });
+    // Return both tokens to client
+    res.json({ user, token: accessToken, refreshToken });
   });
   
   app.post('/auth/register', async (req, res) => {

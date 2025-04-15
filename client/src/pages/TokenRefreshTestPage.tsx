@@ -1,17 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
 export default function TokenRefreshTestPage() {
-  const { user, refreshToken } = useAuth();
+  const { user, refreshToken, loginMutation } = useAuth();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTokenValue, setRefreshTokenValue] = useState<string | null>(null);
   
-  // For testing purposes - normally we'd store and get the refresh token from secure storage
-  const mockRefreshToken = "test-refresh-token";
+  // Store refresh token when logging in for testing purposes
+  useEffect(() => {
+    if (loginMutation.data?.refreshToken) {
+      setRefreshTokenValue(loginMutation.data.refreshToken);
+    }
+  }, [loginMutation.data]);
 
   const handleTestRefresh = async () => {
     setLoading(true);
@@ -19,8 +24,11 @@ export default function TokenRefreshTestPage() {
     setError(null);
     
     try {
-      // In a real application, we would retrieve the refresh token from secure storage
-      const response = await refreshToken(mockRefreshToken);
+      if (!refreshTokenValue) {
+        throw new Error("No refresh token available. Please login first to get a refresh token.");
+      }
+      // Use the actual refresh token from the login response
+      const response = await refreshToken(refreshTokenValue);
       setResult(JSON.stringify(response, null, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
