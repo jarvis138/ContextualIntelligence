@@ -28,6 +28,9 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByExternalId(externalId: string, provider: string): Promise<User | undefined>;
+  
+  // Refresh Tokens
+  storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
@@ -39,7 +42,6 @@ export interface IStorage {
   
   // Refresh Tokens
   saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
-  storeRefreshToken(userId: number, tokenId: string, token: string, expiresAt: Date): Promise<RefreshToken>;
   getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined>;
   getRefreshTokenByToken(token: string): Promise<RefreshToken | undefined>;
   deleteRefreshToken(userId: number, tokenId: string): Promise<boolean>;

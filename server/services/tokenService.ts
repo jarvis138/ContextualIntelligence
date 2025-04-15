@@ -75,12 +75,8 @@ export function generateToken(
  */
 async function storeRefreshToken(userId: number, tokenId: string, token: string): Promise<void> {
   try {
-    await storage.saveRefreshToken({
-      userId,
-      tokenId,
-      token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await storage.storeRefreshToken(userId, tokenId, token, expiresAt);
   } catch (error) {
     console.error('Error storing refresh token:', error);
   }
