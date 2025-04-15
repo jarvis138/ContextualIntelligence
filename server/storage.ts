@@ -36,6 +36,14 @@ export interface IStorage {
   saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any>;
   getOAuthToken(userId: number, provider: string): Promise<any | undefined>;
   deleteOAuthToken(userId: number, provider: string): Promise<boolean>;
+  
+  // Refresh Tokens
+  saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  getRefreshToken(userId: number, tokenId: string): Promise<RefreshToken | undefined>;
+  getRefreshTokenByToken(token: string): Promise<RefreshToken | undefined>;
+  deleteRefreshToken(userId: number, tokenId: string): Promise<boolean>;
+  deleteAllRefreshTokens(userId: number): Promise<number>;
+  deleteExpiredRefreshTokens(): Promise<number>;
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
@@ -114,6 +122,7 @@ export class MemStorage implements IStorage {
   private integrations: Map<number, Integration>;
   private insights: Map<number, Insight>;
   private relationships: Map<number, Relationship>;
+  private refreshTokens: Map<number, RefreshToken>;
 
   private currentIds: {
     users: number;
@@ -127,6 +136,7 @@ export class MemStorage implements IStorage {
     integrations: number;
     insights: number;
     relationships: number;
+    refreshTokens: number;
   };
 
   constructor() {
@@ -147,6 +157,7 @@ export class MemStorage implements IStorage {
     this.integrations = new Map();
     this.insights = new Map();
     this.relationships = new Map();
+    this.refreshTokens = new Map();
 
     this.currentIds = {
       users: 1,
@@ -159,7 +170,8 @@ export class MemStorage implements IStorage {
       activities: 1,
       integrations: 1,
       insights: 1,
-      relationships: 1
+      relationships: 1,
+      refreshTokens: 1
     };
 
     // Initialize with demo data
