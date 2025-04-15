@@ -15,6 +15,10 @@ export default function Documents() {
   const [_, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   
+  const navigateToDocumentManagement = () => {
+    navigate('/documents/manage');
+  };
+  
   const { data: documents, isLoading } = useQuery({
     queryKey: ['/api/documents/recent'],
     queryFn: () => getRecentDocuments()
@@ -115,6 +119,10 @@ export default function Documents() {
                 description: "This would open a document creation form"
               })}>
                 <i className="ri-add-line mr-1"></i> New
+              </Button>
+              
+              <Button variant="secondary" onClick={navigateToDocumentManagement}>
+                <i className="ri-settings-line mr-1"></i> Manage Docs
               </Button>
             </div>
           </div>
