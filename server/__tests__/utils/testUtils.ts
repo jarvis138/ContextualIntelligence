@@ -201,46 +201,66 @@ export async function getAuthToken(app: Express, username: string, password: str
 
 /**
  * Clean up test data after tests
+ * Note: In a real implementation, this would use actual delete methods from storage
+ * This is a simplified version that logs what would be deleted
  */
 export async function cleanupTestData(testData: TestData): Promise<void> {
-  // Delete in reverse order of dependencies
+  // Instead of actually deleting, we'll just log what would be deleted
+  // This is because the current storage interface doesn't have delete methods
+  
+  // In a real implementation with proper delete methods, you would:
+  // 1. Delete in reverse order of dependencies
+  // 2. Use actual storage.deleteX methods
+  
+  console.log('Cleaning up test data...');
+  
+  // Tasks
   for (const task of testData.tasks) {
     try {
-      await storage.deleteTask(task.id);
+      // await storage.deleteTask(task.id);
+      console.log(`Would delete task ${task.id}`);
     } catch (err) {
-      console.error(`Failed to delete test task ${task.id}:`, err);
+      console.error(`Failed to clean up test task ${task.id}:`, err);
     }
   }
   
+  // Documents
   for (const document of testData.documents) {
     try {
-      await storage.deleteDocument(document.id);
+      // await storage.deleteDocument(document.id);
+      console.log(`Would delete document ${document.id}`);
     } catch (err) {
-      console.error(`Failed to delete test document ${document.id}:`, err);
+      console.error(`Failed to clean up test document ${document.id}:`, err);
     }
   }
   
+  // Teams
   for (const team of testData.teams) {
     try {
-      await storage.deleteTeam(team.id);
+      // await storage.deleteTeam(team.id);
+      console.log(`Would delete team ${team.id}`);
     } catch (err) {
-      console.error(`Failed to delete test team ${team.id}:`, err);
+      console.error(`Failed to clean up test team ${team.id}:`, err);
     }
   }
   
+  // Projects
   for (const project of testData.projects) {
     try {
-      await storage.deleteProject(project.id);
+      // await storage.deleteProject(project.id);
+      console.log(`Would delete project ${project.id}`);
     } catch (err) {
-      console.error(`Failed to delete test project ${project.id}:`, err);
+      console.error(`Failed to clean up test project ${project.id}:`, err);
     }
   }
   
+  // Users
   for (const user of testData.users) {
     try {
-      await storage.deleteUser(user.id);
+      // await storage.deleteUser(user.id);
+      console.log(`Would delete user ${user.id}`);
     } catch (err) {
-      console.error(`Failed to delete test user ${user.id}:`, err);
+      console.error(`Failed to clean up test user ${user.id}:`, err);
     }
   }
 }
