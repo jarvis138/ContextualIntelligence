@@ -927,8 +927,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Admin routes - Development Data Generation
   // This route is for development only and should be removed in production
-  router.post("/admin/generate-sample-data", async (req, res) => {
+  router.post("/admin/generate-sample-data", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const { generateSampleData } = await import('./controllers/adminController');
       await generateSampleData(req, res);
     } catch (error: any) {
@@ -941,9 +945,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes - Audit Logs
-  // For development, remove authentication temporarily
-  router.get("/admin/audit-logs", async (req, res) => {
+  router.get("/admin/audit-logs", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
       const action = req.query.action as string;
       const entityType = req.query.entityType as string;
@@ -979,9 +986,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin routes - Database stats
-  // For development, remove authentication temporarily
-  router.get("/admin/db-stats", async (req, res) => {
+  router.get("/admin/db-stats", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const stats = await adminService.getDatabaseStats();
       res.json(stats);
     } catch (error: any) {
@@ -994,9 +1004,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin routes - System performance
-  // For development, remove authentication temporarily
-  router.get("/admin/system-performance", async (req, res) => {
+  router.get("/admin/system-performance", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const performance = await adminService.getSystemPerformance();
       res.json(performance);
     } catch (error: any) {
@@ -1446,8 +1459,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract entities from text
   router.post("/nlp/extract-entities", authenticateToken, nlpController.extractEntities);
   
-  // Simple test endpoint for text processing without authentication
-  router.post("/nlp/test-preprocessing", async (req, res) => {
+  // Simple test endpoint for text processing
+  router.post("/nlp/test-preprocessing", authenticateToken, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     try {
       if (!req.body.text) {
         return res.status(400).json({ error: 'Text is required' });
