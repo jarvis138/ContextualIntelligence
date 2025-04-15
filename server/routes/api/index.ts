@@ -6,6 +6,13 @@
  */
 
 import { Router } from 'express';
+import { userRoutes } from './users';
+import { projectRoutes } from './projects';
+import { documentRoutes } from './documents';
+import { taskRoutes } from './tasks';
+import { teamRoutes } from './teams';
+import { settingsRoutes } from './settings';
+import { errorHandler } from '../../middleware/errorHandler';
 
 // Create API router
 const apiRouter = Router();
@@ -20,12 +27,14 @@ apiRouter.get('/health', (req, res) => {
 });
 
 // Mount resource routes
-// These will be implemented in their respective files
-// apiRouter.use('/users', userRoutes);
-// apiRouter.use('/projects', projectRoutes);
-// apiRouter.use('/documents', documentRoutes);
-// apiRouter.use('/tasks', taskRoutes);
-// apiRouter.use('/teams', teamRoutes);
-// apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/projects', projectRoutes);
+apiRouter.use('/documents', documentRoutes);
+apiRouter.use('/tasks', taskRoutes);
+apiRouter.use('/teams', teamRoutes);
+apiRouter.use('/settings', settingsRoutes);
+
+// Apply error handler to all API routes
+apiRouter.use(errorHandler);
 
 export { apiRouter };
