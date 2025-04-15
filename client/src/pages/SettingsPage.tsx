@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import MainLayout from '@/components/layout/MainLayout';
 import { apiRequest } from '@/lib/queryClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle, Copy } from 'lucide-react';
 
 interface OAuthProvider {
   id: string;
@@ -24,13 +26,17 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   
   // Fetch saved providers
-  const { data: providers = [], isLoading } = useQuery({
+  const { data: providers = [], isLoading, error: fetchError } = useQuery({
     queryKey: ['/api/settings/oauth-providers'],
     queryFn: async () => {
       try {
         const res = await apiRequest('GET', '/api/settings/oauth-providers');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch OAuth providers: ${res.status} ${res.statusText}`);
+        }
         return await res.json();
       } catch (error) {
+        console.error("Error fetching OAuth providers:", error);
         // If there's an error or no saved providers, return default providers
         return getDefaultProviders();
       }
@@ -38,22 +44,25 @@ export default function SettingsPage() {
   });
   
   // Form state
-  const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>(
-    providers.length > 0 ? providers : getDefaultProviders()
-  );
+  const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>(getDefaultProviders());
   
   // Update providers when fetched data changes
-  useState(() => {
-    if (providers.length > 0) {
+  useEffect(() => {
+    if (providers && providers.length > 0) {
+      console.log("Updating OAuth providers from API:", providers);
       setOauthProviders(providers);
     }
-  });
+  }, [providers]);
   
   // Save OAuth provider settings
   const saveProvidersMutation = useMutation({
     mutationFn: async (providers: OAuthProvider[]) => {
       const res = await apiRequest('POST', '/api/settings/oauth-providers', providers);
-      return res.json();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Failed to save settings: ${res.status} ${res.statusText}`);
+      }
+      return await res.json();
     },
     onSuccess: () => {
       toast({
@@ -63,6 +72,7 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/settings/oauth-providers'] });
     },
     onError: (error: any) => {
+      console.error("Error saving OAuth providers:", error);
       toast({
         title: "Error saving settings",
         description: error.message || "There was an error saving your settings.",
@@ -73,7 +83,25 @@ export default function SettingsPage() {
   
   // Handle form submission
   const handleSaveSettings = () => {
+    console.log("Saving OAuth provider settings:", oauthProviders);
     saveProvidersMutation.mutate(oauthProviders);
+  };
+  
+  // Copy to clipboard helper
+  const copyToClipboard = (text: string, description: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ 
+        title: "Copied to clipboard",
+        description: description || "Text copied to clipboard"
+      });
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive"
+      });
+    });
   };
   
   // Update provider settings
