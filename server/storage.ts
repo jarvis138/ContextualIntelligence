@@ -931,6 +931,17 @@ export class MemStorage implements IStorage {
     // Delete the token from storage
     return this.refreshTokens.delete(token.id);
   }
+  
+  async revokeRefreshToken(tokenId: string): Promise<boolean> {
+    // Find the token by tokenId
+    const token = await this.getRefreshTokenByTokenId(tokenId);
+    if (!token) return false;
+    
+    // Mark token as revoked instead of deleting it
+    token.revokedAt = new Date();
+    this.refreshTokens.set(token.id, token);
+    return true;
+  }
 
   async deleteAllRefreshTokens(userId: number): Promise<number> {
     // Find all tokens for this user
@@ -1093,6 +1104,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(refreshTokens.token, token));
     return refreshToken || undefined;
   }
+  
+  async getRefreshTokenByTokenId(tokenId: string): Promise<RefreshToken | undefined> {
+    const [refreshToken] = await db.select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenId, tokenId));
+    return refreshToken || undefined;
+  }
 
   async deleteRefreshToken(userId: number, tokenId: string): Promise<boolean> {
     await db.delete(refreshTokens)
@@ -1119,6 +1137,16 @@ export class DatabaseStorage implements IStorage {
     // Count is not directly available from delete operation
     // This is an approximation
     return 1; // Return at least 1 if operation was successful
+  }
+  
+  async revokeRefreshToken(tokenId: string): Promise<boolean> {
+    // Mark token as revoked instead of deleting it
+    const [updatedToken] = await db.update(refreshTokens)
+      .set({ revokedAt: new Date() })
+      .where(eq(refreshTokens.tokenId, tokenId))
+      .returning();
+    
+    return !!updatedToken;
   }
 
   // PKCE Code Verifiers
@@ -1283,6 +1311,17 @@ export class DatabaseStorage implements IStorage {
         sql`${oauthTokens.userId} = ${userId} AND ${oauthTokens.provider} = ${provider}`
       );
     return token || undefined;
+  }
+  
+  async getLatestOAuthToken(userId: number, provider: string): Promise<any | undefined> {
+    // In this implementation, there's only one token per user/provider combination
+    // So this is the same as getOAuthToken
+    return this.getOAuthToken(userId, provider);
+  }
+  
+  async revokeOAuthToken(userId: number, provider: string): Promise<boolean> {
+    // This implementation simply deletes the token
+    return this.deleteOAuthToken(userId, provider);
   }
   
   async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
