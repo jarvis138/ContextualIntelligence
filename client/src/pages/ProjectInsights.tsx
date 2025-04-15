@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, AlertCircle, Search, FileText, Network } from "lucide-react";
-import ContextGraph from "@/components/nlp/ContextGraph";
+import { Loader2, AlertCircle, Search, FileText, Network, RefreshCw } from "lucide-react";
+import { ContextGraph } from "@/components/visualization/ContextGraph";
 import DocumentSummary, { DocumentSummaryData } from "@/components/nlp/DocumentSummary";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/queryClient";
@@ -181,12 +181,41 @@ const ProjectInsights = () => {
         
         {/* Context Graph Tab */}
         <TabsContent value="graph" className="space-y-4">
-          <ContextGraph
-            projectId={id}
-            data={graphData}
-            isLoading={isLoadingGraph || regenerateGraphMutation.isPending}
-            onRefresh={() => regenerateGraphMutation.mutate()}
-          />
+          <Card>
+            <CardHeader className="flex flex-row justify-between">
+              <div>
+                <CardTitle>Contextual Relationship Graph</CardTitle>
+                <CardDescription>
+                  Interactive visualization of project relationships and connections
+                </CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => regenerateGraphMutation.mutate()}
+                disabled={isLoadingGraph || regenerateGraphMutation.isPending}
+              >
+                {(isLoadingGraph || regenerateGraphMutation.isPending) ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                Refresh Graph
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[600px] w-full">
+                <ContextGraph
+                  projectId={id}
+                  relationships={graphData?.relationships || []}
+                  isLoading={isLoadingGraph || regenerateGraphMutation.isPending}
+                  height={550}
+                  width={900}
+                  showControls={true}
+                />
+              </div>
+            </CardContent>
+          </Card>
           
           {graphError && (
             <Alert variant="destructive">
