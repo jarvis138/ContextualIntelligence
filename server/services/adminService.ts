@@ -16,9 +16,12 @@ import {
   type InsertSystemEvent,
   type InsertBackup,
   type InsertAuditLog,
+  systemMetricTypeEnum,
+  systemEventSeverityEnum,
+  backupStatusEnum
 } from "@shared/schema";
-import { desc, eq, sql, and, gte, lte } from "drizzle-orm";
-import { Pool } from "@neondatabase/serverless";
+import { desc, eq, sql, and, gte, lte, SQL } from "drizzle-orm";
+import { Pool, QueryResult } from "@neondatabase/serverless";
 
 /**
  * Admin Service for system monitoring and administration
@@ -44,28 +47,36 @@ export class AdminService {
    * @returns Array of system metrics
    */
   public async getMetrics(
-    type?: string,
+    type?: (typeof systemMetricTypeEnum.enumValues)[number],
     limit: number = 100,
     startDate?: Date,
     endDate?: Date
   ): Promise<SystemMetric[]> {
-    let query = db.select().from(systemMetrics);
+    const query = db.select().from(systemMetrics);
+    const conditions: SQL<unknown>[] = [];
 
     if (type) {
-      query = query.where(eq(systemMetrics.type, type));
+      conditions.push(eq(systemMetrics.type, type));
     }
 
     if (startDate && endDate) {
-      query = query.where(
+      conditions.push(
         and(
           gte(systemMetrics.timestamp, startDate),
           lte(systemMetrics.timestamp, endDate)
         )
       );
     } else if (startDate) {
-      query = query.where(gte(systemMetrics.timestamp, startDate));
+      conditions.push(gte(systemMetrics.timestamp, startDate));
     } else if (endDate) {
-      query = query.where(lte(systemMetrics.timestamp, endDate));
+      conditions.push(lte(systemMetrics.timestamp, endDate));
+    }
+
+    if (conditions.length > 0) {
+      return query
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        .orderBy(desc(systemMetrics.timestamp))
+        .limit(limit);
     }
 
     return query
@@ -93,23 +104,31 @@ export class AdminService {
    * @returns Array of system events
    */
   public async getEvents(
-    severity?: string,
+    severity?: (typeof systemEventSeverityEnum.enumValues)[number],
     source?: string,
     limit: number = 100,
     acknowledged?: boolean
   ): Promise<SystemEvent[]> {
-    let query = db.select().from(systemEvents);
+    const query = db.select().from(systemEvents);
+    const conditions: SQL<unknown>[] = [];
 
     if (severity) {
-      query = query.where(eq(systemEvents.severity, severity));
+      conditions.push(eq(systemEvents.severity, severity));
     }
 
     if (source) {
-      query = query.where(eq(systemEvents.source, source));
+      conditions.push(eq(systemEvents.source, source));
     }
 
     if (acknowledged !== undefined) {
-      query = query.where(eq(systemEvents.acknowledged, acknowledged));
+      conditions.push(eq(systemEvents.acknowledged, acknowledged));
+    }
+
+    if (conditions.length > 0) {
+      return query
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        .orderBy(desc(systemEvents.timestamp))
+        .limit(limit);
     }
 
     return query
@@ -157,13 +176,21 @@ export class AdminService {
    * @returns Array of backup records
    */
   public async getBackups(
-    status?: string,
+    status?: (typeof backupStatusEnum.enumValues)[number],
     limit: number = 50
   ): Promise<Backup[]> {
-    let query = db.select().from(backups);
+    const query = db.select().from(backups);
+    const conditions: SQL<unknown>[] = [];
 
     if (status) {
-      query = query.where(eq(backups.status, status));
+      conditions.push(eq(backups.status, status));
+    }
+
+    if (conditions.length > 0) {
+      return query
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        .orderBy(desc(backups.createdAt))
+        .limit(limit);
     }
 
     return query
@@ -196,18 +223,26 @@ export class AdminService {
     entityType?: string,
     limit: number = 100
   ): Promise<AuditLog[]> {
-    let query = db.select().from(auditLogs);
+    const query = db.select().from(auditLogs);
+    const conditions: SQL<unknown>[] = [];
 
     if (userId) {
-      query = query.where(eq(auditLogs.userId, userId));
+      conditions.push(eq(auditLogs.userId, userId));
     }
 
     if (action) {
-      query = query.where(eq(auditLogs.action, action));
+      conditions.push(eq(auditLogs.action, action));
     }
 
     if (entityType) {
-      query = query.where(eq(auditLogs.entityType, entityType));
+      conditions.push(eq(auditLogs.entityType, entityType));
+    }
+
+    if (conditions.length > 0) {
+      return query
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        .orderBy(desc(auditLogs.timestamp))
+        .limit(limit);
     }
 
     return query
@@ -219,7 +254,12 @@ export class AdminService {
    * Get database statistics
    * @returns Database statistics including table counts
    */
-  public async getDatabaseStats(): Promise<any> {
+  public async getDatabaseStats(): Promise<{
+    tableStats: QueryResult<Record<string, unknown>>;
+    databaseSize?: Record<string, unknown>;
+    indexStats: QueryResult<Record<string, unknown>>;
+    error?: string;
+  }> {
     try {
       // Get table row counts
       const tableStats = await db.execute(sql`
@@ -233,10 +273,15 @@ export class AdminService {
       `);
 
       // Get database size
-      const dbSize = await db.execute(sql`
+      const dbSizeResult = await db.execute(sql`
         SELECT 
           pg_size_pretty(pg_database_size(current_database())) as db_size
       `);
+
+      // Get the first row from the result
+      const dbSize = dbSizeResult.rows && dbSizeResult.rows.length > 0 
+        ? dbSizeResult.rows[0] as Record<string, unknown>
+        : undefined;
 
       // Get index statistics
       const indexStats = await db.execute(sql`
@@ -253,12 +298,16 @@ export class AdminService {
 
       return {
         tableStats,
-        databaseSize: dbSize[0],
+        databaseSize: dbSize,
         indexStats
       };
     } catch (error) {
       console.error("Error getting database stats:", error);
-      return { error: "Failed to retrieve database statistics" };
+      return { 
+        tableStats: { rows: [] } as QueryResult<Record<string, unknown>>,
+        indexStats: { rows: [] } as QueryResult<Record<string, unknown>>,
+        error: "Failed to retrieve database statistics" 
+      };
     }
   }
 
@@ -266,26 +315,31 @@ export class AdminService {
    * Get system performance metrics from the database
    * @returns System performance metrics
    */
-  public async getSystemPerformance(): Promise<any> {
+  public async getSystemPerformance(): Promise<{
+    cpu: SystemMetric[];
+    memory: SystemMetric[];
+    api: SystemMetric[];
+    error?: string;
+  }> {
     try {
       // Get CPU metrics
       const cpuMetrics = await db.select()
         .from(systemMetrics)
-        .where(eq(systemMetrics.type, "cpu"))
+        .where(eq(systemMetrics.type, systemMetricTypeEnum.enumValues[1])) // "cpu"
         .orderBy(desc(systemMetrics.timestamp))
         .limit(50);
 
       // Get memory metrics
       const memoryMetrics = await db.select()
         .from(systemMetrics)
-        .where(eq(systemMetrics.type, "memory"))
+        .where(eq(systemMetrics.type, systemMetricTypeEnum.enumValues[2])) // "memory"
         .orderBy(desc(systemMetrics.timestamp))
         .limit(50);
 
       // Get API metrics
       const apiMetrics = await db.select()
         .from(systemMetrics)
-        .where(eq(systemMetrics.type, "api"))
+        .where(eq(systemMetrics.type, systemMetricTypeEnum.enumValues[5])) // "api"
         .orderBy(desc(systemMetrics.timestamp))
         .limit(50);
 
@@ -296,7 +350,12 @@ export class AdminService {
       };
     } catch (error) {
       console.error("Error getting system performance:", error);
-      return { error: "Failed to retrieve system performance metrics" };
+      return { 
+        cpu: [],
+        memory: [],
+        api: [],
+        error: "Failed to retrieve system performance metrics" 
+      };
     }
   }
 }
