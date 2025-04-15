@@ -82,7 +82,8 @@ import {
   ExternalLinkIcon,
   HistoryIcon,
   ReplaceIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  X
 } from 'lucide-react';
 
 // Document type definitions
@@ -1109,7 +1110,7 @@ export default function DocumentManagement() {
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <DotsVerticalIcon className="h-4 w-4" />
+                                        <MoreVerticalIcon className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
@@ -1226,7 +1227,7 @@ export default function DocumentManagement() {
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <DotsVerticalIcon className="h-4 w-4" />
+                                        <MoreVerticalIcon className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
@@ -1335,7 +1336,7 @@ export default function DocumentManagement() {
                           }
                         }}
                       >
-                        <XIcon className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                     
