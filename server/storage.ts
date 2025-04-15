@@ -865,6 +865,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    // Drizzle ORM handles the mapping between JavaScript camelCase and SQL snake_case
+    // but we'll log what we're inserting to verify
+    console.log('Creating user with data:', JSON.stringify(insertUser, null, 2));
+    
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
