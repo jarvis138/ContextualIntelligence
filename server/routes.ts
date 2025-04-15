@@ -32,6 +32,14 @@ import {
 } from "./services/slack";
 import * as openaiService from "./services/openai";
 
+// Import integration services
+import { slackIntegrationService } from "./services/integrations/slackIntegration";
+import { gitIntegrationService } from "./services/integrations/gitIntegration";
+import { taskManagementIntegrationService } from "./services/integrations/taskManagementIntegration";
+import { googleWorkspaceIntegrationService } from "./services/integrations/googleWorkspaceIntegration";
+import { integrationManager, SUPPORTED_INTEGRATIONS } from "./services/integrationManager";
+import { documentProcessingService } from "./services/documentProcessingService";
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
   app.use(cookieParser());
@@ -395,6 +403,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const success = await storage.deleteIntegration(id);
     if (!success) return res.status(404).json({ message: "Integration not found" });
     res.status(204).send();
+  });
+  
+  // New integration manager routes
+  router.get("/integrations/types", (req, res) => {
+    const integrationTypes = SUPPORTED_INTEGRATIONS;
+    res.json(integrationTypes);
+  });
+  
+  router.post("/integrations/test", async (req, res) => {
+    try {
+      const { type, config } = req.body;
+      
+      if (!type || !config) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Integration type and configuration are required" 
+        });
+      }
+      
+      const result = await integrationManager.testIntegration(0, type, config);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to test integration",
+        error: error.message 
+      });
+    }
+  });
+  
+  // Integration data extraction routes
+  router.post("/users/:userId/integrations/:type/extract", authenticateToken, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const type = req.params.type;
+      const options = req.body;
+      
+      if (!req.user || req.user.id !== userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      
+      const result = await integrationManager.extractData(userId, type, options);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to extract data from ${req.params.type} integration`,
+        error: error.message 
+      });
+    }
+  });
+  
+  // Document processing routes
+  router.post("/documents/process", authenticateToken, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
+      const { documentId, content, mimeType, fileName, options } = req.body;
+      
+      if (!content && !documentId) {
+        return res.status(400).json({ success: false, message: "Document content or ID is required" });
+      }
+      
+      let result;
+      
+      if (documentId) {
+        // Process existing document
+        const document = await storage.getDocument(parseInt(documentId));
+        if (!document) {
+          return res.status(404).json({ success: false, message: "Document not found" });
+        }
+        
+        result = await documentProcessingService.processExistingDocument(document, options);
+      } else {
+        // Process new content
+        if (!mimeType) {
+          return res.status(400).json({ success: false, message: "MIME type is required for content processing" });
+        }
+        
+        // Convert base64 content to buffer if needed
+        let contentBuffer = content;
+        if (typeof content === 'string' && content.startsWith('data:')) {
+          const base64Data = content.split(',')[1];
+          contentBuffer = Buffer.from(base64Data, 'base64');
+        } else if (typeof content === 'string') {
+          contentBuffer = Buffer.from(content);
+        }
+        
+        result = await documentProcessingService.processBuffer(contentBuffer, mimeType, fileName, options);
+      }
+      
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to process document",
+        error: error.message 
+      });
+    }
   });
   
   // Slack integration specific routes
