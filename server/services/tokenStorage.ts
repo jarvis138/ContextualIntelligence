@@ -27,8 +27,8 @@ export class TokenStorage {
   ): Promise<number> {
     try {
       // Encrypt sensitive token data
-      const encryptedAccessToken = encrypt(accessToken);
-      const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : null;
+      const encryptedAccessToken = JSON.stringify(encrypt(accessToken));
+      const encryptedRefreshToken = refreshToken ? JSON.stringify(encrypt(refreshToken)) : null;
       
       // Calculate expiration date if expiresIn is provided
       const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null;
@@ -72,7 +72,8 @@ export class TokenStorage {
       }
       
       // Decrypt and return the access token
-      return decrypt(token.accessToken);
+      const encryptedData = JSON.parse(token.accessToken);
+      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
     } catch (error) {
       console.error('Failed to retrieve OAuth access token:', error);
       return null;
@@ -95,7 +96,8 @@ export class TokenStorage {
       }
       
       // Decrypt and return the refresh token
-      return decrypt(token.refreshToken);
+      const encryptedData = JSON.parse(token.refreshToken);
+      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
     } catch (error) {
       console.error('Failed to retrieve OAuth refresh token:', error);
       return null;
@@ -138,7 +140,7 @@ export class TokenStorage {
       const encryptedToken = encrypt(token);
       
       // Store the token
-      await storage.storeRefreshToken(userId, tokenId, encryptedToken, expiresAt);
+      await storage.storeRefreshToken(userId, tokenId, JSON.stringify(encryptedToken), expiresAt);
       
       return tokenId;
     } catch (error) {
@@ -166,7 +168,8 @@ export class TokenStorage {
       }
       
       // Decrypt and return the token
-      return decrypt(token.token);
+      const encryptedData = JSON.parse(token.token);
+      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
     } catch (error) {
       console.error('Failed to retrieve refresh token:', error);
       return null;
