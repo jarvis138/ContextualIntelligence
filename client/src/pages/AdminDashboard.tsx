@@ -1,76 +1,97 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { 
-  BarChart, 
-  RefreshCw, 
-  Users, 
-  Server, 
-  Database, 
-  Shield, 
-  Activity,
-  AlertTriangle,
-  FileText,
-  Clock
-} from 'lucide-react';
+import { RefreshCw, Users } from 'lucide-react';
+import { SystemMetricsCard } from '@/components/admin/SystemMetricsCard';
+import { SystemEventsCard } from '@/components/admin/SystemEventsCard';
+import { DatabaseStatsCard } from '@/components/admin/DatabaseStatsCard';
+import { AuditLogsCard } from '@/components/admin/AuditLogsCard';
+import { useQuery, QueryKey } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 
 export default function AdminDashboard() {
-  // Sample data - in a real application, this would come from API
-  const systemHealth = {
-    cpu: 32,
-    memory: 64,
-    storage: 48,
-    network: 71,
-    apiResponseTime: 230, // ms
-    queueLength: 12,
-    activeConnections: 38,
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Keep track of the query keys to invalidate on refresh
+  const queryKeysByTab: Record<string, QueryKey[]> = {
+    overview: [
+      ['/api/admin/metrics'],
+      ['/api/admin/events'],
+      ['/api/admin/system-performance']
+    ],
+    users: [],
+    system: [
+      ['/api/admin/metrics'],
+      ['/api/admin/system-performance']
+    ],
+    integrations: [],
+    logs: [
+      ['/api/admin/audit-logs']
+    ],
+    database: [
+      ['/api/admin/db-stats']
+    ]
   };
 
-  const recentAlerts = [
-    { id: 1, type: 'warning', message: 'High CPU usage detected', time: '2h ago' },
-    { id: 2, type: 'error', message: 'Database connection timeout', time: '4h ago' },
-    { id: 3, type: 'info', message: 'System backup completed', time: '6h ago' },
-    { id: 4, type: 'warning', message: 'API rate limit approaching', time: '12h ago' },
-  ];
-
+  // Static data for user and integration stats - could be replaced with API data later
   const userStats = {
-    total: 1245,
-    active: 678,
-    newToday: 24,
-    averageSessionTime: '18m',
+    total: 145,
+    active: 38,
+    newToday: 4,
+    averageSessionTime: '22m',
   };
 
   const integrationStats = {
-    total: 8,
-    active: 6,
-    errorRate: 0.03,
-    dataProcessed: '2.4 GB',
+    total: 6,
+    active: 5,
+    errorRate: 0.02,
+    dataProcessed: '1.7 GB',
+  };
+
+  // Helper function to refresh data for the current tab
+  const refreshData = () => {
+    const currentTabQueryKeys = queryKeysByTab[activeTab] || [];
+    
+    currentTabQueryKeys.forEach(key => {
+      queryClient.invalidateQueries({ queryKey: key });
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Administration Dashboard</h1>
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refreshData}
+        >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh Data
         </Button>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs 
+        defaultValue="overview" 
+        value={activeTab}
+        onValueChange={setActiveTab}
+      >
         <TabsList className="mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="system">System Health</TabsTrigger>
+          <TabsTrigger value="database">Database</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="logs">Audit Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {/* System Metrics */}
+          <SystemMetricsCard />
+
+          {/* User Stats Card - still using static data for now */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* User Stats Card */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -85,88 +106,10 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* System Health Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">System Health</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Server className="h-4 w-4 text-muted-foreground mr-2" />
-                  <div className="text-2xl font-bold">
-                    {systemHealth.cpu < 50 ? 'Good' : systemHealth.cpu < 80 ? 'Warning' : 'Critical'}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  CPU: {systemHealth.cpu}% | Memory: {systemHealth.memory}%
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Storage Usage Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Storage Usage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Database className="h-4 w-4 text-muted-foreground mr-2" />
-                  <div className="text-2xl font-bold">{systemHealth.storage}%</div>
-                </div>
-                <Progress value={systemHealth.storage} className="h-2 mt-2" />
-              </CardContent>
-            </Card>
-
-            {/* API Health Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">API Response Time</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Activity className="h-4 w-4 text-muted-foreground mr-2" />
-                  <div className="text-2xl font-bold">{systemHealth.apiResponseTime}ms</div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {systemHealth.activeConnections} active connections
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Recent Alerts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Alerts</CardTitle>
-              <CardDescription>System alerts from the past 24 hours</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentAlerts.map(alert => (
-                  <div 
-                    key={alert.id} 
-                    className="flex items-start pb-4 border-b last:border-0 last:pb-0"
-                  >
-                    <div className="mr-4 mt-0.5">
-                      <AlertTriangle 
-                        className={`h-5 w-5 ${
-                          alert.type === 'error' ? 'text-red-500' : 
-                          alert.type === 'warning' ? 'text-amber-500' : 
-                          'text-blue-500'
-                        }`} 
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{alert.message}</div>
-                      <div className="text-sm text-muted-foreground">{alert.time}</div>
-                    </div>
-                    <Button variant="ghost" size="sm">View</Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* System Events/Alerts */}
+          <SystemEventsCard />
         </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
@@ -189,44 +132,21 @@ export default function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="system" className="space-y-4">
+          <SystemMetricsCard />
+          
           <Card>
             <CardHeader>
-              <CardTitle>System Health</CardTitle>
-              <CardDescription>Monitor system performance and resources</CardDescription>
+              <CardTitle>System Events</CardTitle>
+              <CardDescription>Monitor and respond to system events</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">CPU Usage</span>
-                    <span className="text-sm font-medium">{systemHealth.cpu}%</span>
-                  </div>
-                  <Progress value={systemHealth.cpu} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">Memory Usage</span>
-                    <span className="text-sm font-medium">{systemHealth.memory}%</span>
-                  </div>
-                  <Progress value={systemHealth.memory} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">Storage Usage</span>
-                    <span className="text-sm font-medium">{systemHealth.storage}%</span>
-                  </div>
-                  <Progress value={systemHealth.storage} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">Network Usage</span>
-                    <span className="text-sm font-medium">{systemHealth.network}%</span>
-                  </div>
-                  <Progress value={systemHealth.network} className="h-2" />
-                </div>
-              </div>
+              <SystemEventsCard />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <DatabaseStatsCard />
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-4">
@@ -268,44 +188,7 @@ export default function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit Logs</CardTitle>
-              <CardDescription>System activity and security logs</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex items-start border-b pb-3 last:border-0 last:pb-0">
-                    <div className="mr-4 mt-0.5">
-                      {i % 3 === 0 ? (
-                        <Shield className="h-5 w-5 text-blue-500" />
-                      ) : i % 3 === 1 ? (
-                        <FileText className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <Users className="h-5 w-5 text-purple-500" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {i % 3 === 0 ? 'User authentication' : 
-                         i % 3 === 1 ? 'Document accessed' : 'User permission changed'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {i % 3 === 0 ? 'admin@example.com logged in' : 
-                         i % 3 === 1 ? 'requirements.pdf viewed by user123' : 
-                         'user456 granted editor access to Project X'}
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {`${i * 12}m ago`}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <AuditLogsCard />
         </TabsContent>
       </Tabs>
     </div>

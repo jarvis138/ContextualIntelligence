@@ -303,9 +303,18 @@ export class AdminService {
       };
     } catch (error) {
       console.error("Error getting database stats:", error);
+      // Create empty result structures with proper types
+      const emptyQueryResult: QueryResult<Record<string, unknown>> = {
+        command: '',
+        rowCount: 0,
+        oid: 0,
+        rows: [],
+        fields: []
+      };
+      
       return { 
-        tableStats: { rows: [] } as QueryResult<Record<string, unknown>>,
-        indexStats: { rows: [] } as QueryResult<Record<string, unknown>>,
+        tableStats: emptyQueryResult,
+        indexStats: emptyQueryResult,
         error: "Failed to retrieve database statistics" 
       };
     }
