@@ -18,33 +18,45 @@ import AuthPage from "@/pages/AuthPage";
 import UserProfile from "@/pages/UserProfile";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
+import MainLayout from "@/components/layout/MainLayout";
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard/custom" component={CustomizableDashboard} />
-      <Route path="/projects" component={Projects} />
-      <Route path="/projects/:id">
-        {params => <ProjectDetail params={params} />}
-      </Route>
-      <Route path="/projects/:projectId/insights" component={ProjectInsights} />
-      <Route path="/team" component={Team} />
-      <Route path="/documents" component={Documents} />
-      <Route path="/documents/manage" component={DocumentManagement} />
-      <Route path="/documents/:documentId">
-        {params => <DocumentDetail documentId={params.documentId} />}
-      </Route>
-      <Route path="/conversations" component={Conversations} />
-      <Route path="/search" component={Search} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/profile" component={UserProfile} />
-      <Route path="/integrations" component={Integrations} />
-      <Route path="/integrations/trello" component={Integrations} />
-      <Route path="/integrations/jira" component={Integrations} />
-      <Route path="/integrations/slack" component={Integrations} />
-      <Route path="/integrations/gsuite" component={Integrations} />
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
+      
+      {/* All other routes wrapped in MainLayout */}
+      <Route path="/">
+        {(params) => (
+          <MainLayout>
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/dashboard/custom" component={CustomizableDashboard} />
+              <Route path="/projects" component={Projects} />
+              <Route path="/projects/:id">
+                {params => <ProjectDetail params={params} />}
+              </Route>
+              <Route path="/projects/:projectId/insights" component={ProjectInsights} />
+              <Route path="/teams" component={Team} />
+              <Route path="/documents" component={Documents} />
+              <Route path="/documents/manage" component={DocumentManagement} />
+              <Route path="/documents/:documentId">
+                {params => <DocumentDetail documentId={params.documentId} />}
+              </Route>
+              <Route path="/conversations" component={Conversations} />
+              <Route path="/search" component={Search} />
+              <Route path="/profile" component={UserProfile} />
+              <Route path="/integrations" component={Integrations} />
+              <Route path="/integrations/trello" component={Integrations} />
+              <Route path="/integrations/jira" component={Integrations} />
+              <Route path="/integrations/slack" component={Integrations} />
+              <Route path="/integrations/gsuite" component={Integrations} />
+              {/* Fallback to 404 */}
+              <Route component={NotFound} />
+            </Switch>
+          </MainLayout>
+        )}
+      </Route>
     </Switch>
   );
 }
