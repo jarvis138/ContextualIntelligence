@@ -385,6 +385,32 @@ function setupAuthRoutes(app: Express) {
     res.json({ user: req.user });
   });
   
+  // Token refresh endpoint
+  app.post('/auth/refresh-token', async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      
+      if (!refreshToken) {
+        return res.status(400).json({ message: 'Refresh token is required' });
+      }
+      
+      // Use the token service to refresh the token
+      const { accessToken, user } = await refreshAccessToken(refreshToken);
+      
+      // Set the new access token as a cookie
+      res.cookie('token', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 1000 // 1 hour
+      });
+      
+      res.json({ accessToken, user });
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+  });
+  
   // Available OAuth providers route
   app.get('/auth/providers', (req, res) => {
     const providers = {

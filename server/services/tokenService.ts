@@ -60,7 +60,7 @@ export function generateToken(
     payload,
     process.env.JWT_SECRET || 'default-secret-change-in-production',
     { expiresIn: expiry }
-  );
+  ) as string;
   
   // Store refresh tokens in the database for validation
   if (type === 'refresh') {
@@ -169,7 +169,8 @@ export async function revokeRefreshToken(userId: number, tokenId: string): Promi
  */
 export async function revokeAllRefreshTokens(userId: number): Promise<boolean> {
   try {
-    return await storage.deleteAllRefreshTokens(userId);
+    const result = await storage.deleteAllRefreshTokens(userId);
+    return result > 0;
   } catch (error) {
     console.error('Error revoking all refresh tokens:', error);
     return false;

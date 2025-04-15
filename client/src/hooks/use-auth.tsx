@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useCallback } from "react";
 import {
   useQuery,
   useMutation,
@@ -16,6 +16,7 @@ type AuthContextType = {
   loginMutation: UseMutationResult<User, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<User, Error, InsertUser>;
+  refreshToken: (refreshToken: string) => Promise<{accessToken: string; user: User}>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -33,7 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     // Prevent 'undefined' data which causes TanStack Query errors
-    placeholderData: null
+    placeholderData: null,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const loginMutation = useMutation<User, Error, LoginData>({
