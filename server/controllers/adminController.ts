@@ -108,7 +108,7 @@ export async function generateSampleData(req: Request, res: Response) {
       const entityId = Math.floor(Math.random() * 100) + 1;
       
       await adminService.recordAuditLog({
-        userId: Math.floor(Math.random() * 10) + 1,
+        userId: 6, // Use the admin user we created
         action,
         entityType,
         entityId,
@@ -131,7 +131,7 @@ export async function generateSampleData(req: Request, res: Response) {
         size: Math.floor(Math.random() * 1000) + 500,
         path: '/backups/',
         type: 'full',
-        createdBy: 1
+        createdBy: 6 // Use the admin user we created
       });
     }
 

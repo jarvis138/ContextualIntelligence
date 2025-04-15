@@ -5,14 +5,14 @@
  * Run this script when setting up the CPI Hub for the first time.
  */
 
-import { db } from '../server/db.js';
+import { db } from '../server/db';
 import { 
   systemMetrics, 
   systemEvents, 
   auditLogs, 
   backups,
   userSessions
-} from '../shared/schema.js';
+} from '../shared/schema';
 
 async function createTables() {
   try {
