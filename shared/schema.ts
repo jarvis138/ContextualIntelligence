@@ -950,3 +950,164 @@ export const insertOAuthProviderSettingsSchema = createInsertSchema(oauthProvide
 
 export type OAuthProviderSetting = typeof oauthProviderSettings.$inferSelect;
 export type InsertOAuthProviderSetting = z.infer<typeof insertOAuthProviderSettingsSchema>;
+
+// -------------------------------------------------------------------------------
+// Data Fetching System Schemas
+// -------------------------------------------------------------------------------
+
+// Enum for connector types
+export const connectorTypeEnum = pgEnum("connector_type", [
+  "google_drive",
+  "slack",
+  "gmail",
+  "microsoft_graph"
+]);
+
+// Enum for job schedule types
+export const scheduleTypeEnum = pgEnum("schedule_type", [
+  "once",
+  "interval",
+  "cron",
+  "manual"
+]);
+
+// Enum for job priority
+export const jobPriorityEnum = pgEnum("job_priority", [
+  "low",
+  "normal", 
+  "high",
+  "urgent"
+]);
+
+// Enum for job status
+export const jobStatusEnum = pgEnum("job_status", [
+  "pending",
+  "scheduled",
+  "running",
+  "completed",
+  "failed",
+  "cancelled"
+]);
+
+// API tokens for external services
+export const apiTokens = pgTable("api_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  connectorType: connectorTypeEnum("connector_type").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenSecret: text("token_secret"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+}, (table) => {
+  return {
+    userConnectorIdx: uniqueIndex("user_connector_idx").on(table.userId, table.connectorType),
+    userIdIdx: index("api_token_user_idx").on(table.userId)
+  };
+});
+
+// API tokens relations
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [apiTokens.userId],
+    references: [users.id],
+  })
+}));
+
+// Fetching jobs
+export const fetchingJobs = pgTable("fetching_jobs", {
+  id: serial("id").primaryKey(),
+  jobId: text("job_id").notNull().unique(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  connectorType: connectorTypeEnum("connector_type").notNull(),
+  dataType: text("data_type").notNull(),
+  parameters: jsonb("parameters").notNull().default({}),
+  scheduleType: scheduleTypeEnum("schedule_type").notNull(),
+  scheduleValue: text("schedule_value"),
+  priority: jobPriorityEnum("priority").notNull().default("normal"),
+  status: jobStatusEnum("status").notNull().default("pending"),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  lastResult: jsonb("last_result"),
+  lastError: text("last_error"),
+  runCount: integer("run_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+}, (table) => {
+  return {
+    jobIdIdx: index("job_id_idx").on(table.jobId),
+    userIdIdx: index("fetching_jobs_user_idx").on(table.userId),
+    connectorTypeIdx: index("connector_type_idx").on(table.connectorType),
+    statusIdx: index("job_status_idx").on(table.status),
+    nextRunAtIdx: index("next_run_at_idx").on(table.nextRunAt)
+  };
+});
+
+// Fetching jobs relations
+export const fetchingJobsRelations = relations(fetchingJobs, ({ one }) => ({
+  user: one(users, {
+    fields: [fetchingJobs.userId],
+    references: [users.id],
+  })
+}));
+
+// Fetched data items
+export const fetchedData = pgTable("fetched_data", {
+  id: serial("id").primaryKey(),
+  dataId: text("data_id").notNull().unique(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  jobId: text("job_id").references(() => fetchingJobs.jobId),
+  connectorType: connectorTypeEnum("connector_type").notNull(),
+  dataType: text("data_type").notNull(),
+  title: text("title"),
+  content: text("content"),
+  metadata: jsonb("metadata"),
+  sourceUrl: text("source_url"),
+  sourceId: text("source_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  fetchedAt: timestamp("fetched_at").notNull()
+}, (table) => {
+  return {
+    dataIdIdx: index("data_id_idx").on(table.dataId),
+    userIdIdx: index("fetched_data_user_idx").on(table.userId),
+    jobIdIdx: index("job_id_rel_idx").on(table.jobId),
+    connectorTypeIdx: index("fetched_connector_type_idx").on(table.connectorType),
+    dataTypeIdx: index("data_type_idx").on(table.dataType),
+    fetchedAtIdx: index("fetched_at_idx").on(table.fetchedAt)
+  };
+});
+
+// Fetched data relations
+export const fetchedDataRelations = relations(fetchedData, ({ one }) => ({
+  user: one(users, {
+    fields: [fetchedData.userId],
+    references: [users.id],
+  }),
+  job: one(fetchingJobs, {
+    fields: [fetchedData.jobId],
+    references: [fetchingJobs.jobId]
+  })
+}));
+
+// Create insert schemas for the fetching tables
+export const insertApiTokenSchema = createInsertSchema(apiTokens)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertFetchingJobSchema = createInsertSchema(fetchingJobs)
+  .omit({ id: true, createdAt: true, updatedAt: true, runCount: true, lastRunAt: true, nextRunAt: true, lastResult: true, lastError: true });
+
+export const insertFetchedDataSchema = createInsertSchema(fetchedData)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+// Export types for the fetching tables
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type InsertApiToken = z.infer<typeof insertApiTokenSchema>;
+
+export type FetchingJob = typeof fetchingJobs.$inferSelect;
+export type InsertFetchingJob = z.infer<typeof insertFetchingJobSchema>;
+
+export type FetchedData = typeof fetchedData.$inferSelect;
+export type InsertFetchedData = z.infer<typeof insertFetchedDataSchema>;

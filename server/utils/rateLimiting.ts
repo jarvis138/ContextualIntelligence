@@ -6,7 +6,7 @@
  */
 
 import Bottleneck from 'bottleneck';
-import pRetry from 'p-retry';
+import pRetry, { AbortError } from 'p-retry';
 
 interface RateLimiterOptions {
   maxConcurrent?: number;
@@ -106,7 +106,7 @@ export async function executeWithRateLimit<T>(
           }
           
           // For non-transient errors, don't retry
-          throw new pRetry.AbortError(error);
+          throw new AbortError(error);
         }
       },
       {
@@ -156,7 +156,7 @@ export async function executeWithRetry<T>(
         }
         
         // For non-retryable errors, don't retry
-        throw new pRetry.AbortError(error);
+        throw new AbortError(error);
       }
     },
     {
