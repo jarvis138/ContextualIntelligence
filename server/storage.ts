@@ -55,6 +55,11 @@ export interface IStorage {
   getPkceCodeVerifierByState(state: string): Promise<PkceCodeVerifier | undefined>;
   updatePkceCodeVerifier(id: number, data: Partial<InsertPkceCodeVerifier>): Promise<PkceCodeVerifier | undefined>;
   deleteExpiredPkceCodeVerifiers(): Promise<number>;
+  
+  // OAuth Provider Settings
+  getOAuthProviderSettings(): Promise<OAuthProviderSetting[]>;
+  getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined>;
+  saveOAuthProviderSettings(providerSetting: InsertOAuthProviderSetting): Promise<OAuthProviderSetting>;
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
@@ -1011,6 +1016,29 @@ export class MemStorage implements IStorage {
     
     return count;
   }
+  
+  // OAuth Provider Settings
+  async getOAuthProviderSettings(): Promise<OAuthProviderSetting[]> {
+    return Array.from(this.oauthProviderSettings.values());
+  }
+  
+  async getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined> {
+    return Array.from(this.oauthProviderSettings.values()).find(
+      (setting) => setting.providerId === providerId
+    );
+  }
+  
+  async saveOAuthProviderSettings(providerSetting: InsertOAuthProviderSetting): Promise<OAuthProviderSetting> {
+    const id = this.currentIds.oauthProviderSettings++;
+    const setting: OAuthProviderSetting = { 
+      ...providerSetting, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date() 
+    };
+    this.oauthProviderSettings.set(id, setting);
+    return setting;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1117,6 +1145,58 @@ export class DatabaseStorage implements IStorage {
     // Count is not directly available from delete operation
     // This is an approximation
     return 1; // Return at least 1 if operation was successful
+  }
+  
+  // OAuth Provider Settings
+  async getOAuthProviderSettings(): Promise<OAuthProviderSetting[]> {
+    return await db.select().from(oauthProviderSettings);
+  }
+  
+  async getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined> {
+    const [setting] = await db.select()
+      .from(oauthProviderSettings)
+      .where(eq(oauthProviderSettings.providerId, providerId));
+    return setting || undefined;
+  }
+  
+  async saveOAuthProviderSettings(providerSetting: InsertOAuthProviderSetting): Promise<OAuthProviderSetting> {
+    // Check if setting already exists
+    const [existingSetting] = await db.select()
+      .from(oauthProviderSettings)
+      .where(eq(oauthProviderSettings.providerId, providerSetting.providerId));
+    
+    if (existingSetting) {
+      // Update existing setting
+      const [updatedSetting] = await db.update(oauthProviderSettings)
+        .set({
+          name: providerSetting.name,
+          enabled: providerSetting.enabled,
+          clientId: providerSetting.clientId,
+          clientSecret: providerSetting.clientSecret,
+          scope: providerSetting.scope,
+          updatedAt: new Date(),
+          updatedBy: providerSetting.updatedBy
+        })
+        .where(eq(oauthProviderSettings.providerId, providerSetting.providerId))
+        .returning();
+      return updatedSetting;
+    } else {
+      // Insert new setting
+      const [newSetting] = await db.insert(oauthProviderSettings)
+        .values({
+          providerId: providerSetting.providerId,
+          name: providerSetting.name,
+          enabled: providerSetting.enabled,
+          clientId: providerSetting.clientId,
+          clientSecret: providerSetting.clientSecret,
+          scope: providerSetting.scope,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          updatedBy: providerSetting.updatedBy
+        })
+        .returning();
+      return newSetting;
+    }
   }
 
   // Users
