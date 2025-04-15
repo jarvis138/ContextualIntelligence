@@ -46,6 +46,7 @@ import { taskManagementIntegrationService } from "./services/integrations/taskMa
 import { googleWorkspaceIntegrationService } from "./services/integrations/googleWorkspaceIntegration";
 import { integrationManager, SUPPORTED_INTEGRATIONS } from "./services/integrationManager";
 import { documentProcessingService } from "./services/documentProcessingService.fixed";
+import { adminService } from "./services/adminService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
@@ -723,6 +724,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newRelationship);
     } catch (error) {
       res.status(400).json({ message: "Invalid relationship data", error });
+    }
+  });
+  
+  // Admin routes - System Monitoring
+  router.get("/admin/metrics", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const type = req.query.type as string;
+      const limit = parseInt(req.query.limit as string || "100");
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      
+      const metrics = await adminService.getMetrics(type, limit, startDate, endDate);
+      res.json(metrics);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch system metrics", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/admin/metrics", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const metric = await adminService.recordMetric(req.body);
+      res.status(201).json(metric);
+    } catch (error: any) {
+      res.status(400).json({ 
+        success: false, 
+        message: "Failed to record system metric", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.get("/admin/events", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const severity = req.query.severity as string;
+      const source = req.query.source as string;
+      const limit = parseInt(req.query.limit as string || "100");
+      const acknowledged = req.query.acknowledged === "true" ? true : 
+                          req.query.acknowledged === "false" ? false : undefined;
+      
+      const events = await adminService.getEvents(severity, source, limit, acknowledged);
+      res.json(events);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch system events", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/admin/events", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const event = await adminService.recordEvent(req.body);
+      res.status(201).json(event);
+    } catch (error: any) {
+      res.status(400).json({ 
+        success: false, 
+        message: "Failed to record system event", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/admin/events/:id/acknowledge", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      
+      const eventId = parseInt(req.params.id);
+      const acknowledged = await adminService.acknowledgeEvent(eventId, req.user.id);
+      
+      if (acknowledged) {
+        res.json({ success: true, message: "Event acknowledged successfully" });
+      } else {
+        res.status(404).json({ success: false, message: "Event not found or could not be acknowledged" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to acknowledge event", 
+        error: error.message 
+      });
+    }
+  });
+  
+  // Admin routes - Backups
+  router.get("/admin/backups", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const limit = parseInt(req.query.limit as string || "50");
+      
+      const backups = await adminService.getBackups(status, limit);
+      res.json(backups);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch backup records", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/admin/backups", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      
+      const backupData = { ...req.body, createdBy: req.user.id };
+      const backup = await adminService.recordBackup(backupData);
+      res.status(201).json(backup);
+    } catch (error: any) {
+      res.status(400).json({ 
+        success: false, 
+        message: "Failed to record backup", 
+        error: error.message 
+      });
+    }
+  });
+  
+  // Admin routes - Audit Logs
+  router.get("/admin/audit-logs", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
+      const action = req.query.action as string;
+      const entityType = req.query.entityType as string;
+      const limit = parseInt(req.query.limit as string || "100");
+      
+      const logs = await adminService.getAuditLogs(userId, action, entityType, limit);
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch audit logs", 
+        error: error.message 
+      });
+    }
+  });
+  
+  router.post("/admin/audit-logs", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      
+      const logData = { ...req.body, userId: req.user.id };
+      const log = await adminService.recordAuditLog(logData);
+      res.status(201).json(log);
+    } catch (error: any) {
+      res.status(400).json({ 
+        success: false, 
+        message: "Failed to record audit log", 
+        error: error.message 
+      });
+    }
+  });
+  
+  // Admin routes - Database stats
+  router.get("/admin/db-stats", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const stats = await adminService.getDatabaseStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch database statistics", 
+        error: error.message 
+      });
+    }
+  });
+  
+  // Admin routes - System performance
+  router.get("/admin/system-performance", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const performance = await adminService.getSystemPerformance();
+      res.json(performance);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch system performance metrics", 
+        error: error.message 
+      });
     }
   });
 
