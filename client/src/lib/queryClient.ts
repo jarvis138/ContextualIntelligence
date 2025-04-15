@@ -16,8 +16,8 @@ type FetchOptions = {
 };
 
 export function getQueryFn(options: FetchOptions = {}) {
-  return async function queryFn({ queryKey }: { queryKey: (string | number)[] }): Promise<any> {
-    let endpoint = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+  return async function queryFn({ queryKey }: { queryKey: readonly unknown[] }): Promise<any> {
+    let endpoint = Array.isArray(queryKey) ? queryKey[0] as string : queryKey as string;
     let id = queryKey.length > 1 ? queryKey[1] : null;
 
     if (id) {
