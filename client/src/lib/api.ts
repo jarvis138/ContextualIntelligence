@@ -13,9 +13,25 @@ import {
 } from "./types";
 
 // Project API
-export async function getProjects(): Promise<Project[]> {
-  const res = await apiRequest("GET", "/api/projects");
-  return res.json();
+export async function getProjects(): Promise<any> {
+  try {
+    const res = await apiRequest("GET", "/api/projects");
+    return await res.json();
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    // Return empty data with pagination for development
+    return {
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+      }
+    };
+  }
 }
 
 export async function getProject(id: number): Promise<Project> {

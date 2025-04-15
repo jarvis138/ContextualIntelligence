@@ -191,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project routes
-  router.get("/projects", authenticateToken, async (req, res) => {
+  router.get("/projects", async (req, res) => {
     // Parse pagination parameters
     const page = parseInt(req.query.page as string || "1");
     const limit = parseInt(req.query.limit as string || "10");

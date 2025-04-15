@@ -14,9 +14,11 @@ export default function Projects() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { data: projectsData, isLoading } = useQuery({
+  const { data: projectsData, isLoading, isError } = useQuery({
     queryKey: ['/api/projects'],
-    queryFn: getProjects
+    queryFn: getProjects,
+    retry: 0,
+    refetchOnWindowFocus: false
   });
   
   // Extract the actual projects array from the response
