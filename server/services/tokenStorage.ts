@@ -1,205 +1,230 @@
-import { storage } from '../storage';
-import { encrypt, decrypt } from '../utils/encryption';
-import { InsertOAuthToken, InsertRefreshToken } from '@shared/schema';
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * Service for secure storage and retrieval of access/refresh tokens
- * using AES-256 encryption
+ * Token Storage Service
+ * 
+ * This service handles secure storage and retrieval of OAuth tokens.
+ * Tokens are encrypted before being stored in the database.
  */
+
+import { db } from '../db';
+import { oauthTokens } from '@shared/schema';
+import { eq, and, lt } from 'drizzle-orm';
+import * as encryption from '../utils/encryption';
+
 export class TokenStorage {
   /**
-   * Stores an OAuth access token with encryption
-   * @param userId User ID associated with the token
-   * @param provider OAuth provider (google, microsoft, slack, etc.)
-   * @param accessToken The access token to store
-   * @param refreshToken Optional refresh token
-   * @param expiresIn Token expiration time in seconds
-   * @returns The ID of the stored token
+   * Store an OAuth token in the database
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
+   * @param accessToken The access token
+   * @param refreshToken The refresh token (if available)
+   * @param expiresAt The token expiration time
+   * @returns The stored token
    */
-  public static async storeOAuthToken(
+  static async storeOAuthToken(
     userId: number,
     provider: string,
     accessToken: string,
-    refreshToken?: string | null,
-    expiresIn?: number | null,
-    tokenData?: any
-  ): Promise<number> {
-    try {
-      // Encrypt sensitive token data
-      const encryptedAccessToken = JSON.stringify(encrypt(accessToken));
-      const encryptedRefreshToken = refreshToken ? JSON.stringify(encrypt(refreshToken)) : null;
-      
-      // Calculate expiration date if expiresIn is provided
-      const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null;
-      
-      // Save the token to the database
-      const token = await storage.saveOAuthToken({
-        userId,
-        provider,
-        accessToken: encryptedAccessToken,
-        refreshToken: encryptedRefreshToken,
-        expiresAt,
-        tokenData: tokenData || null
-      });
-      
-      return token.id;
-    } catch (error) {
-      console.error('Failed to store OAuth token:', error);
-      throw new Error('Failed to securely store OAuth tokens');
-    }
-  }
-  
-  /**
-   * Retrieves an OAuth access token
-   * @param userId User ID associated with the token
-   * @param provider OAuth provider
-   * @returns Decrypted access token
-   */
-  public static async getAccessToken(userId: number, provider: string): Promise<string | null> {
-    try {
-      // Get the most recent token for this user and provider
-      const token = await storage.getLatestOAuthToken(userId, provider);
-      
-      if (!token || !token.accessToken) {
-        return null;
-      }
-      
-      // Check if token is expired
-      if (token.expiresAt && new Date(token.expiresAt) < new Date()) {
-        console.warn(`Access token for user ${userId} and provider ${provider} is expired`);
-        return null;
-      }
-      
-      // Decrypt and return the access token
-      const encryptedData = JSON.parse(token.accessToken);
-      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
-    } catch (error) {
-      console.error('Failed to retrieve OAuth access token:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Retrieves a refresh token
-   * @param userId User ID associated with the token
-   * @param provider OAuth provider
-   * @returns Decrypted refresh token
-   */
-  public static async getRefreshToken(userId: number, provider: string): Promise<string | null> {
-    try {
-      // Get the token for this user and provider
-      const token = await storage.getLatestOAuthToken(userId, provider);
-      
-      if (!token || !token.refreshToken) {
-        return null;
-      }
-      
-      // Decrypt and return the refresh token
-      const encryptedData = JSON.parse(token.refreshToken);
-      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
-    } catch (error) {
-      console.error('Failed to retrieve OAuth refresh token:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Revokes an OAuth token
-   * @param userId User ID associated with the token
-   * @param provider OAuth provider
-   * @returns Whether the revocation was successful
-   */
-  public static async revokeToken(userId: number, provider: string): Promise<boolean> {
-    try {
-      return await storage.revokeOAuthToken(userId, provider);
-    } catch (error) {
-      console.error('Failed to revoke OAuth token:', error);
-      return false;
-    }
-  }
-  
-  /**
-   * Stores an encrypted refresh token
-   * @param userId User ID associated with the token
-   * @param tokenId A unique token identifier
-   * @param token The refresh token to store
-   * @param expiresAt When the token expires
-   * @returns The stored token record
-   */
-  public static async storeRefreshToken(
-    userId: number,
-    token: string,
+    refreshToken: string | null,
     expiresAt: Date
-  ): Promise<string> {
-    try {
-      // Generate a unique token ID
-      const tokenId = uuidv4();
+  ) {
+    // Encrypt tokens before storage
+    const encryptedAccessToken = encryption.Encryption.encrypt(accessToken);
+    const encryptedRefreshToken = refreshToken ? encryption.Encryption.encrypt(refreshToken) : null;
+    
+    // Check if token already exists for this user and provider
+    const existingToken = await db
+      .select()
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      )
+      .limit(1);
+    
+    const tokenData = {
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken,
+      expiresAt,
+      updatedAt: new Date()
+    };
+    
+    // Update or insert token
+    if (existingToken.length > 0) {
+      const [updatedToken] = await db
+        .update(oauthTokens)
+        .set(tokenData)
+        .where(
+          and(
+            eq(oauthTokens.userId, userId),
+            eq(oauthTokens.provider, provider)
+          )
+        )
+        .returning();
       
-      // Encrypt the token
-      const encryptedToken = encrypt(token);
+      return updatedToken;
+    } else {
+      const [newToken] = await db
+        .insert(oauthTokens)
+        .values({
+          userId,
+          provider,
+          ...tokenData,
+          createdAt: new Date()
+        })
+        .returning();
       
-      // Store the token
-      await storage.storeRefreshToken(userId, tokenId, JSON.stringify(encryptedToken), expiresAt);
-      
-      return tokenId;
-    } catch (error) {
-      console.error('Failed to store refresh token:', error);
-      throw new Error('Failed to securely store refresh token');
+      return newToken;
     }
   }
   
   /**
-   * Retrieves and decrypts a refresh token by its ID
-   * @param tokenId The token's unique identifier
+   * Get an access token for a user and provider
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
+   * @returns The decrypted access token or null if not found
+   */
+  static async getAccessToken(userId: number, provider: string): Promise<string | null> {
+    const [token] = await db
+      .select()
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      );
+    
+    if (!token || !token.accessToken) {
+      return null;
+    }
+    
+    // Decrypt the access token
+    return encryption.Encryption.decrypt(token.accessToken);
+  }
+  
+  /**
+   * Get a refresh token for a user and provider
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
    * @returns The decrypted refresh token or null if not found
    */
-  public static async getRefreshTokenById(tokenId: string): Promise<string | null> {
-    try {
-      const token = await storage.getRefreshTokenByTokenId(tokenId);
-      
-      if (!token || !token.token) {
-        return null;
-      }
-      
-      // Check if token is expired or revoked
-      if (token.expiresAt < new Date() || token.revokedAt) {
-        return null;
-      }
-      
-      // Decrypt and return the token
-      const encryptedData = JSON.parse(token.token);
-      return decrypt(encryptedData.encryptedData, encryptedData.iv, encryptedData.authTag);
-    } catch (error) {
-      console.error('Failed to retrieve refresh token:', error);
+  static async getRefreshToken(userId: number, provider: string): Promise<string | null> {
+    const [token] = await db
+      .select()
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      );
+    
+    if (!token || !token.refreshToken) {
       return null;
     }
+    
+    // Decrypt the refresh token
+    return encryption.Encryption.decrypt(token.refreshToken);
   }
   
   /**
-   * Revokes a refresh token by its ID
-   * @param tokenId The token's unique identifier
-   * @returns Whether the revocation was successful
+   * Get token information for a user and provider
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
+   * @returns The token information or null if not found
    */
-  public static async revokeRefreshToken(tokenId: string): Promise<boolean> {
-    try {
-      return await storage.revokeRefreshToken(tokenId);
-    } catch (error) {
-      console.error('Failed to revoke refresh token:', error);
-      return false;
+  static async getToken(userId: number, provider: string) {
+    const [token] = await db
+      .select()
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      );
+    
+    if (!token) {
+      return null;
     }
+    
+    // Return token without the actual token values
+    // This is useful for checking expiration without exposing tokens
+    return {
+      id: token.id,
+      userId: token.userId,
+      provider: token.provider,
+      expiresAt: token.expiresAt,
+      hasRefreshToken: !!token.refreshToken,
+      isExpired: token.expiresAt ? token.expiresAt < new Date() : true,
+      createdAt: token.createdAt,
+      updatedAt: token.updatedAt,
+    };
   }
   
   /**
-   * Cleans up expired refresh tokens
-   * @returns The number of tokens deleted
+   * Check if a token is expired
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
+   * @returns Whether the token is expired
    */
-  public static async cleanupExpiredRefreshTokens(): Promise<number> {
-    try {
-      return await storage.deleteExpiredRefreshTokens();
-    } catch (error) {
-      console.error('Failed to clean up expired refresh tokens:', error);
-      return 0;
+  static async isTokenExpired(userId: number, provider: string): Promise<boolean> {
+    const [token] = await db
+      .select({ expiresAt: oauthTokens.expiresAt })
+      .from(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      );
+    
+    if (!token) {
+      // If no token exists, consider it expired
+      return true;
     }
+    
+    return token.expiresAt ? token.expiresAt < new Date() : true;
+  }
+  
+  /**
+   * Revoke a token by removing it from the database
+   * 
+   * @param userId The user ID
+   * @param provider The OAuth provider ID
+   * @returns Whether the token was successfully revoked
+   */
+  static async revokeToken(userId: number, provider: string): Promise<boolean> {
+    const result = await db
+      .delete(oauthTokens)
+      .where(
+        and(
+          eq(oauthTokens.userId, userId),
+          eq(oauthTokens.provider, provider)
+        )
+      );
+    
+    return (result.rowCount || 0) > 0;
+  }
+  
+  /**
+   * Clean up expired tokens
+   * 
+   * @returns The number of deleted tokens
+   */
+  static async cleanupExpiredTokens(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .delete(oauthTokens)
+      .where(lt(oauthTokens.expiresAt, now));
+    
+    return result.rowCount || 0;
   }
 }

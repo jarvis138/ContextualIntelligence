@@ -63,13 +63,16 @@ export class TokenRefresh {
       
       // Store the new tokens
       const tokenData = response.data;
-      const tokenId = await TokenStorage.storeOAuthToken(
+      // Calculate token expiration time
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+      
+      await TokenStorage.storeOAuthToken(
         userId,
         provider,
         tokenData.access_token,
         tokenData.refresh_token || refreshToken, // Use new refresh token if provided, otherwise keep the old one
-        tokenData.expires_in,
-        tokenData
+        expiresAt
       );
       
       // Return the new token
@@ -109,9 +112,16 @@ export class TokenRefresh {
       expiresAt.setDate(expiresAt.getDate() + 90);
       
       // Store the new refresh token
-      const tokenId = await TokenStorage.storeRefreshToken(userId, newToken, expiresAt);
+      // Using storeOAuthToken with a dummy access token since we only want to store the refresh token
+      await TokenStorage.storeOAuthToken(
+        userId,
+        provider,
+        "dummy_access_token", // This is a placeholder, we only care about the refresh token
+        newToken,
+        expiresAt
+      );
       
-      return !!tokenId;
+      return true; // Successfully stored the new token
     } catch (error) {
       console.error('Failed to rotate refresh token:', error);
       return false;
