@@ -6,7 +6,7 @@
  * authorization code interception attacks.
  */
 
-import { generatePKCEChallenge } from 'pkce-challenge';
+import { generateChallenge } from 'pkce-challenge';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../storage';
 import { oauthConfig } from '../config/oauth';
@@ -39,7 +39,7 @@ export async function createPKCEParams(
 ) {
   try {
     // Generate PKCE challenge
-    const pkce = generatePKCEChallenge();
+    const pkce = generateChallenge();
     
     // Generate unique state parameter for CSRF protection
     const state = uuidv4();
@@ -48,7 +48,7 @@ export async function createPKCEParams(
     const expiresAt = new Date(Date.now() + PKCE_EXPIRES_IN);
     
     // Store PKCE parameters in database
-    await storage.createPKCECodeVerifier({
+    await storage.createPkceCodeVerifier({
       userId: userId || undefined,
       codeChallenge: pkce.code_challenge,
       codeVerifier: pkce.code_verifier,
