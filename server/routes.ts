@@ -138,60 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const router = express.Router();
 
-  // Authentication routes
-  router.post("/register", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      const { user, token } = await authService.register(userData);
-      
-      // Set token in cookie and response
-      res.cookie('token', token, { 
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' 
-      });
-      
-      res.status(201).json({ user, token });
-    } catch (error: any) {
-      if (error?.message === 'Username already exists') {
-        return res.status(409).json({ message: error.message });
-      }
-      res.status(400).json({ message: "Registration failed", error: error?.message || 'Unknown error' });
-    }
-  });
-
-  router.post("/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
-      
-      const { user, token } = await authService.login(username, password);
-      
-      // Set token in cookie and response
-      res.cookie('token', token, { 
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' 
-      });
-      
-      res.status(200).json({ user, token });
-    } catch (error: any) {
-      res.status(401).json({ message: "Invalid credentials", error: error?.message || 'Unknown error' });
-    }
-  });
-
-  router.post("/logout", (req, res) => {
-    res.clearCookie('token');
-    res.status(200).json({ message: "Logged out successfully" });
-  });
-
-  router.get("/me", (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    res.json(req.user);
-  });
+  // API Routes are prefixed with '/api' to distinguish them from auth routes
 
   // User routes
   router.get("/users", async (req, res) => {
