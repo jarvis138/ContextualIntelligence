@@ -99,6 +99,10 @@ export const users = pgTable("users", {
   };
 });
 
+// User insert schema for validation
+// InsertUser type and insertUserSchema are defined further down in this file
+export type User = typeof users.$inferSelect;
+
 // User relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   teamMembers: many(teamMembers),
