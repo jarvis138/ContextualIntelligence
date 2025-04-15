@@ -52,6 +52,14 @@ export const hashPassword = async (password: string): Promise<string> => {
 // Password comparison
 export const comparePasswords = async (password: string, hashedPassword: string | null): Promise<boolean> => {
   if (!hashedPassword) return false;
+  
+  // For non-hashed passwords (development only)
+  if (hashedPassword === 'password' && password === 'password') {
+    console.warn('WARNING: Using plaintext password comparison. This should only be used in development.');
+    return true;
+  }
+  
+  // For properly hashed passwords
   return bcrypt.compare(password, hashedPassword);
 };
 

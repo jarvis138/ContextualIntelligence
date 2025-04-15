@@ -157,19 +157,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API Routes are prefixed with '/api' to distinguish them from auth routes
 
   // User routes
-  router.get("/users", async (req, res) => {
+  router.get("/users", authenticateToken, async (req, res) => {
     const users = await storage.getUsers();
     res.json(users);
   });
 
-  router.get("/users/:id", async (req, res) => {
+  router.get("/users/:id", authenticateToken, async (req, res) => {
     const id = parseInt(req.params.id);
     const user = await storage.getUser(id);
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   });
 
-  router.post("/users", async (req, res) => {
+  router.post("/users", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
       const user = insertUserSchema.parse(req.body);
       const newUser = await storage.createUser(user);
@@ -180,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project routes
-  router.get("/projects", async (req, res) => {
+  router.get("/projects", authenticateToken, async (req, res) => {
     // Parse pagination parameters
     const page = parseInt(req.query.page as string || "1");
     const limit = parseInt(req.query.limit as string || "10");
@@ -212,14 +212,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  router.get("/projects/:id", async (req, res) => {
+  router.get("/projects/:id", authenticateToken, async (req, res) => {
     const id = parseInt(req.params.id);
     const project = await storage.getProject(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.json(project);
   });
 
-  router.post("/projects", async (req, res) => {
+  router.post("/projects", authenticateToken, async (req, res) => {
     try {
       const project = insertProjectSchema.parse(req.body);
       const newProject = await storage.createProject(project);
@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.patch("/projects/:id", async (req, res) => {
+  router.patch("/projects/:id", authenticateToken, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const project = insertProjectSchema.partial().parse(req.body);
