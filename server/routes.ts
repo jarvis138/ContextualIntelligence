@@ -38,7 +38,7 @@ import { gitIntegrationService } from "./services/integrations/gitIntegration";
 import { taskManagementIntegrationService } from "./services/integrations/taskManagementIntegration";
 import { googleWorkspaceIntegrationService } from "./services/integrations/googleWorkspaceIntegration";
 import { integrationManager, SUPPORTED_INTEGRATIONS } from "./services/integrationManager";
-import { documentProcessingService } from "./services/documentProcessingService";
+import { documentProcessingService } from "./services/documentProcessingService.fixed";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware

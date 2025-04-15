@@ -10,7 +10,7 @@ import { google } from 'googleapis';
 import { storage } from '../../storage';
 import { User, Integration, InsertActivity } from '@shared/schema';
 import { pipeline, createStage } from '../../utils/pipeline';
-import { DocumentProcessingService } from '../documentProcessingService';
+import { DocumentProcessingService } from '../documentProcessingService.fixed';
 
 /**
  * Google service types
@@ -1070,5 +1070,5 @@ export class GoogleWorkspaceIntegrationService {
 }
 
 // Create instance
-import { documentProcessingService } from '../documentProcessingService';
+import { documentProcessingService } from '../documentProcessingService.fixed';
 export const googleWorkspaceIntegrationService = new GoogleWorkspaceIntegrationService(documentProcessingService);

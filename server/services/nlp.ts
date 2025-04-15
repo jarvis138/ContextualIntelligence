@@ -429,7 +429,7 @@ ${documentChunks.map((chunk, i) => `[${i}] ${chunk.chunk.substring(0, 500)}...`)
  * Generate project insights by analyzing all project data
  * @param projectId ID of the project to analyze
  */
-export async function generateInsights(projectId: number): Promise<any[]> {
+export async function generateInsights(project: any, tasks: any[], documents: any[], activities: any[]): Promise<any[]> {
   try {
     // Get project data
     const project = await storage.getProject(projectId);

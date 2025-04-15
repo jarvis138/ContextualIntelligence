@@ -25,7 +25,7 @@ interface ContextGraphProps {
   className?: string;
 }
 
-export default function ContextGraph({ 
+export function ContextGraph({ 
   projectId, 
   initialFilter = {}, 
   height = 700,
@@ -365,3 +365,6 @@ export default function ContextGraph({
     </div>
   );
 }
+
+// Also export as default for backward compatibility
+export default ContextGraph;
