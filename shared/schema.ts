@@ -493,6 +493,12 @@ export const pkceCodeVerifiers = pgTable("pkce_code_verifiers", {
   };
 });
 
+// Insert schema for PKCE Code Verifiers
+export const insertPkceCodeVerifierSchema = createInsertSchema(pkceCodeVerifiers).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Define PKCE Code Verifiers relations
 export const pkceCodeVerifiersRelations = relations(pkceCodeVerifiers, ({ one }) => ({
   user: one(users, {
@@ -919,3 +925,6 @@ export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type PkceCodeVerifier = typeof pkceCodeVerifiers.$inferSelect;
+export type InsertPkceCodeVerifier = z.infer<typeof insertPkceCodeVerifierSchema>;

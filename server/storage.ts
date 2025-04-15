@@ -12,7 +12,8 @@ import {
   integrations, type Integration, type InsertIntegration,
   insights, type Insight, type InsertInsight,
   relationships, type Relationship, type InsertRelationship,
-  refreshTokens, type RefreshToken, type InsertRefreshToken
+  refreshTokens, type RefreshToken, type InsertRefreshToken,
+  pkceCodeVerifiers, type InsertPkceCodeVerifier
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, sql, lt } from "drizzle-orm";
@@ -47,6 +48,12 @@ export interface IStorage {
   deleteRefreshToken(userId: number, tokenId: string): Promise<boolean>;
   deleteAllRefreshTokens(userId: number): Promise<number>;
   deleteExpiredRefreshTokens(): Promise<number>;
+  
+  // PKCE Code Verifiers
+  createPkceCodeVerifier(verifier: InsertPkceCodeVerifier): Promise<PkceCodeVerifier>;
+  getPkceCodeVerifierByState(state: string): Promise<PkceCodeVerifier | undefined>;
+  updatePkceCodeVerifier(id: number, data: Partial<InsertPkceCodeVerifier>): Promise<PkceCodeVerifier | undefined>;
+  deleteExpiredPkceCodeVerifiers(): Promise<number>;
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
