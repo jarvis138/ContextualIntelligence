@@ -182,6 +182,12 @@ export async function generateTopicModels(projectId: number): Promise<TopicModel
  */
 export async function resolveCoreferences(documentIds: number[]): Promise<Record<string, string[]>> {
   try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot resolve coreferences.");
+      return {};
+    }
+    
     // Get documents by IDs
     const documents = await getDocumentsByIds(documentIds);
     
@@ -239,6 +245,12 @@ export async function resolveCoreferences(documentIds: number[]): Promise<Record
  */
 export async function generatePredictiveInsights(projectId: number, focusArea: 'timeline' | 'resources' | 'risks' = 'timeline'): Promise<any> {
   try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot generate predictive insights.");
+      return { predictions: [], recommendations: [] };
+    }
+    
     // Get project data for analysis
     const projectData = await getProjectDataForAnalysis(projectId, {
       includeTasks: true,
@@ -327,6 +339,12 @@ export async function generatePredictiveInsights(projectId: number, focusArea: '
  */
 export async function detectAnomalies(projectId: number): Promise<any> {
   try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot detect anomalies.");
+      return [];
+    }
+    
     // Get project data for analysis
     const projectData = await getProjectDataForAnalysis(projectId, {
       includeTasks: true,

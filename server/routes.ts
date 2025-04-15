@@ -1380,6 +1380,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // AI service status route
+  router.get("/ai/status", authenticateToken, async (req, res) => {
+    try {
+      // Check which AI services are configured
+      const status = {
+        openai: !!process.env.OPENAI_API_KEY,
+        perplexity: !!process.env.PERPLEXITY_API_KEY
+      };
+      
+      res.json(status);
+    } catch (error) {
+      console.error('Error checking AI service status:', error);
+      res.status(500).json({ error: 'Failed to check AI service status' });
+    }
+  });
+
   // AI-powered insights routes
   router.post("/projects/:projectId/ai-insights", authenticateToken, async (req, res) => {
     try {
