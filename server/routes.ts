@@ -885,6 +885,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin routes - Development Data Generation
+  // This route is for development only and should be removed in production
+  router.post("/admin/generate-sample-data", async (req, res) => {
+    try {
+      const { generateSampleData } = await import('./controllers/adminController');
+      await generateSampleData(req, res);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to generate sample data", 
+        error: error.message 
+      });
+    }
+  });
+
   // Admin routes - Audit Logs
   // For development, remove authentication temporarily
   router.get("/admin/audit-logs", async (req, res) => {

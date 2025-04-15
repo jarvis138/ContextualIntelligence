@@ -15,7 +15,7 @@ export async function generateSampleData(req: Request, res: Response) {
         name: 'system_cpu_usage',
         value: (Math.random() * 70 + 10).toFixed(1),
         unit: 'percent',
-        labels: { source: 'system_monitor' }
+        metadata: { source: 'system_monitor' }
       });
     }
 
@@ -26,7 +26,7 @@ export async function generateSampleData(req: Request, res: Response) {
         name: 'system_memory_usage',
         value: (Math.random() * 60 + 20).toFixed(1),
         unit: 'percent',
-        labels: { source: 'system_monitor' }
+        metadata: { source: 'system_monitor' }
       });
     }
 
