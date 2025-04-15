@@ -3,7 +3,9 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 
 // Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || '' // Provide empty string as fallback to avoid null
+});
 
 // Type definitions
 interface InsightResult {
@@ -77,12 +79,17 @@ export async function generateAIInsights(params: AnalysisRequest): Promise<Insig
     });
     
     // Parse and process response
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content);
     
     return result.insights || [];
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error generating AI insights:", error);
-    throw new Error(`Failed to generate AI insights: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate AI insights: ${error.message}`);
+    } else {
+      throw new Error("Failed to generate AI insights: Unknown error");
+    }
   }
 }
 
@@ -130,15 +137,20 @@ export async function generateTopicModels(projectId: number): Promise<TopicModel
     });
     
     // Parse response
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content);
     
     return {
       topics: result.topics || [],
       documentTopics: result.documentTopics || []
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error generating topic models:", error);
-    throw new Error(`Failed to generate topic models: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate topic models: ${error.message}`);
+    } else {
+      throw new Error("Failed to generate topic models: Unknown error");
+    }
   }
 }
 
@@ -186,12 +198,17 @@ export async function resolveCoreferences(documentIds: number[]): Promise<Record
     });
     
     // Parse response
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content);
     
     return result.coreferences || {};
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error resolving coreferences:", error);
-    throw new Error(`Failed to resolve coreferences: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to resolve coreferences: ${error.message}`);
+    } else {
+      throw new Error("Failed to resolve coreferences: Unknown error");
+    }
   }
 }
 
@@ -269,7 +286,8 @@ export async function generatePredictiveInsights(projectId: number, focusArea: '
     });
     
     // Parse response
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content);
     
     return result;
   } catch (error) {
@@ -331,7 +349,8 @@ export async function detectAnomalies(projectId: number): Promise<any> {
     });
     
     // Parse response
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content);
     
     return result.anomalies || [];
   } catch (error) {
