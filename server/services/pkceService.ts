@@ -6,12 +6,17 @@
  * authorization code interception attacks.
  */
 
-import { generateChallenge } from 'pkce-challenge';
+import * as pkceChallenge from 'pkce-challenge';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../storage';
 import { oauthConfig } from '../config/oauth';
 import { AuthUser } from '../auth';
 import { generateToken } from './tokenService';
+
+// Wrapper for pkce-challenge to handle the correct type
+const generateChallenge = (length: string) => {
+  return pkceChallenge.default(length);
+};
 
 // PKCE configuration
 const PKCE_EXPIRES_IN = 10 * 60 * 1000; // 10 minutes
@@ -39,7 +44,7 @@ export async function createPKCEParams(
 ) {
   try {
     // Generate PKCE challenge
-    const pkce = generateChallenge();
+    const pkce = generateChallenge('32');
     
     // Generate unique state parameter for CSRF protection
     const state = uuidv4();
@@ -146,7 +151,7 @@ export async function exchangeCodeForToken(
 ): Promise<{ accessToken: string, refreshToken?: string, user: AuthUser, idToken?: string }> {
   try {
     // Verify state and get stored PKCE parameters
-    const pkceData = await storage.getPKCECodeVerifierByState(state);
+    const pkceData = await storage.getPkceCodeVerifierByState(state);
     if (!pkceData) {
       throw new Error('Invalid or expired state parameter');
     }
@@ -213,7 +218,7 @@ export async function exchangeCodeForToken(
     const tokenData = await response.json();
     
     // Mark PKCE verifier as used
-    await storage.updatePKCECodeVerifier(pkceData.id, { used: true });
+    await storage.updatePkceCodeVerifier(pkceData.id, { used: true });
     
     // Get user profile from provider
     const userProfile = await getUserProfile(provider, tokenData.access_token);
