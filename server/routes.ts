@@ -1070,8 +1070,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Slack integration specific routes
-  router.post("/integrations/slack/test", async (req, res) => {
+  router.post("/integrations/slack/test", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const { token, channelId } = req.body;
       
       if (!token || !channelId) {
@@ -1085,33 +1089,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (success) {
         // If test is successful, create or update integration
-        if (req.body.userId) {
-          const userId = parseInt(req.body.userId);
-          const existingIntegrations = await storage.getIntegrations(userId);
-          const slackIntegration = existingIntegrations.find(i => i.type === 'slack');
-          
-          if (slackIntegration) {
-            // Update existing integration
-            await storage.updateIntegration(slackIntegration.id, {
-              config: {
-                token,
-                channelId
-              },
-              active: true
-            });
-          } else {
-            // Create new integration
-            await storage.createIntegration({
-              userId,
-              name: "Slack Integration",
-              type: "slack",
-              active: true,
-              config: {
-                token,
-                channelId
-              }
-            });
-          }
+        // Use the authenticated user's ID if userId is not provided in the request
+        const userId = req.body.userId ? parseInt(req.body.userId) : req.user.id;
+        
+        // Check if the user has permission to create/update integration for this userId
+        if (req.user.id !== userId && req.user.role !== 'admin') {
+          return res.status(403).json({ 
+            success: false, 
+            message: "You don't have permission to create/update integrations for another user" 
+          });
+        }
+        
+        const existingIntegrations = await storage.getIntegrations(userId);
+        const slackIntegration = existingIntegrations.find(i => i.type === 'slack');
+        
+        if (slackIntegration) {
+          // Update existing integration
+          await storage.updateIntegration(slackIntegration.id, {
+            config: {
+              token,
+              channelId
+            },
+            active: true
+          });
+        } else {
+          // Create new integration
+          await storage.createIntegration({
+            userId,
+            name: "Slack Integration",
+            type: "slack",
+            active: true,
+            config: {
+              token,
+              channelId
+            }
+          });
         }
         
         res.json({ 
@@ -1134,8 +1146,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  router.post("/projects/:projectId/slack/update", async (req, res) => {
+  router.post("/projects/:projectId/slack/update", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const projectId = parseInt(req.params.projectId);
       const { token, channelId, message } = req.body;
       
@@ -1166,7 +1182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "integration",
         description: "Sent project update to Slack",
-        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        userId: req.user.id, // Use authenticated user's ID
         projectId,
         entityType: "project",
         entityId: projectId
@@ -1187,8 +1203,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  router.post("/projects/:projectId/slack/insight", async (req, res) => {
+  router.post("/projects/:projectId/slack/insight", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const projectId = parseInt(req.params.projectId);
       const { token, channelId, insightId } = req.body;
       
@@ -1229,7 +1249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "integration",
         description: "Shared project insight to Slack",
-        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        userId: req.user.id, // Use authenticated user's ID
         projectId,
         entityType: "insight",
         entityId: parseInt(insightId)
@@ -1251,8 +1271,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // OpenAI Integration routes
-  router.post("/integrations/openai/test", async (req, res) => {
+  router.post("/integrations/openai/test", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ 
+          valid: false, 
+          message: "Authentication required" 
+        });
+      }
+      
       const { apiKey } = req.body;
       
       if (!apiKey) {
@@ -1266,31 +1293,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (testResult.valid) {
         // If test is successful, create or update integration
-        if (req.body.userId) {
-          const userId = parseInt(req.body.userId);
-          const existingIntegrations = await storage.getIntegrations(userId);
-          const openaiIntegration = existingIntegrations.find(i => i.type === 'openai');
-          
-          if (openaiIntegration) {
-            // Update existing integration
-            await storage.updateIntegration(openaiIntegration.id, {
-              config: {
-                apiKey
-              },
-              active: true
-            });
-          } else {
-            // Create new integration
-            await storage.createIntegration({
-              name: "OpenAI Integration",
-              type: "openai",
-              active: true,
-              userId,
-              config: {
-                apiKey
-              }
-            });
-          }
+        // Use the authenticated user's ID if userId is not provided in the request
+        const userId = req.body.userId ? parseInt(req.body.userId) : req.user.id;
+        
+        // Check if the user has permission to create/update integration for this userId
+        if (req.user.id !== userId && req.user.role !== 'admin') {
+          return res.status(403).json({ 
+            valid: false, 
+            message: "You don't have permission to create/update integrations for another user" 
+          });
+        }
+        
+        const existingIntegrations = await storage.getIntegrations(userId);
+        const openaiIntegration = existingIntegrations.find(i => i.type === 'openai');
+        
+        if (openaiIntegration) {
+          // Update existing integration
+          await storage.updateIntegration(openaiIntegration.id, {
+            config: {
+              apiKey
+            },
+            active: true
+          });
+        } else {
+          // Create new integration
+          await storage.createIntegration({
+            name: "OpenAI Integration",
+            type: "openai",
+            active: true,
+            userId,
+            config: {
+              apiKey
+            }
+          });
         }
       }
       
@@ -1349,6 +1384,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/projects/:projectId/openai/insights", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const projectId = parseInt(req.params.projectId);
       const project = await storage.getProject(projectId);
       
@@ -1383,7 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "ai",
         description: "Generated AI insights for project",
-        userId: parseInt(req.body.userId) || 1, // Default to user 1 if not provided
+        userId: req.user.id, // Use authenticated user's ID
         projectId,
         entityType: "project",
         entityId: projectId
@@ -1610,7 +1649,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/search/hybrid", authenticateToken, searchController.hybridSearch);
   
   // Dashboard data route - combined endpoint for dashboard data
-  router.get("/projects/:projectId/dashboard", async (req, res) => {
+  router.get("/projects/:projectId/dashboard", authenticateToken, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+    
     const projectId = parseInt(req.params.projectId);
     const project = await storage.getProject(projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -1658,7 +1701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeTasks: tasks.filter(t => t.status !== "completed").length,
         documents: documents.length,
         teamMembers: (await storage.getUsers()).length,
-        integrations: (await storage.getIntegrations(1)).length // Hard-coded user ID 1 for demo
+        integrations: (await storage.getIntegrations(req.user.id)).length // Use authenticated user's ID
       },
       teams: teamsWithCounts,
       recentActivities: enrichedActivities,
@@ -1715,7 +1758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "ai_analysis",
         description: "Generated AI-powered insights for project",
-        userId: req.user?.id || 1, // Default to system user if not authenticated
+        userId: req.user.id, // Use authenticated user's ID
         projectId
       });
       
@@ -1757,7 +1800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "ai_analysis",
         description: "Generated topic model for project documents",
-        userId: req.user?.id || 1,
+        userId: req.user.id, // Use authenticated user's ID
         projectId
       });
       
@@ -1840,7 +1883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "ai_analysis",
         description: `Generated predictive insights for project (${focusArea})`,
-        userId: req.user?.id || 1,
+        userId: req.user.id, // Use authenticated user's ID
         projectId
       });
       
@@ -1883,7 +1926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createActivity({
         type: "ai_analysis",
         description: "Detected anomalies in project data",
-        userId: req.user?.id || 1,
+        userId: req.user.id, // Use authenticated user's ID
         projectId
       });
       
