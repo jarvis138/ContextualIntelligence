@@ -107,7 +107,7 @@ export async function handleOAuthCallback(req: Request, res: Response) {
       user = await OAuthService.createOrUpdateUserFromOAuth(
         provider,
         result.userInfo,
-        result.userId
+        result.userId || undefined
       );
     }
     

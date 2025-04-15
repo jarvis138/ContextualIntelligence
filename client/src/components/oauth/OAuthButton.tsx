@@ -4,15 +4,18 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
-// Create a type that omits the onError prop from ButtonProps to avoid conflicts
-type ButtonPropsWithoutOnError = Omit<ButtonProps, 'onError'>;
-
-interface OAuthButtonProps extends ButtonPropsWithoutOnError {
+// Custom props for the OAuth button
+interface OAuthButtonProps {
   providerId: string;
   providerName: string;
   icon?: React.ReactNode;
   onSuccess?: (authUrl: string) => void;
   onError?: (error: string) => void;
+  className?: string;
+  disabled?: boolean;
+  variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
+  children?: React.ReactNode;
 }
 
 /**

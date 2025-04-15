@@ -39,6 +39,7 @@ import {
   extractProjectDataFromSlack
 } from "./services/slack";
 import * as openaiService from "./services/openai";
+import * as oauthController from "./controllers/oauthController";
 
 // Import integration services
 import { slackIntegrationService } from "./services/integrations/slackIntegration";
