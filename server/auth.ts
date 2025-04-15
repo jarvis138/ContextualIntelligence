@@ -297,6 +297,14 @@ function setupAuthRoutes(app: Express) {
     });
   });
   
+  // Get current user endpoint
+  app.get('/auth/me', (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    res.json(req.user);
+  });
+  
   // Google OAuth routes
   app.get('/auth/google', passport.authenticate('google', {
     scope: ['profile', 'email']

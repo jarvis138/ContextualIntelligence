@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<User | null | undefined, Error>({
-    queryKey: ["/api/me"],
+    queryKey: ["/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     // Prevent 'undefined' data which causes TanStack Query errors
@@ -38,11 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation<User, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
+      const res = await apiRequest("POST", "/auth/login", credentials);
       return await res.json();
     },
     onSuccess: (user: User) => {
-      queryClient.setQueryData(["/api/me"], user);
+      queryClient.setQueryData(["/auth/me"], user);
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.fullName || user.username}!`,
@@ -59,11 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation<User, Error, InsertUser>({
     mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
+      const res = await apiRequest("POST", "/auth/register", credentials);
       return await res.json();
     },
     onSuccess: (user: User) => {
-      queryClient.setQueryData(["/api/me"], user);
+      queryClient.setQueryData(["/auth/me"], user);
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.fullName || user.username}!`,
@@ -80,10 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      await apiRequest("GET", "/auth/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/me"], null);
+      queryClient.setQueryData(["/auth/me"], null);
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
