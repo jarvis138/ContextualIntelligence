@@ -2050,6 +2050,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function heartbeat(this: WebSocket) {
     (this as any).isAlive = true;
   }
+  
+  // Create a heartbeat interval to detect dead connections
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if ((ws as any).isAlive === false) {
+        console.log('WebSocket client terminated due to inactivity');
+        return ws.terminate();
+      }
+      
+      // Mark as inactive for next ping cycle
+      (ws as any).isAlive = false;
+      
+      // Send a ping (native WebSocket ping)
+      try {
+        ws.ping();
+      } catch (err) {
+        console.error('Error sending ping:', err);
+        ws.terminate();
+      }
+    });
+  }, 30000); // Check every 30 seconds
+
+  // Cleanup heartbeat interval on server close
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
 
   // Handle client connections
   wss.on('connection', (ws, req) => {
@@ -2071,27 +2097,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Handle incoming messages
     ws.on('message', (message) => {
       try {
-        const data = JSON.parse(message.toString());
-        console.log('WebSocket message received:', data.type || 'unknown type');
+        // Handle potential string or Buffer
+        const messageString = message instanceof Buffer 
+          ? message.toString() 
+          : message.toString();
         
-        if (data.type === 'ping') {
-          // Respond to ping messages directly
-          ws.send(JSON.stringify({
-            type: 'pong',
-            timestamp: new Date().toISOString()
-          }));
+        // Simple ping message (not JSON)
+        if (messageString === 'ping') {
+          console.log('WebSocket received simple ping, sending pong');
+          ws.send('pong');
           return;
         }
         
-        // Process other message types
-        handleWebSocketMessage(ws, data, wss);
+        try {
+          // Try to parse as JSON
+          const data = JSON.parse(messageString);
+          console.log('WebSocket message received:', data.type || 'unknown type');
+          
+          if (data.type === 'ping') {
+            // Reset the isAlive flag as we received a ping
+            (ws as any).isAlive = true;
+            // Respond to ping messages directly
+            ws.send(JSON.stringify({
+              type: 'pong',
+              timestamp: new Date().toISOString()
+            }));
+            return;
+          }
+          
+          // Process other message types
+          handleWebSocketMessage(ws, data, wss);
+        } catch (parseError) {
+          // Not a valid JSON message, log and ignore
+          console.log('WebSocket received non-JSON message:', messageString);
+        }
       } catch (error: any) {
         console.error('WebSocket message error:', error?.message || 'Unknown error');
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Failed to process message',
-          error: error?.message || 'Unknown error'
-        }));
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to process message',
+            error: error?.message || 'Unknown error'
+          }));
+        } catch (sendError) {
+          console.error('Failed to send error response:', sendError);
+        }
       }
     });
     
@@ -2111,23 +2161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('WebSocket server error:', error);
   });
   
-  // Check for dead connections every 30 seconds
-  const interval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-      if ((ws as any).isAlive === false) {
-        console.log('Terminating inactive WebSocket connection');
-        return ws.terminate();
-      }
-      
-      (ws as any).isAlive = false;
-      ws.ping();
-    });
-  }, 30000);
-  
-  // Clear interval when server is closed
-  wss.on('close', () => {
-    clearInterval(interval);
-  });
+  // Note: Using the heartbeat interval defined above
   
   // Function to handle different types of WebSocket messages
   function handleWebSocketMessage(ws: WebSocket, data: any, wss: WebSocketServer) {
