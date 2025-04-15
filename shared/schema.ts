@@ -2,6 +2,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb, index, forei
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
+import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 
 // Search filter schema for frontend to backend communication
 export const searchFilterSchema = z.object({
@@ -440,6 +441,31 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   }),
 }));
 
+// Refresh Tokens schema for handling token rotation and revocation
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenId: varchar("token_id", { length: 255 }).notNull(),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at"),
+}, (table) => {
+  return {
+    userTokenIdIdx: uniqueIndex("user_token_id_idx").on(table.userId, table.tokenId),
+    tokenIdx: index("token_idx").on(table.token),
+    expiryIdx: index("token_expiry_idx").on(table.expiresAt),
+  };
+});
+
+// Define refresh token relations
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [refreshTokens.userId],
+    references: [users.id],
+  }),
+}));
+
 // Integrations schema - updated to match actual database structure
 export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
@@ -564,6 +590,11 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 }));
 
 // Export insert schemas
+export const insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   // No createdAt or updatedAt to omit because they don't exist in the schema
@@ -695,3 +726,6 @@ export type InsertEmbedding = z.infer<typeof insertEmbeddingSchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;

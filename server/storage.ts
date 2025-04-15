@@ -11,7 +11,8 @@ import {
   activities, type Activity, type InsertActivity,
   integrations, type Integration, type InsertIntegration,
   insights, type Insight, type InsertInsight,
-  relationships, type Relationship, type InsertRelationship
+  relationships, type Relationship, type InsertRelationship,
+  refreshTokens, type RefreshToken, type InsertRefreshToken
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, sql } from "drizzle-orm";
