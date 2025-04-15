@@ -31,6 +31,13 @@ import {
   extractProjectDataFromSlack
 } from "./services/slack";
 import * as openaiService from "./services/openai";
+import { 
+  generateAIInsights, 
+  generateTopicModels, 
+  resolveCoreferences, 
+  generatePredictiveInsights, 
+  detectAnomalies 
+} from "./services/aiService";
 
 // Import integration services
 import { slackIntegrationService } from "./services/integrations/slackIntegration";
