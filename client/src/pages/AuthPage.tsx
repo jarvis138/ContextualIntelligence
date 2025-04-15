@@ -119,31 +119,24 @@ export default function AuthPage() {
     setRegisterForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Get mutations from useAuth
+  const { loginMutation, registerMutation } = useAuth();
+
   // Handle login submission
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginForm)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Invalid username or password');
-      }
-
-      // Login successful
+      await loginMutation.mutateAsync(loginForm);
+      
+      // Login successful - the hook will handle the user state update
       toast({
         title: 'Success',
         description: 'Login successful. Redirecting...',
       });
       
-      setTimeout(() => setLocation('/'), 500);
+      // No need for setTimeout, the ProtectedRoute component will handle redirection
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       toast({
@@ -151,8 +144,6 @@ export default function AuthPage() {
         description: err instanceof Error ? err.message : 'Invalid credentials',
         variant: 'destructive'
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -170,20 +161,15 @@ export default function AuthPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: registerForm.username,
-          email: registerForm.email,
-          password: registerForm.password
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
-      }
+      // Prepare user data without confirmPassword
+      const userData = {
+        username: registerForm.username,
+        email: registerForm.email,
+        password: registerForm.password
+      };
+      
+      // Use the registerMutation from useAuth
+      await registerMutation.mutateAsync(userData);
 
       // Registration successful
       toast({
@@ -191,6 +177,7 @@ export default function AuthPage() {
         description: 'Account created successfully. You can now log in.',
       });
       
+      // Move to login tab and prefill login form with registration credentials
       setActiveTab('login');
       setLoginForm({
         username: registerForm.username,
