@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, Share, Settings } from 'lucide-react';
+import { Search, Plus, Eye, Share, Settings, AlertCircle } from 'lucide-react';
 
 export default function Projects() {
   const { toast } = useToast();
@@ -86,6 +86,14 @@ export default function Projects() {
           <div className="text-center">
             <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full mb-4"></div>
             <p className="text-muted-foreground">Loading projects...</p>
+          </div>
+        </div>
+      ) : isError ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-medium">Failed to load projects</h3>
+            <p className="text-muted-foreground mt-1">This is a demo view with development mode authentication bypass</p>
           </div>
         </div>
       ) : (
