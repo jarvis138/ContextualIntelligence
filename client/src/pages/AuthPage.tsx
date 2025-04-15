@@ -92,10 +92,10 @@ export default function AuthPage() {
 
   // Get available auth providers
   const { data: providersData } = useQuery({
-    queryKey: ['/api/auth/providers'],
+    queryKey: ['/auth/providers'],
     queryFn: async () => {
       try {
-        const res = await fetch('/api/auth/providers');
+        const res = await fetch('/auth/providers');
         if (!res.ok) throw new Error('Failed to fetch auth providers');
         return await res.json();
       } catch (error) {
