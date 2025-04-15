@@ -38,13 +38,27 @@ export function useWebSocket(): UseWebSocketReturn {
       try {
         setConnecting(true);
         
+        // In Replit, we need to be careful about the WebSocket URL construction
         // Use wss:// for https, ws:// for http
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        // Get the correct host, ensuring we use the Replit domain
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws`;
         
         console.log('Connecting to WebSocket server at:', wsUrl);
         
-        const socket = new WebSocket(wsUrl);
+        // Create the WebSocket with error handling
+        let socket: WebSocket;
+        try {
+          socket = new WebSocket(wsUrl);
+        } catch (wsError) {
+          console.error('Initial WebSocket construction failed:', wsError);
+          
+          // Fallback to plain ws protocol if wss fails (for development in Replit)
+          console.log('Trying fallback WebSocket connection with ws:// protocol');
+          socket = new WebSocket(`ws://${host}/ws`);
+        }
         socketRef.current = socket;
         
         // Connection opened
