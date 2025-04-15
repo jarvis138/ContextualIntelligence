@@ -1969,6 +1969,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OAuth Provider Settings
+  router.get("/settings/oauth-providers", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const providers = await storage.getOAuthProviderSettings();
+      res.json(providers);
+    } catch (error: any) {
+      res.status(500).json({ message: "Error fetching OAuth provider settings", error: error.message });
+    }
+  });
+
+  router.post("/settings/oauth-providers", authenticateToken, authorizeRoles("admin"), async (req, res) => {
+    try {
+      const providers = req.body;
+      
+      // Validate providers array
+      if (!Array.isArray(providers)) {
+        return res.status(400).json({ message: "Invalid data format. Expected an array of providers." });
+      }
+      
+      // Update each provider
+      for (const provider of providers) {
+        // Validate required fields
+        if (!provider.id || !provider.name) {
+          return res.status(400).json({ message: "Each provider must have an id and name." });
+        }
+        
+        // Save provider settings
+        await storage.saveOAuthProviderSettings(provider);
+      }
+      
+      // Update environment variables in memory
+      for (const provider of providers) {
+        if (provider.enabled && provider.clientId && provider.clientSecret) {
+          process.env[`${provider.id.toUpperCase()}_CLIENT_ID`] = provider.clientId;
+          process.env[`${provider.id.toUpperCase()}_CLIENT_SECRET`] = provider.clientSecret;
+        }
+      }
+      
+      res.json({ success: true, message: "OAuth provider settings saved successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Error saving OAuth provider settings", error: error.message });
+    }
+  });
+
   // Register the router with /api prefix
   app.use("/api", router);
 

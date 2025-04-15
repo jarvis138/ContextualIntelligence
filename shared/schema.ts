@@ -928,3 +928,22 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type PkceCodeVerifier = typeof pkceCodeVerifiers.$inferSelect;
 export type InsertPkceCodeVerifier = z.infer<typeof insertPkceCodeVerifierSchema>;
+
+// Schema for OAuth provider settings
+export const oauthProviderSettings = pgTable('oauth_provider_settings', {
+  id: serial('id').primaryKey(),
+  providerId: text('provider_id').notNull(), // e.g., 'google', 'microsoft', 'slack'
+  name: text('name').notNull(),
+  enabled: boolean('enabled').notNull().default(false),
+  clientId: text('client_id'),
+  clientSecret: text('client_secret'),
+  scope: text('scope'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedBy: integer('updated_by').references(() => users.id)
+});
+
+export const insertOAuthProviderSettingsSchema = createInsertSchema(oauthProviderSettings)
+  .omit({ id: true });
+
+export type OAuthProviderSetting = typeof oauthProviderSettings.$inferSelect;
+export type InsertOAuthProviderSetting = z.infer<typeof insertOAuthProviderSettingsSchema>;

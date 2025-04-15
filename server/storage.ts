@@ -13,7 +13,8 @@ import {
   insights, type Insight, type InsertInsight,
   relationships, type Relationship, type InsertRelationship,
   refreshTokens, type RefreshToken, type InsertRefreshToken,
-  pkceCodeVerifiers, type PkceCodeVerifier, type InsertPkceCodeVerifier
+  pkceCodeVerifiers, type PkceCodeVerifier, type InsertPkceCodeVerifier,
+  oauthProviderSettings, type OAuthProviderSetting, type InsertOAuthProviderSetting
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, sql, lt } from "drizzle-orm";
@@ -117,6 +118,11 @@ export interface IStorage {
   getRelationship(id: number): Promise<Relationship | undefined>;
   getRelationships(projectId: number): Promise<Relationship[]>;
   createRelationship(relationship: InsertRelationship): Promise<Relationship>;
+  
+  // OAuth Provider Settings
+  getOAuthProviderSettings(): Promise<OAuthProviderSetting[]>;
+  getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined>;
+  saveOAuthProviderSettings(provider: InsertOAuthProviderSetting): Promise<OAuthProviderSetting>;
 }
 
 export class MemStorage implements IStorage {
