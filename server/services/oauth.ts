@@ -1,211 +1,226 @@
-/**
- * OAuth Service
- * 
- * This service handles OAuth 2.0 authorization with PKCE for various providers including Google,
- * Microsoft, and Slack. It includes methods for generating authorization URLs, token exchange,
- * token refresh, and token revocation.
- */
+import { db } from "../db";
+import { TokenStorage } from "./tokenStorage";
+import { PKCEService } from "./pkceService";
+import axios from "axios";
+import { eq } from "drizzle-orm";
+import { oauthProviderSettings } from "@shared/schema";
+import crypto from "crypto";
+import type { Express } from "express";
 
-import axios from 'axios';
-import querystring from 'querystring';
-import { storage } from '../storage';
-import { PKCEService } from './pkceService';
-import { TokenStorage } from './tokenStorage';
-import { oauthConfig } from '../config/oauth';
-import { db } from '../db';
-import { oauthProviderSettings, users, oauthTokens } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
-
-// Types for OAuth responses
-interface TokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token?: string;
-  scope?: string;
-  id_token?: string;
+// OAuth provider configuration interface
+interface OAuthProviderConfig {
+  authorizeUrl: string;
+  tokenUrl: string;
+  userInfoUrl?: string;
+  revokeUrl?: string;
+  clientId: string;
+  clientSecret?: string;
+  scopes: string[];
+  accessType?: string;
+  responseType?: string;
+  redirectUri: string;
 }
 
-interface UserInfoResponse {
-  id?: string;
-  sub?: string;
-  email?: string;
-  name?: string;
-  picture?: string;
-  given_name?: string;
-  family_name?: string;
-  [key: string]: any;
-}
+// Configuration for supported OAuth providers
+const providers: Record<string, Partial<OAuthProviderConfig>> = {
+  google: {
+    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    userInfoUrl: "https://www.googleapis.com/oauth2/v3/userinfo",
+    revokeUrl: "https://oauth2.googleapis.com/revoke",
+    scopes: ["openid", "profile", "email"],
+    accessType: "offline",
+    responseType: "code"
+  },
+  microsoft: {
+    authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+    revokeUrl: undefined, // Microsoft doesn't have a standard revoke endpoint
+    scopes: ["openid", "profile", "email", "User.Read"],
+    responseType: "code"
+  },
+  slack: {
+    authorizeUrl: "https://slack.com/oauth/v2/authorize",
+    tokenUrl: "https://slack.com/api/oauth.v2.access",
+    userInfoUrl: "https://slack.com/api/users.identity",
+    revokeUrl: "https://slack.com/api/auth.revoke",
+    scopes: ["channels:read", "chat:write", "team:read", "users:read"],
+    responseType: "code"
+  }
+};
 
 /**
- * Configure OAuth strategies for Passport
+ * Configure OAuth strategies for passport authentication
  * @param app Express application
  */
-export function configureOAuthStrategies(app: any) {
-  // Implementation will be added as needed
-  // This sets up OAuth providers with Passport
+export function configureOAuthStrategies(app: Express) {
   console.log('OAuth strategies configuration placeholder');
+  // This is a placeholder for OAuth strategy configuration
+  // The actual implementation would set up passport strategies for each provider
+  // Currently, we're using a custom OAuth implementation with PKCE
 }
 
+// OAuth service helper class
 export class OAuthService {
   /**
-   * Generate an authorization URL for a specific provider
-   * 
-   * @param providerId The OAuth provider ID (google, microsoft, slack)
-   * @param userId The user ID requesting authorization
-   * @param redirectUri The redirect URI after authorization
-   * @returns An object containing the authorization URL and state
+   * Get all available OAuth providers and their configuration
    */
-  static async generateAuthorizationUrl(providerId: string, userId?: number, redirectUri?: string) {
-    // Get provider configuration from database or fallback to static config
-    const providerSetting = await storage.getOAuthProviderSetting(providerId);
-    const providerBaseConfig = oauthConfig[providerId as keyof typeof oauthConfig];
+  static async getAvailableProviders() {
+    const providerList = Object.keys(providers);
     
-    if (!providerBaseConfig) {
-      throw new Error(`Unsupported OAuth provider: ${providerId}`);
-    }
-    
-    // Use dynamic provider settings from DB if available, otherwise use static config
-    const clientId = providerSetting?.clientId || providerBaseConfig.clientID;
-    const scope = providerSetting?.scope || providerBaseConfig.scope.join(' ');
-    const authorizeUrl = providerBaseConfig.authorizeUrl;
-    
-    if (!clientId) {
-      throw new Error(`Missing client ID for provider: ${providerId}`);
-    }
-    
-    if (!authorizeUrl) {
-      throw new Error(`Missing authorization URL for provider: ${providerId}`);
-    }
-    
-    // Use actual redirect URI or fallback to configured one
-    const finalRedirectUri = redirectUri || providerBaseConfig.callbackURL;
-    
-    // Generate PKCE code verifier and challenge
-    const codeVerifier = PKCEService.generateCodeVerifier();
-    const codeChallenge = PKCEService.generateCodeChallenge(codeVerifier);
-    
-    // Generate state for CSRF protection
-    const state = PKCEService.generateState();
-    
-    // Set expiration time for code verifier (10 minutes)
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
-    
-    // Store PKCE data in the database
-    await PKCEService.storePkceCodeVerifier({
-      userId,
-      codeVerifier,
-      codeChallenge,
-      state,
-      provider: providerId,
-      redirectUri: finalRedirectUri,
-      scope,
-      expiresAt,
-      used: false,
-    });
-    
-    // Generate authorization URL
-    const params = {
-      client_id: clientId,
-      redirect_uri: finalRedirectUri,
-      response_type: 'code',
-      scope,
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      access_type: 'offline', // For refresh tokens
-      prompt: 'consent', // Force consent to ensure refresh tokens
-    };
-    
-    const authUrl = `${authorizeUrl}?${querystring.stringify(params)}`;
-    
-    return {
-      authorizationUrl: authUrl,
-      state,
-    };
+    // Return the list of available providers with minimal info
+    return providerList.map(id => ({
+      id,
+      name: id.charAt(0).toUpperCase() + id.slice(1),
+      configurable: true,
+    }));
   }
   
   /**
-   * Exchange an authorization code for tokens
-   * 
-   * @param providerId The OAuth provider ID
-   * @param code The authorization code
-   * @param state The state from the authorization request
-   * @returns The tokens and user info
+   * Get configuration for a specific provider
    */
-  static async exchangeCodeForTokens(providerId: string, code: string, state: string) {
-    // Retrieve the PKCE code verifier from the database using the state
-    const verifier = await PKCEService.getPkceCodeVerifierByState(state);
-    
-    if (!verifier) {
-      throw new Error(`Invalid state parameter: ${state}`);
-    }
-    
-    if (verifier.used) {
-      throw new Error('Authorization code has already been used');
-    }
-    
-    if (verifier.expiresAt < new Date()) {
-      throw new Error('Authorization code has expired');
-    }
-    
-    // Get provider configuration
-    const providerSetting = await storage.getOAuthProviderSetting(providerId);
-    const providerBaseConfig = oauthConfig[providerId as keyof typeof oauthConfig];
-    
-    if (!providerBaseConfig) {
+  static async getProviderConfig(providerId: string): Promise<OAuthProviderConfig> {
+    // Get base configuration
+    const baseConfig = providers[providerId];
+    if (!baseConfig) {
       throw new Error(`Unsupported OAuth provider: ${providerId}`);
     }
     
-    // Use dynamic provider settings from DB if available, otherwise use static config
-    const clientId = providerSetting?.clientId || providerBaseConfig.clientID;
-    const clientSecret = providerSetting?.clientSecret || providerBaseConfig.clientSecret;
-    const tokenUrl = providerBaseConfig.tokenUrl;
+    // Get stored provider settings
+    const [storedSettings] = await db
+      .select()
+      .from(oauthProviderSettings)
+      .where(eq(oauthProviderSettings.providerId, providerId));
     
-    if (!tokenUrl) {
-      throw new Error(`Missing token URL for provider: ${providerId}`);
+    if (!storedSettings) {
+      throw new Error(`Provider settings not found for ${providerId}`);
     }
     
-    // Exchange the code for tokens
+    // Create complete configuration
+    return {
+      ...baseConfig,
+      clientId: storedSettings.clientId,
+      clientSecret: storedSettings.clientSecret,
+      redirectUri: `${process.env.APP_URL || ""}/oauth/callback/${providerId}`,
+    } as OAuthProviderConfig;
+  }
+  
+  /**
+   * Generate authorization URL for OAuth flow
+   */
+  static async generateAuthorizationUrl(provider: string, userId: number) {
     try {
-      const tokenParams = {
-        client_id: clientId,
-        client_secret: clientSecret,
+      // Get provider configuration
+      const config = await OAuthService.getProviderConfig(provider);
+      
+      // Generate PKCE challenge
+      const codeVerifier = PKCEService.generateCodeVerifier();
+      const codeChallenge = PKCEService.generateCodeChallenge(codeVerifier);
+      
+      // Generate state parameter (used to prevent CSRF)
+      const state = PKCEService.generateState();
+      
+      // Store code verifier for later use
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiration
+      await PKCEService.storePkceCodeVerifier({
+        state,
+        codeVerifier,
+        codeChallenge,
+        userId,
+        expiresAt,
+        used: false,
+        provider,
+        redirectUri: config.redirectUri,
+        scope: config.scopes.join(' ')
+      });
+      
+      // Build authorization URL
+      const authUrl = new URL(config.authorizeUrl);
+      
+      // Add common parameters
+      authUrl.searchParams.append('client_id', config.clientId);
+      authUrl.searchParams.append('redirect_uri', config.redirectUri);
+      authUrl.searchParams.append('state', state);
+      authUrl.searchParams.append('response_type', config.responseType || 'code');
+      authUrl.searchParams.append('code_challenge', codeChallenge);
+      authUrl.searchParams.append('code_challenge_method', 'S256');
+      
+      // Add scopes
+      authUrl.searchParams.append('scope', config.scopes.join(' '));
+      
+      // Add provider-specific parameters
+      if (config.accessType) {
+        authUrl.searchParams.append('access_type', config.accessType);
+      }
+      
+      // Return authorization URL
+      return authUrl.toString();
+    } catch (error) {
+      console.error(`Error generating authorization URL for ${provider}:`, error);
+      throw new Error(`Failed to generate authorization URL for ${provider}`);
+    }
+  }
+  
+  /**
+   * Exchange authorization code for tokens
+   */
+  static async exchangeCodeForTokens(provider: string, code: string, state: string) {
+    try {
+      // Get provider configuration
+      const config = await OAuthService.getProviderConfig(provider);
+      
+      // Get PKCE code verifier
+      const verifier = await PKCEService.getPkceCodeVerifierByState(state);
+      if (!verifier) {
+        throw new Error('Invalid or expired state parameter');
+      }
+      const { codeVerifier, userId } = verifier;
+      if (!codeVerifier) {
+        throw new Error('Invalid or expired state parameter');
+      }
+      
+      // Build token request
+      const tokenRequest = {
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
         code,
-        code_verifier: verifier.codeVerifier,
-        redirect_uri: verifier.redirectUri,
-        grant_type: 'authorization_code',
+        code_verifier: codeVerifier,
+        redirect_uri: config.redirectUri,
+        grant_type: 'authorization_code'
       };
-
-      // Make the token request
-      const tokenResponse = await axios.post<TokenResponse>(
-        tokenUrl,
-        querystring.stringify(tokenParams),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
+      
+      // Exchange code for tokens
+      const response = await axios.post(config.tokenUrl, new URLSearchParams(tokenRequest as Record<string, string>), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
-      );
+      });
       
-      const tokens = tokenResponse.data;
+      const tokens = response.data;
       
-      // Mark the code verifier as used
+      // Get user info if provider supports it
+      let userInfo = null;
+      if (config.userInfoUrl) {
+        const userInfoResponse = await axios.get(config.userInfoUrl, {
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`
+          }
+        });
+        userInfo = userInfoResponse.data;
+      }
+      
+      // Mark code verifier as used to prevent replay attacks
       await PKCEService.markPkceCodeVerifierAsUsed(state);
       
-      // Get user info using the access token
-      const userInfo = await this.getUserInfo(providerId, tokens.access_token);
+      // Store tokens
+      const expiresIn = tokens.expires_in || 3600; // Default to 1 hour if not provided
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
       
-      // Calculate token expiration time
-      const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in);
-      
-      // Store tokens if userId is available
-      if (verifier.userId) {
+      if (userId) {
         await TokenStorage.storeOAuthToken(
-          verifier.userId,
-          providerId,
+          userId,
+          provider,
           tokens.access_token,
           tokens.refresh_token || null,
           expiresAt
@@ -215,405 +230,74 @@ export class OAuthService {
       return {
         tokens,
         userInfo,
-        userId: verifier.userId,
+        userId
       };
     } catch (error) {
-      console.error('Error exchanging code for tokens:', error);
-      throw new Error(`Failed to exchange authorization code: ${error.message}`);
+      console.error(`Error exchanging code for tokens for ${provider}:`, error);
+      throw new Error(`Failed to exchange code for tokens for ${provider}`);
     }
   }
   
   /**
-   * Get user information from an OAuth provider using an access token
-   * 
-   * @param providerId The OAuth provider ID
-   * @param accessToken The OAuth access token
-   * @returns The user information from the provider
+   * Create or update user from OAuth info
    */
-  static async getUserInfo(providerId: string, accessToken: string): Promise<UserInfoResponse> {
-    const providerConfig = oauthConfig[providerId as keyof typeof oauthConfig];
+  static async createOrUpdateUserFromOAuth(provider: string, userInfo: any, userId?: number) {
+    // This method would typically create or update a user in the database
+    // based on the provided OAuth user info and link it to the OAuth account
     
-    if (!providerConfig) {
-      throw new Error(`Unsupported OAuth provider: ${providerId}`);
-    }
-    
-    const userInfoUrl = providerConfig.userInfoUrl;
-    
-    if (!userInfoUrl) {
-      throw new Error(`Missing user info URL for provider: ${providerId}`);
-    }
-    
-    try {
-      const response = await axios.get<UserInfoResponse>(userInfoUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching user info:', error);
-      throw new Error(`Failed to fetch user info: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Refresh an OAuth token
-   * 
-   * @param userId The user ID
-   * @param providerId The OAuth provider ID
-   * @returns The refreshed tokens
-   */
-  static async refreshToken(userId: number, providerId: string) {
-    // Get the refresh token from storage
-    const refreshToken = await TokenStorage.getRefreshToken(userId, providerId);
-    
-    if (!refreshToken) {
-      throw new Error(`No refresh token found for user ${userId} and provider ${providerId}`);
-    }
-    
-    // Get provider configuration
-    const providerSetting = await storage.getOAuthProviderSetting(providerId);
-    const providerBaseConfig = oauthConfig[providerId as keyof typeof oauthConfig];
-    
-    if (!providerBaseConfig) {
-      throw new Error(`Unsupported OAuth provider: ${providerId}`);
-    }
-    
-    const clientId = providerSetting?.clientId || providerBaseConfig.clientID;
-    const clientSecret = providerSetting?.clientSecret || providerBaseConfig.clientSecret;
-    const tokenUrl = providerBaseConfig.tokenUrl;
-    
-    if (!tokenUrl) {
-      throw new Error(`Missing token URL for provider: ${providerId}`);
-    }
-    
-    try {
-      // Prepare refresh token request
-      const refreshParams = {
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      };
-      
-      // Make the refresh token request
-      const response = await axios.post<TokenResponse>(
-        tokenUrl,
-        querystring.stringify(refreshParams),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
-      );
-      
-      const tokens = response.data;
-      
-      // Calculate token expiration time
-      const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in);
-      
-      // Store the new tokens
-      await TokenStorage.storeOAuthToken(
-        userId,
-        providerId,
-        tokens.access_token,
-        tokens.refresh_token || refreshToken, // Use the new refresh token or keep the old one
-        expiresAt
-      );
-      
-      return tokens;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      throw new Error(`Failed to refresh token: ${error.message}`);
-    }
+    // For now, we'll just return the user info since user management
+    // is already implemented separately
+    return {
+      id: userId,
+      provider,
+      providerUserId: userInfo.id || userInfo.sub,
+      email: userInfo.email,
+      name: userInfo.name || userInfo.display_name,
+      profilePicture: userInfo.picture || userInfo.image_url
+    };
   }
   
   /**
    * Revoke an OAuth token
-   * 
-   * @param userId The user ID
-   * @param providerId The OAuth provider ID
-   * @returns Whether the revocation was successful
    */
-  static async revokeToken(userId: number, providerId: string) {
-    const providerConfig = oauthConfig[providerId as keyof typeof oauthConfig];
-    
-    if (!providerConfig) {
-      throw new Error(`Unsupported OAuth provider: ${providerId}`);
-    }
-    
-    const revokeUrl = providerConfig.revokeUrl;
-    
-    if (!revokeUrl) {
-      // If no revoke URL is available, just remove the token from storage
-      return await TokenStorage.revokeToken(userId, providerId);
-    }
-    
-    // Get the access token from storage
-    const accessToken = await TokenStorage.getAccessToken(userId, providerId);
-    
-    if (!accessToken) {
-      throw new Error(`No access token found for user ${userId} and provider ${providerId}`);
-    }
-    
-    // Get provider configuration
-    const providerSetting = await storage.getOAuthProviderSetting(providerId);
-    const clientId = providerSetting?.clientId || providerConfig.clientID;
-    
+  static async revokeToken(userId: number, provider: string): Promise<boolean> {
     try {
-      // Prepare revoke token request
-      const revokeParams = {
-        client_id: clientId,
-        token: accessToken,
-        token_type_hint: 'access_token',
-      };
+      // Get provider configuration
+      const config = await OAuthService.getProviderConfig(provider);
       
-      // Make the revoke token request
-      await axios.post(
-        revokeUrl,
-        querystring.stringify(revokeParams),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
-      );
+      // Get token to revoke
+      const accessToken = await TokenStorage.getAccessToken(userId, provider);
       
-      // Remove the token from storage
-      await TokenStorage.revokeToken(userId, providerId);
+      if (!accessToken) {
+        // If no token found, consider it already revoked
+        return true;
+      }
       
-      return true;
-    } catch (error) {
-      console.error('Error revoking token:', error);
-      
-      // Even if the revocation fails on the provider side, we should still
-      // remove the token from our storage
-      await TokenStorage.revokeToken(userId, providerId);
-      
-      return false;
-    }
-  }
-  
-  /**
-   * Create or update a user from OAuth user info
-   * 
-   * @param providerId The OAuth provider ID
-   * @param userInfo The user info from the OAuth provider
-   * @param existingUserId Optional existing user ID to update
-   * @returns The user
-   */
-  static async createOrUpdateUserFromOAuth(
-    providerId: string,
-    userInfo: UserInfoResponse,
-    existingUserId?: number
-  ) {
-    // Extract user data from provider-specific format
-    const email = userInfo.email;
-    const externalId = userInfo.id || userInfo.sub;
-    const name = userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim();
-    const picture = userInfo.picture;
-    
-    if (!email || !externalId) {
-      throw new Error('OAuth provider did not return required user information (email or ID)');
-    }
-    
-    try {
-      // Check if we have an existing user with this external ID and provider
-      let user;
-      
-      if (existingUserId) {
-        // Update existing user
-        const [updatedUser] = await db.update(users)
-          .set({
-            email,
-            fullName: name,
-            avatar: picture || null,
-          })
-          .where(eq(users.id, existingUserId))
-          .returning();
-        
-        user = updatedUser;
-      } else {
-        // Check if user exists by external ID
-        const [existingUserByExtId] = await db.select()
-          .from(users)
-          .where(
-            and(
-              eq(users.authMethod, providerId as any),
-              eq(users.externalId as any, externalId)
-            )
-          );
-        
-        if (existingUserByExtId) {
-          // Update existing user
-          const [updatedUser] = await db.update(users)
-            .set({
-              email,
-              fullName: name,
-              avatar: picture || null,
-            })
-            .where(eq(users.id, existingUserByExtId.id))
-            .returning();
-          
-          user = updatedUser;
-        } else {
-          // Check if user exists by email
-          const [existingUserByEmail] = await db.select()
-            .from(users)
-            .where(eq(users.email, email));
-          
-          if (existingUserByEmail) {
-            // Update existing user to connect OAuth
-            const [updatedUser] = await db.update(users)
-              .set({
-                authMethod: providerId as any,
-                externalId,
-                fullName: name || existingUserByEmail.fullName,
-                avatar: picture || existingUserByEmail.avatar,
-              })
-              .where(eq(users.id, existingUserByEmail.id))
-              .returning();
-            
-            user = updatedUser;
-          } else {
-            // Create new user
-            const [newUser] = await db.insert(users)
-              .values({
-                username: email.split('@')[0] + '-' + Math.floor(Math.random() * 1000),
-                email,
-                fullName: name,
-                authMethod: providerId as any,
-                externalId,
-                avatar: picture || null,
-                role: 'user',
-                password: null,
-              })
-              .returning();
-            
-            user = newUser;
-          }
+      // If provider supports token revocation
+      if (config.revokeUrl) {
+        try {
+          await axios.post(config.revokeUrl, new URLSearchParams({
+            token: accessToken,
+            client_id: config.clientId,
+            ...(config.clientSecret ? { client_secret: config.clientSecret } : {})
+          }), {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
+        } catch (error) {
+          console.error(`Error revoking token for ${provider}:`, error);
+          // Continue to delete token from our storage even if revocation fails
         }
       }
       
-      return user;
-    } catch (error) {
-      console.error('Error creating/updating user from OAuth:', error);
-      throw new Error(`Failed to create/update user: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Connect an OAuth provider to an existing user
-   * 
-   * @param userId The user ID to connect to
-   * @param providerId The OAuth provider ID
-   * @param code The authorization code
-   * @param state The state from the authorization request
-   * @returns The updated user
-   */
-  static async connectProviderToUser(userId: number, providerId: string, code: string, state: string) {
-    // Exchange code for tokens
-    const { tokens, userInfo } = await this.exchangeCodeForTokens(providerId, code, state);
-    
-    // Update user with OAuth provider info
-    const user = await this.createOrUpdateUserFromOAuth(providerId, userInfo, userId);
-    
-    // Calculate token expiration
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in);
-    
-    // Store OAuth tokens
-    await TokenStorage.storeOAuthToken(
-      user.id,
-      providerId,
-      tokens.access_token,
-      tokens.refresh_token || null,
-      expiresAt
-    );
-    
-    return user;
-  }
-  
-  /**
-   * Disconnect an OAuth provider from a user
-   * 
-   * @param userId The user ID
-   * @param providerId The OAuth provider ID
-   * @returns Whether the disconnection was successful
-   */
-  static async disconnectProviderFromUser(userId: number, providerId: string) {
-    try {
-      // Revoke the token at the provider
-      await this.revokeToken(userId, providerId);
-      
-      // Update user to remove OAuth connection if this isn't their primary auth method
-      const [user] = await db.select().from(users).where(eq(users.id, userId));
-      
-      if (user && user.authMethod === providerId) {
-        // If this is their primary auth method, they need to have a password set
-        // before we can disconnect this provider
-        if (!user.password) {
-          throw new Error('Cannot disconnect primary authentication method without setting a password first');
-        }
-        
-        // Update to local auth method
-        await db.update(users)
-          .set({
-            authMethod: 'local',
-            externalId: null,
-          })
-          .where(eq(users.id, userId));
-      }
-      
-      // Remove tokens from database
-      await db.delete(oauthTokens)
-        .where(
-          and(
-            eq(oauthTokens.userId, userId),
-            eq(oauthTokens.provider, providerId)
-          )
-        );
+      // Remove token from storage
+      await TokenStorage.revokeToken(userId, provider);
       
       return true;
     } catch (error) {
-      console.error('Error disconnecting provider:', error);
-      throw new Error(`Failed to disconnect provider: ${error.message}`);
+      console.error(`Error revoking token for ${provider}:`, error);
+      throw new Error(`Failed to revoke token for ${provider}`);
     }
-  }
-  
-  /**
-   * Get a user's connected OAuth providers
-   * 
-   * @param userId The user ID
-   * @returns Array of connected provider IDs
-   */
-  static async getUserConnectedProviders(userId: number) {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    
-    if (!user) {
-      throw new Error(`User not found: ${userId}`);
-    }
-    
-    // Get all OAuth tokens for this user
-    const tokens = await db.select()
-      .from(oauthTokens)
-      .where(eq(oauthTokens.userId, userId));
-    
-    // Create a set of connected providers
-    const providers = new Set<string>();
-    
-    // Add the user's primary auth method if it's not local
-    if (user.authMethod !== 'local') {
-      providers.add(user.authMethod);
-    }
-    
-    // Add all providers with tokens
-    for (const token of tokens) {
-      providers.add(token.provider);
-    }
-    
-    return Array.from(providers);
   }
 }

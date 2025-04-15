@@ -2018,6 +2018,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OAuth routes
+  router.get("/auth/providers", authenticateToken, oauthController.getOAuthProviders);
+  router.get("/auth/:provider/authorize", authenticateToken, oauthController.authorizeOAuthProvider);
+  router.post("/auth/:provider/callback", oauthController.handleOAuthCallback);
+  router.delete("/auth/:provider/revoke", authenticateToken, oauthController.revokeOAuthToken);
+  router.get("/auth/connected", authenticateToken, oauthController.getUserConnectedProviders);
+
   // Register the router with /api prefix
   app.use("/api", router);
 
