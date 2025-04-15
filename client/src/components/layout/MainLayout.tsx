@@ -71,30 +71,32 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <SheetContent side="left" className="w-[240px] sm:w-[300px]">
                 <nav className="flex flex-col gap-4 pt-4">
                   {navItems.map((item) => (
-                    <Link key={item.href} href={item.href}>
-                      <a
+                    <div key={item.href}>
+                      <Link 
+                        href={item.href}
+                        onClick={() => setSidebarOpen(false)}
                         className={cn(
                           "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md",
                           location === item.href
                             ? "bg-primary/10 text-primary"
                             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         )}
-                        onClick={() => setSidebarOpen(false)}
                       >
                         {item.icon}
                         {item.name}
-                      </a>
-                    </Link>
+                      </Link>
+                    </div>
                   ))}
                 </nav>
               </SheetContent>
             </Sheet>
             {/* Logo */}
-            <Link href="/">
-              <a className="flex items-center gap-2">
-                <Grid className="h-6 w-6 text-primary" />
-                <span className="font-bold text-lg">CPI Hub</span>
-              </a>
+            <Link 
+              href="/"
+              className="flex items-center gap-2"
+            >
+              <Grid className="h-6 w-6 text-primary" />
+              <span className="font-bold text-lg">CPI Hub</span>
             </Link>
           </div>
 
@@ -180,8 +182,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="flex h-full flex-col">
             <nav className="flex-1 p-4 space-y-1">
               {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <a
+                <div key={item.href}>
+                  <Link 
+                    href={item.href}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md",
                       location === item.href
@@ -191,8 +194,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   >
                     {item.icon}
                     {item.name}
-                  </a>
-                </Link>
+                  </Link>
+                </div>
               ))}
             </nav>
             <div className="border-t p-4">
