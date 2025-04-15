@@ -768,9 +768,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin routes - System Monitoring
-  // For development, remove authentication temporarily
-  router.get("/admin/metrics", async (req, res) => {
+  router.get("/admin/metrics", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const typeQuery = req.query.type as string | undefined;
       // Convert string type to enum value or pass undefined
       const type = typeQuery ? (
@@ -813,9 +816,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // For development, remove authentication temporarily
-  router.get("/admin/events", async (req, res) => {
+  router.get("/admin/events", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const severityQuery = req.query.severity as string | undefined;
       // Convert string severity to enum value or pass undefined
       const severity = severityQuery ? (
@@ -880,9 +886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin routes - Backups
-  // For development, remove authentication temporarily
-  router.get("/admin/backups", async (req, res) => {
+  router.get("/admin/backups", authenticateToken, authorizeRoles("admin"), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const statusQuery = req.query.status as string | undefined;
       // Convert string status to enum value or pass undefined
       const status = statusQuery ? (

@@ -471,6 +471,36 @@ export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
   }),
 }));
 
+// PKCE Code Verifiers schema for OAuth 2.0 with PKCE flow
+export const pkceCodeVerifiers = pgTable("pkce_code_verifiers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  codeChallenge: varchar("code_challenge", { length: 128 }).notNull(),
+  codeVerifier: varchar("code_verifier", { length: 128 }).notNull(),
+  state: varchar("state", { length: 255 }).notNull().unique(),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  scope: text("scope").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+}, (table) => {
+  return {
+    stateIdx: index("state_idx").on(table.state),
+    challengeIdx: index("code_challenge_idx").on(table.codeChallenge),
+    providerIdx: index("provider_idx").on(table.provider),
+    expiryIdx: index("pkce_expiry_idx").on(table.expiresAt),
+  };
+});
+
+// Define PKCE Code Verifiers relations
+export const pkceCodeVerifiersRelations = relations(pkceCodeVerifiers, ({ one }) => ({
+  user: one(users, {
+    fields: [pkceCodeVerifiers.userId],
+    references: [users.id],
+  }),
+}));
+
 // System monitoring tables
 export const systemMetrics = pgTable("system_metrics", {
   id: serial("id").primaryKey(),
