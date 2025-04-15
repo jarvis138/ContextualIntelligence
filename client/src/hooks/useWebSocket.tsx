@@ -30,7 +30,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     try {
       // Determine WebSocket protocol based on page protocol
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      // Use the same host as the current page to ensure port is included
       const wsUrl = `${protocol}//${window.location.host}/ws`;
+      console.log('Connecting to WebSocket at:', wsUrl);
       
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
