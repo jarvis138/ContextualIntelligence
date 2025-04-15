@@ -16,6 +16,7 @@ import Integrations from "@/pages/Integrations";
 import AuthPage from "@/pages/AuthPage";
 import UserProfile from "@/pages/UserProfile";
 import AdminDashboard from "@/pages/AdminDashboard";
+import AdminDashboardDev from "@/pages/AdminDashboardDev";
 import SystemMonitoring from "@/pages/SystemMonitoring";
 import Settings from "@/pages/Settings";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
@@ -76,7 +77,7 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       {/* Temporarily add direct route to admin dashboard for development purposes */}
-      <Route path="/admin-dev" component={AdminDashboard} />
+      <Route path="/admin-dev" component={AdminDashboardDev} />
       <ProtectedRoute path="/" component={ProtectedContent} />
     </Switch>
   );

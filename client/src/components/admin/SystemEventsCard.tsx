@@ -8,8 +8,12 @@ import { useSystemEvents, useAcknowledgeEvent } from '@/hooks/useAdminData';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
-export const SystemEventsCard: React.FC = () => {
-  const { data: events, isLoading, refetch } = useSystemEvents(undefined, undefined, 5, false);
+interface SystemEventsCardProps {
+  limit?: number;
+}
+
+export const SystemEventsCard: React.FC<SystemEventsCardProps> = ({ limit = 5 }) => {
+  const { data: events, isLoading, refetch } = useSystemEvents(undefined, undefined, limit, false);
   const acknowledgeEvent = useAcknowledgeEvent();
   const { toast } = useToast();
 
