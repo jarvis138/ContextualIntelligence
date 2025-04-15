@@ -18,6 +18,13 @@ import {
 } from "@shared/schema";
 import { analyzeProjectData, generateInsights } from "./services/nlp";
 import * as nlpController from "./controllers/nlpController";
+import { 
+  generateAIInsights, 
+  generateTopicModels, 
+  resolveCoreferences, 
+  generatePredictiveInsights, 
+  detectAnomalies 
+} from "./services/aiService";
 import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
 import { fetchExternalProjectData } from "./services/integrations";
@@ -31,13 +38,6 @@ import {
   extractProjectDataFromSlack
 } from "./services/slack";
 import * as openaiService from "./services/openai";
-import { 
-  generateAIInsights, 
-  generateTopicModels, 
-  resolveCoreferences, 
-  generatePredictiveInsights, 
-  detectAnomalies 
-} from "./services/aiService";
 
 // Import integration services
 import { slackIntegrationService } from "./services/integrations/slackIntegration";
