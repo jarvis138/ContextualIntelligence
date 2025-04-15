@@ -1,5 +1,5 @@
 import { storage } from '../storage';
-import { Encryption } from '../utils/encryption';
+import { encrypt, decrypt } from '../utils/encryption';
 import { InsertOAuthToken, InsertRefreshToken } from '@shared/schema';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,8 +27,8 @@ export class TokenStorage {
   ): Promise<number> {
     try {
       // Encrypt sensitive token data
-      const encryptedAccessToken = Encryption.encrypt(accessToken);
-      const encryptedRefreshToken = refreshToken ? Encryption.encrypt(refreshToken) : null;
+      const encryptedAccessToken = encrypt(accessToken);
+      const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : null;
       
       // Calculate expiration date if expiresIn is provided
       const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null;
@@ -72,7 +72,7 @@ export class TokenStorage {
       }
       
       // Decrypt and return the access token
-      return Encryption.decrypt(token.accessToken);
+      return decrypt(token.accessToken);
     } catch (error) {
       console.error('Failed to retrieve OAuth access token:', error);
       return null;
@@ -95,7 +95,7 @@ export class TokenStorage {
       }
       
       // Decrypt and return the refresh token
-      return Encryption.decrypt(token.refreshToken);
+      return decrypt(token.refreshToken);
     } catch (error) {
       console.error('Failed to retrieve OAuth refresh token:', error);
       return null;
@@ -135,7 +135,7 @@ export class TokenStorage {
       const tokenId = uuidv4();
       
       // Encrypt the token
-      const encryptedToken = Encryption.encrypt(token);
+      const encryptedToken = encrypt(token);
       
       // Store the token
       await storage.storeRefreshToken(userId, tokenId, encryptedToken, expiresAt);
@@ -166,7 +166,7 @@ export class TokenStorage {
       }
       
       // Decrypt and return the token
-      return Encryption.decrypt(token.token);
+      return decrypt(token.token);
     } catch (error) {
       console.error('Failed to retrieve refresh token:', error);
       return null;

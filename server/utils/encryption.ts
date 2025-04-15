@@ -1,93 +1,112 @@
-import crypto from 'crypto';
+/**
+ * Encryption utility for secure storage of sensitive credentials
+ * 
+ * This module provides utilities for encrypting and decrypting sensitive data
+ * like OAuth tokens using AES-256-GCM.
+ */
+
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
+
+// Use a secure environment variable for the encryption key or generate one
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'cpi-hub-default-encryption-key-change-in-prod';
+
+// Derive a 32-byte key (256 bits) from the encryption key string
+const getKey = (key: string): Buffer => {
+  return createHash('sha256').update(key).digest();
+};
+
+// Encryption algorithm
+const ALGORITHM = 'aes-256-gcm';
 
 /**
- * Utility class for AES-256 encryption and decryption of sensitive data
+ * Encrypt a string using AES-256-GCM
+ * 
+ * @param text The text to encrypt
+ * @returns Object containing the encrypted text, initialization vector, and auth tag
  */
-export class Encryption {
-  private static readonly algorithm = 'aes-256-gcm';
-  private static readonly keyLength = 32; // 256 bits
-  private static readonly ivLength = 16; // 128 bits
-  private static readonly authTagLength = 16; // 128 bits
+export function encrypt(text: string): { 
+  encryptedData: string; 
+  iv: string; 
+  authTag: string 
+} {
+  // Generate a random initialization vector
+  const iv = randomBytes(16);
   
-  /**
-   * Get encryption key from environment or generate a new one
-   * In production, this should always be from environment
-   */
-  private static getEncryptionKey(): Buffer {
-    const envKey = process.env.ENCRYPTION_KEY;
-    
-    if (envKey) {
-      return Buffer.from(envKey, 'hex');
-    } else {
-      // For development only - in production, always use an environment variable
-      console.warn('WARNING: Using fallback encryption key. Set ENCRYPTION_KEY environment variable in production.');
-      
-      // Use a deterministic key for development to avoid losing access to encrypted data
-      // on application restart
-      return crypto.scryptSync('development-encryption-key-do-not-use-in-production', 'salt', this.keyLength);
-    }
-  }
+  // Create cipher with key, IV, and algorithm
+  const cipher = createCipheriv(ALGORITHM, getKey(ENCRYPTION_KEY), iv);
   
-  /**
-   * Encrypts a string using AES-256-GCM
-   * @param text Plain text to encrypt
-   * @returns Encrypted text in format: iv:authTag:encryptedData (base64)
-   */
-  public static encrypt(text: string): string {
-    // Generate a random initialization vector
-    const iv = crypto.randomBytes(this.ivLength);
-    
-    // Get the encryption key
-    const key = this.getEncryptionKey();
-    
-    // Create cipher
-    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
-    
-    // Encrypt the data
-    const encrypted = Buffer.concat([
-      cipher.update(text, 'utf8'),
-      cipher.final()
-    ]);
-    
-    // Get the auth tag
-    const authTag = cipher.getAuthTag();
-    
-    // Format as iv:authTag:encryptedData and encode to base64
-    return Buffer.concat([iv, authTag, encrypted]).toString('base64');
-  }
+  // Encrypt the text
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
   
-  /**
-   * Decrypts a string that was encrypted using the encrypt method
-   * @param encryptedText The encrypted text in format: iv:authTag:encryptedData (base64)
-   * @returns The decrypted plain text
-   */
-  public static decrypt(encryptedText: string): string {
-    try {
-      // Parse the parts from the base64 string
-      const buffer = Buffer.from(encryptedText, 'base64');
-      
-      // Extract the different parts
-      const iv = buffer.subarray(0, this.ivLength);
-      const authTag = buffer.subarray(this.ivLength, this.ivLength + this.authTagLength);
-      const encrypted = buffer.subarray(this.ivLength + this.authTagLength);
-      
-      // Get the decryption key
-      const key = this.getEncryptionKey();
-      
-      // Create decipher
-      const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
-      decipher.setAuthTag(authTag);
-      
-      // Decrypt the data
-      const decrypted = Buffer.concat([
-        decipher.update(encrypted),
-        decipher.final()
-      ]);
-      
-      return decrypted.toString('utf8');
-    } catch (error) {
-      console.error('Decryption error:', error);
-      throw new Error('Failed to decrypt data: The data may be corrupted or tampered with');
-    }
+  // Get the authentication tag
+  const authTag = cipher.getAuthTag().toString('hex');
+  
+  return {
+    encryptedData: encrypted,
+    iv: iv.toString('hex'),
+    authTag
+  };
+}
+
+/**
+ * Decrypt a string that was encrypted with AES-256-GCM
+ * 
+ * @param encryptedData The encrypted data (hex string)
+ * @param iv The initialization vector used for encryption (hex string)
+ * @param authTag The authentication tag generated during encryption (hex string)
+ * @returns The decrypted text
+ */
+export function decrypt(encryptedData: string, iv: string, authTag: string): string {
+  try {
+    // Create decipher
+    const decipher = createDecipheriv(
+      ALGORITHM, 
+      getKey(ENCRYPTION_KEY), 
+      Buffer.from(iv, 'hex')
+    );
+    
+    // Set auth tag
+    decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+    
+    // Decrypt
+    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('Decryption failed:', error);
+    throw new Error('Failed to decrypt data. The data may be corrupted or the encryption key is incorrect.');
   }
+}
+
+/**
+ * Encrypt an object by serializing it to JSON and encrypting the result
+ * 
+ * @param obj The object to encrypt
+ * @returns The encrypted object data with IV and auth tag
+ */
+export function encryptObject<T>(obj: T): { 
+  encryptedData: string; 
+  iv: string; 
+  authTag: string 
+} {
+  return encrypt(JSON.stringify(obj));
+}
+
+/**
+ * Decrypt an object that was encrypted with encryptObject
+ * 
+ * @param encryptedData The encrypted data
+ * @param iv The initialization vector
+ * @param authTag The authentication tag
+ * @returns The decrypted object
+ */
+export function decryptObject<T>(
+  encryptedData: string, 
+  iv: string, 
+  authTag: string
+): T {
+  const decrypted = decrypt(encryptedData, iv, authTag);
+  return JSON.parse(decrypted) as T;
 }
