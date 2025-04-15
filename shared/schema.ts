@@ -471,6 +471,117 @@ export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
   }),
 }));
 
+// System monitoring tables
+export const systemMetrics = pgTable("system_metrics", {
+  id: serial("id").primaryKey(),
+  type: systemMetricTypeEnum("type").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  value: text("value").notNull(),
+  unit: varchar("unit", { length: 20 }),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  metadata: jsonb("metadata"),
+}, (table) => {
+  return {
+    typeIdx: index("metric_type_idx").on(table.type),
+    nameIdx: index("metric_name_idx").on(table.name),
+    timestampIdx: index("metric_timestamp_idx").on(table.timestamp),
+  };
+});
+
+export const systemEvents = pgTable("system_events", {
+  id: serial("id").primaryKey(),
+  severity: systemEventSeverityEnum("severity").notNull().default("info"),
+  source: varchar("source", { length: 100 }).notNull(),
+  message: text("message").notNull(),
+  details: jsonb("details"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  acknowledged: boolean("acknowledged").notNull().default(false),
+  acknowledgedBy: integer("acknowledged_by").references(() => users.id),
+  acknowledgedAt: timestamp("acknowledged_at"),
+}, (table) => {
+  return {
+    severityIdx: index("event_severity_idx").on(table.severity),
+    sourceIdx: index("event_source_idx").on(table.source),
+    timestampIdx: index("event_timestamp_idx").on(table.timestamp),
+    acknowledgedIdx: index("event_acknowledged_idx").on(table.acknowledged),
+  };
+});
+
+export const systemEventsRelations = relations(systemEvents, ({ one }) => ({
+  acknowledgedByUser: one(users, {
+    fields: [systemEvents.acknowledgedBy],
+    references: [users.id],
+  }),
+}));
+
+// Backup and restore tables
+export const backups = pgTable("backups", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  size: integer("size").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // full, incremental, etc.
+  status: backupStatusEnum("status").notNull().default("completed"),
+  path: text("path").notNull(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  metadata: jsonb("metadata"),
+  restoredAt: timestamp("restored_at"),
+  restoredBy: integer("restored_by").references(() => users.id),
+  notes: text("notes"),
+}, (table) => {
+  return {
+    statusIdx: index("backup_status_idx").on(table.status),
+    createdAtIdx: index("backup_created_at_idx").on(table.createdAt),
+    createdByIdx: index("backup_created_by_idx").on(table.createdBy),
+  };
+});
+
+export const backupsRelations = relations(backups, ({ one }) => ({
+  creator: one(users, {
+    fields: [backups.createdBy],
+    references: [users.id],
+  }),
+  restorer: one(users, {
+    fields: [backups.restoredBy],
+    references: [users.id],
+  }),
+}));
+
+// User sessions for tracking active users (matching actual db schema)
+export const userSessions = pgTable("user_sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
+// Audit logs for tracking admin actions
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: integer("entity_id"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  ipAddress: varchar("ip_address", { length: 50 }),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("audit_user_id_idx").on(table.userId),
+    actionIdx: index("audit_action_idx").on(table.action),
+    entityIdx: index("audit_entity_idx").on(table.entityType, table.entityId),
+    timestampIdx: index("audit_timestamp_idx").on(table.timestamp),
+  };
+});
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
 // Integrations schema - updated to match actual database structure
 export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
@@ -684,6 +795,34 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+// Admin feature insert schemas
+export const insertSystemMetricSchema = createInsertSchema(systemMetrics).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertSystemEventSchema = createInsertSchema(systemEvents).omit({
+  id: true,
+  timestamp: true,
+  acknowledged: true,
+  acknowledgedBy: true,
+  acknowledgedAt: true,
+});
+
+export const insertBackupSchema = createInsertSchema(backups).omit({
+  id: true,
+  createdAt: true,
+  restoredAt: true,
+  restoredBy: true,
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions);
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -734,3 +873,19 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;
+
+// Admin feature types
+export type SystemMetric = typeof systemMetrics.$inferSelect;
+export type InsertSystemMetric = z.infer<typeof insertSystemMetricSchema>;
+
+export type SystemEvent = typeof systemEvents.$inferSelect;
+export type InsertSystemEvent = z.infer<typeof insertSystemEventSchema>;
+
+export type Backup = typeof backups.$inferSelect;
+export type InsertBackup = z.infer<typeof insertBackupSchema>;
+
+export type UserSession = typeof userSessions.$inferSelect;
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
