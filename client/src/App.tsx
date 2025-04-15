@@ -3,21 +3,26 @@ import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
+import CustomizableDashboard from "@/pages/CustomizableDashboard";
 import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import ProjectInsights from "@/pages/ProjectInsights";
 import Team from "@/pages/Team";
 import Documents from "@/pages/Documents";
+import DocumentManagement from "@/pages/DocumentManagement";
 import DocumentDetail from "@/pages/DocumentDetail";
 import Conversations from "@/pages/Conversations";
 import Search from "@/pages/Search";
 import Integrations from "@/pages/Integrations";
+import AuthPage from "@/pages/AuthPage";
+import UserProfile from "@/pages/UserProfile";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard/custom" component={CustomizableDashboard} />
       <Route path="/projects" component={Projects} />
       <Route path="/projects/:id">
         {params => <ProjectDetail params={params} />}
@@ -25,11 +30,14 @@ function Router() {
       <Route path="/projects/:projectId/insights" component={ProjectInsights} />
       <Route path="/team" component={Team} />
       <Route path="/documents" component={Documents} />
+      <Route path="/documents/manage" component={DocumentManagement} />
       <Route path="/documents/:documentId">
         {params => <DocumentDetail documentId={params.documentId} />}
       </Route>
       <Route path="/conversations" component={Conversations} />
       <Route path="/search" component={Search} />
+      <Route path="/auth" component={AuthPage} />
+      <Route path="/profile" component={UserProfile} />
       <Route path="/integrations" component={Integrations} />
       <Route path="/integrations/trello" component={Integrations} />
       <Route path="/integrations/jira" component={Integrations} />

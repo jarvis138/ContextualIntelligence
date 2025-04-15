@@ -69,7 +69,7 @@ import {
   UploadIcon, 
   FolderIcon, 
   ChevronRightIcon,
-  DotsVerticalIcon,
+  MoreVerticalIcon,
   EyeIcon,
   PenIcon,
   TrashIcon,

@@ -26,8 +26,8 @@ import {
   LayoutGridIcon,
   PlusIcon,
   XIcon,
-  ArrowsMaximize,
-  ArrowsMinimize,
+  Maximize2Icon,
+  Minimize2Icon,
   Settings2Icon,
   SaveIcon,
   UndoIcon,
@@ -477,9 +477,9 @@ export default function CustomizableDashboard() {
                           onClick={() => toggleWidgetExpansion(widget.id)}
                         >
                           {widget.expanded ? (
-                            <ArrowsMinimize className="h-4 w-4" />
+                            <Minimize2Icon className="h-4 w-4" />
                           ) : (
-                            <ArrowsMaximize className="h-4 w-4" />
+                            <Maximize2Icon className="h-4 w-4" />
                           )}
                         </Button>
                       )}
