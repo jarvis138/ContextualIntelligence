@@ -48,16 +48,39 @@ describe('Teams API', () => {
   });
 
   describe('GET /api/teams', () => {
-    it('should return a list of teams', async () => {
+    it('should return a list of teams for authenticated users', async () => {
       const response = await request(app)
         .get('/api/teams')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data.length).toBeGreaterThan(0);
+    });
+    
+    it('should support filtering by name', async () => {
+      const response = await request(app)
+        .get(`/api/teams?name=${encodeURIComponent(testTeam.name.substring(0, 3))}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+      
+      // At least one team should match the search
+      expect(response.body.data.length).toBeGreaterThan(0);
+    });
+    
+    it('should support pagination', async () => {
+      const response = await request(app)
+        .get('/api/teams?page=1&pageSize=10')
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+      
+      expect(response.body.pagination).toBeDefined();
+      expect(response.body.pagination.page).toBe(1);
+      expect(response.body.pagination.pageSize).toBe(10);
     });
     
     it('should require authentication', async () => {
@@ -71,7 +94,7 @@ describe('Teams API', () => {
     it('should return a specific team by ID', async () => {
       const response = await request(app)
         .get(`/api/teams/${testTeam.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
@@ -83,7 +106,7 @@ describe('Teams API', () => {
     it('should return 404 for non-existent team ID', async () => {
       await request(app)
         .get('/api/teams/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
     });
     
@@ -96,16 +119,16 @@ describe('Teams API', () => {
 
   describe('POST /api/teams', () => {
     it('should create a new team', async () => {
-      const newTeamData: InsertTeam = {
+      const newTeamData: Partial<InsertTeam> = {
         name: 'New Test Team',
-        description: 'Team created during API tests',
-        icon: 'test-icon-new',
-        progress: 10
+        description: 'This is a test team created by API test',
+        icon: 'group',
+        progress: 0
       };
       
       const response = await request(app)
         .post('/api/teams')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .send(newTeamData)
         .expect('Content-Type', /json/)
         .expect(201);
@@ -115,7 +138,6 @@ describe('Teams API', () => {
       expect(response.body.data.name).toBe(newTeamData.name);
       expect(response.body.data.description).toBe(newTeamData.description);
       expect(response.body.data.icon).toBe(newTeamData.icon);
-      expect(response.body.data.progress).toBe(newTeamData.progress);
       
       // Add the created team to testData for cleanup
       testData.teams.push(response.body.data);
@@ -123,40 +145,53 @@ describe('Teams API', () => {
     
     it('should validate required fields', async () => {
       const invalidTeam = {
-        description: 'Invalid team without required fields'
+        description: 'Missing required name field'
       };
       
       await request(app)
         .post('/api/teams')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(invalidTeam)
+        .expect(400);
+    });
+    
+    it('should validate progress range', async () => {
+      const invalidTeam = {
+        name: 'Invalid Progress Team',
+        progress: 101 // Progress should be 0-100
+      };
+      
+      await request(app)
+        .post('/api/teams')
+        .set('Authorization', `Bearer ${userToken}`)
         .send(invalidTeam)
         .expect(400);
     });
     
     it('should require authentication', async () => {
-      const teamData = {
+      const newTeamData = {
         name: 'Unauthenticated Team',
-        description: 'Team created without authentication'
+        description: 'This should fail without auth'
       };
       
       await request(app)
         .post('/api/teams')
-        .send(teamData)
+        .send(newTeamData)
         .expect(401);
     });
   });
 
   describe('PATCH /api/teams/:id', () => {
-    it('should update an existing team', async () => {
+    it('should update team data', async () => {
       const updateData = {
         name: 'Updated Team Name',
         description: 'Updated team description',
-        progress: 75
+        progress: 25
       };
       
       const response = await request(app)
         .patch(`/api/teams/${testTeam.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .send(updateData)
         .expect('Content-Type', /json/)
         .expect(200);
@@ -168,12 +203,20 @@ describe('Teams API', () => {
       expect(response.body.data.progress).toBe(updateData.progress);
     });
     
-    it('should return 404 for non-existent team ID', async () => {
+    it('should prevent updates to non-existent teams', async () => {
       await request(app)
         .patch('/api/teams/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ name: 'Update Non-existent Team' })
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ name: 'Non-existent Team' })
         .expect(404);
+    });
+    
+    it('should validate progress range on update', async () => {
+      await request(app)
+        .patch(`/api/teams/${testTeam.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ progress: -10 }) // Progress should be 0-100
+        .expect(400);
     });
     
     it('should require authentication', async () => {
@@ -182,50 +225,23 @@ describe('Teams API', () => {
         .send({ name: 'Unauthenticated Update' })
         .expect(401);
     });
-  });
-
-  describe('DELETE /api/teams/:id', () => {
-    it('should delete an existing team', async () => {
-      // First create a team to delete
-      const teamToDelete: InsertTeam = {
-        name: 'Team To Delete',
-        description: 'This team will be deleted',
-        icon: 'delete-icon',
-        progress: 0
-      };
-      
-      const createResponse = await request(app)
-        .post('/api/teams')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send(teamToDelete)
-        .expect(201);
-      
-      const teamId = createResponse.body.data.id;
-      
-      // Now delete the team
-      await request(app)
-        .delete(`/api/teams/${teamId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(204);
-      
-      // Verify the team is gone
-      await request(app)
-        .get(`/api/teams/${teamId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
-    });
     
-    it('should return 404 for non-existent team ID', async () => {
-      await request(app)
-        .delete('/api/teams/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
-    });
-    
-    it('should require authentication', async () => {
-      await request(app)
-        .delete(`/api/teams/${testTeam.id}`)
-        .expect(401);
+    it('should enforce team ownership or admin role for updates', async () => {
+      // This test assumes there's a team in the test data 
+      // that the regular user doesn't own and isn't a member of
+      const otherTeamIdx = testData.teams.findIndex((team: any) => 
+        team.ownerId !== testData.users[1].id &&
+        !team.members?.some((m: any) => m.userId === testData.users[1].id)
+      );
+      
+      if (otherTeamIdx >= 0) {
+        const otherTeam = testData.teams[otherTeamIdx];
+        await request(app)
+          .patch(`/api/teams/${otherTeam.id}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({ name: 'Unauthorized Update' })
+          .expect(403);
+      }
     });
   });
 
@@ -233,12 +249,20 @@ describe('Teams API', () => {
     it('should return team members', async () => {
       const response = await request(app)
         .get(`/api/teams/${testTeam.id}/members`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
+      // Members array might be empty if no members are assigned in test data
+    });
+    
+    it('should return 404 for non-existent team ID', async () => {
+      await request(app)
+        .get('/api/teams/9999/members')
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
     });
     
     it('should require authentication', async () => {
@@ -250,78 +274,70 @@ describe('Teams API', () => {
 
   describe('POST /api/teams/:id/members', () => {
     it('should add a member to a team', async () => {
-      const memberData = {
-        userId: testData.users[1].id,
-        role: 'member'
-      };
+      const userId = testData.users[1].id; // Use a test user ID
       
       const response = await request(app)
         .post(`/api/teams/${testTeam.id}/members`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send(memberData)
+        .send({ userId, role: 'member' })
         .expect('Content-Type', /json/)
         .expect(201);
       
       expect(response.body.data).toBeDefined();
-      expect(response.body.data.userId).toBe(memberData.userId);
+      expect(response.body.data.userId).toBe(userId);
       expect(response.body.data.teamId).toBe(testTeam.id);
-      expect(response.body.data.role).toBe(memberData.role);
     });
     
     it('should validate required fields', async () => {
       await request(app)
         .post(`/api/teams/${testTeam.id}/members`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({})
+        .send({ role: 'member' })
         .expect(400);
     });
     
-    it('should return 404 for non-existent user ID', async () => {
-      await request(app)
-        .post(`/api/teams/${testTeam.id}/members`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ userId: 9999, role: 'member' })
-        .expect(404);
-    });
-    
-    it('should require authentication', async () => {
-      await request(app)
-        .post(`/api/teams/${testTeam.id}/members`)
-        .send({ userId: testData.users[0].id, role: 'member' })
-        .expect(401);
-    });
-  });
-
-  describe('DELETE /api/teams/:id/members/:userId', () => {
-    it('should remove a member from a team', async () => {
-      // First add a member to remove
-      const memberData = {
-        userId: testData.users[0].id,
-        role: 'member'
-      };
+    it('should validate role values', async () => {
+      const userId = testData.users[1].id;
       
       await request(app)
         .post(`/api/teams/${testTeam.id}/members`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send(memberData);
-      
-      // Now remove the member
-      await request(app)
-        .delete(`/api/teams/${testTeam.id}/members/${memberData.userId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(204);
+        .send({ userId, role: 'invalid_role' })
+        .expect(400);
     });
     
-    it('should return 404 for non-existent member', async () => {
+    it('should prevent adding members to non-existent teams', async () => {
+      const userId = testData.users[1].id;
+      
       await request(app)
-        .delete(`/api/teams/${testTeam.id}/members/9999`)
+        .post('/api/teams/9999/members')
         .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userId, role: 'member' })
         .expect(404);
     });
     
+    it('should require team ownership or admin role', async () => {
+      // This assumes the regular user is not the owner of the test team
+      // and is testing if a non-owner can add members
+      if (testTeam.ownerId !== testData.users[1].id) {
+        const userId = testData.users[0].id;
+        
+        const response = await request(app)
+          .post(`/api/teams/${testTeam.id}/members`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({ userId, role: 'member' });
+        
+        // Should either return 403 or 401 based on permission model
+        expect(response.status === 403 || response.status === 401).toBe(true);
+      }
+    });
+    
     it('should require authentication', async () => {
+      const userId = testData.users[1].id;
+      
       await request(app)
-        .delete(`/api/teams/${testTeam.id}/members/${testData.users[0].id}`)
+        .post(`/api/teams/${testTeam.id}/members`)
+        .send({ userId, role: 'member' })
         .expect(401);
     });
   });

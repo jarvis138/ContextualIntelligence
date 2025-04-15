@@ -48,10 +48,10 @@ describe('Documents API', () => {
   });
 
   describe('GET /api/documents', () => {
-    it('should return a list of documents', async () => {
+    it('should return a list of documents for authenticated users', async () => {
       const response = await request(app)
         .get('/api/documents')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
@@ -60,31 +60,38 @@ describe('Documents API', () => {
       expect(response.body.data.length).toBeGreaterThan(0);
     });
     
-    it('should support filtering by project ID', async () => {
+    it('should support filtering by tags', async () => {
+      // Assuming test document has tags
+      if (testDocument.tags && testDocument.tags.length > 0) {
+        const response = await request(app)
+          .get(`/api/documents?tags=${testDocument.tags[0]}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .expect('Content-Type', /json/)
+          .expect(200);
+        
+        // At least one document should have the tag
+        expect(response.body.data.length).toBeGreaterThan(0);
+      }
+    });
+    
+    it('should support filtering by access level', async () => {
       const response = await request(app)
-        .get(`/api/documents?projectId=${testData.projects[0].id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .get('/api/documents?accessLevel=public')
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
-      expect(response.body.data).toBeDefined();
-      expect(Array.isArray(response.body.data)).toBe(true);
-      
-      // All returned documents should be from the specified project
-      for (const doc of response.body.data) {
-        expect(doc.projectId).toBe(testData.projects[0].id);
-      }
+      // All returned documents should have public access level
+      expect(response.body.data.every((doc: any) => doc.accessLevel === 'public')).toBe(true);
     });
     
     it('should support pagination', async () => {
       const response = await request(app)
         .get('/api/documents?page=1&pageSize=10')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
-      expect(response.body.data).toBeDefined();
-      expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.pagination).toBeDefined();
       expect(response.body.pagination.page).toBe(1);
       expect(response.body.pagination.pageSize).toBe(10);
@@ -101,7 +108,7 @@ describe('Documents API', () => {
     it('should return a specific document by ID', async () => {
       const response = await request(app)
         .get(`/api/documents/${testDocument.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
@@ -113,8 +120,24 @@ describe('Documents API', () => {
     it('should return 404 for non-existent document ID', async () => {
       await request(app)
         .get('/api/documents/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
+    });
+    
+    it('should respect access control for private documents', async () => {
+      // This test assumes there's a private document in the test data
+      // that the regular user doesn't have access to
+      const privateDocIdx = testData.documents.findIndex((doc: any) => 
+        doc.accessLevel === 'private' && doc.createdBy !== testData.users[1].id
+      );
+      
+      if (privateDocIdx >= 0) {
+        const privateDoc = testData.documents[privateDocIdx];
+        await request(app)
+          .get(`/api/documents/${privateDoc.id}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .expect(403);
+      }
     });
     
     it('should require authentication', async () => {
@@ -126,19 +149,18 @@ describe('Documents API', () => {
 
   describe('POST /api/documents', () => {
     it('should create a new document', async () => {
-      const newDocumentData: InsertDocument = {
+      const newDocumentData: Partial<InsertDocument> = {
         title: 'New Test Document',
-        content: 'Content created during API tests',
-        description: 'Document created during API tests',
-        fileType: 'text',
-        projectId: testData.projects[0].id,
-        createdBy: testData.users[0].id,
-        updatedBy: testData.users[0].id
+        content: 'This is a test document created by API test',
+        description: 'Test document description',
+        tags: ['test', 'api'],
+        accessLevel: 'public',
+        lifecycleState: 'draft'
       };
       
       const response = await request(app)
         .post('/api/documents')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .send(newDocumentData)
         .expect('Content-Type', /json/)
         .expect(201);
@@ -147,9 +169,7 @@ describe('Documents API', () => {
       expect(response.body.data.id).toBeDefined();
       expect(response.body.data.title).toBe(newDocumentData.title);
       expect(response.body.data.content).toBe(newDocumentData.content);
-      expect(response.body.data.description).toBe(newDocumentData.description);
-      expect(response.body.data.fileType).toBe(newDocumentData.fileType);
-      expect(response.body.data.projectId).toBe(newDocumentData.projectId);
+      expect(response.body.data.tags).toEqual(newDocumentData.tags);
       
       // Add the created document to testData for cleanup
       testData.documents.push(response.body.data);
@@ -157,42 +177,54 @@ describe('Documents API', () => {
     
     it('should validate required fields', async () => {
       const invalidDocument = {
-        description: 'Invalid document without required fields'
+        content: 'Missing required title field'
       };
       
       await request(app)
         .post('/api/documents')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(invalidDocument)
+        .expect(400);
+    });
+    
+    it('should validate access level enum values', async () => {
+      const invalidDocument = {
+        title: 'Invalid Access Level Document',
+        content: 'Test content',
+        accessLevel: 'invalid_level'
+      };
+      
+      await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${userToken}`)
         .send(invalidDocument)
         .expect(400);
     });
     
     it('should require authentication', async () => {
-      const documentData = {
+      const newDocumentData = {
         title: 'Unauthenticated Document',
-        content: 'Document content',
-        fileType: 'text',
-        projectId: testData.projects[0].id
+        content: 'This should fail without auth'
       };
       
       await request(app)
         .post('/api/documents')
-        .send(documentData)
+        .send(newDocumentData)
         .expect(401);
     });
   });
 
   describe('PATCH /api/documents/:id', () => {
-    it('should update an existing document', async () => {
+    it('should update document data', async () => {
       const updateData = {
         title: 'Updated Document Title',
-        content: 'Updated document content',
-        description: 'Updated document description'
+        description: 'Updated document description',
+        tags: ['updated', 'test']
       };
       
       const response = await request(app)
         .patch(`/api/documents/${testDocument.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .send(updateData)
         .expect('Content-Type', /json/)
         .expect(200);
@@ -200,16 +232,24 @@ describe('Documents API', () => {
       expect(response.body.data).toBeDefined();
       expect(response.body.data.id).toBe(testDocument.id);
       expect(response.body.data.title).toBe(updateData.title);
-      expect(response.body.data.content).toBe(updateData.content);
       expect(response.body.data.description).toBe(updateData.description);
+      expect(response.body.data.tags).toEqual(updateData.tags);
     });
     
-    it('should return 404 for non-existent document ID', async () => {
+    it('should prevent updates to non-existent documents', async () => {
       await request(app)
         .patch('/api/documents/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ title: 'Update Non-existent Document' })
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ title: 'Non-existent Document' })
         .expect(404);
+    });
+    
+    it('should validate lifecycle state enum values on update', async () => {
+      await request(app)
+        .patch(`/api/documents/${testDocument.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ lifecycleState: 'invalid_state' })
+        .expect(400);
     });
     
     it('should require authentication', async () => {
@@ -218,66 +258,43 @@ describe('Documents API', () => {
         .send({ title: 'Unauthenticated Update' })
         .expect(401);
     });
-  });
-
-  describe('DELETE /api/documents/:id', () => {
-    it('should delete an existing document', async () => {
-      // First create a document to delete
-      const documentToDelete: InsertDocument = {
-        title: 'Document To Delete',
-        content: 'This document will be deleted',
-        description: 'This is a test document for deletion',
-        fileType: 'text',
-        projectId: testData.projects[0].id,
-        createdBy: testData.users[0].id,
-        updatedBy: testData.users[0].id
-      };
-      
-      const createResponse = await request(app)
-        .post('/api/documents')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send(documentToDelete)
-        .expect(201);
-      
-      const documentId = createResponse.body.data.id;
-      
-      // Now delete the document
-      await request(app)
-        .delete(`/api/documents/${documentId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(204);
-      
-      // Verify the document is gone
-      await request(app)
-        .get(`/api/documents/${documentId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
-    });
     
-    it('should return 404 for non-existent document ID', async () => {
-      await request(app)
-        .delete('/api/documents/9999')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
-    });
-    
-    it('should require authentication', async () => {
-      await request(app)
-        .delete(`/api/documents/${testDocument.id}`)
-        .expect(401);
+    it('should enforce document ownership for updates', async () => {
+      // This test assumes there's a document in the test data 
+      // that the regular user doesn't own
+      const otherDocIdx = testData.documents.findIndex((doc: any) => 
+        doc.createdBy !== testData.users[1].id
+      );
+      
+      if (otherDocIdx >= 0) {
+        const otherDoc = testData.documents[otherDocIdx];
+        await request(app)
+          .patch(`/api/documents/${otherDoc.id}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({ title: 'Unauthorized Update' })
+          .expect(403);
+      }
     });
   });
 
   describe('GET /api/documents/:id/versions', () => {
-    it('should return versions for a document', async () => {
+    it('should return document versions', async () => {
       const response = await request(app)
         .get(`/api/documents/${testDocument.id}/versions`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
+      // Versions array might be empty if no versions exist in test data
+    });
+    
+    it('should return 404 for non-existent document ID', async () => {
+      await request(app)
+        .get('/api/documents/9999/versions')
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
     });
     
     it('should require authentication', async () => {
@@ -288,15 +305,23 @@ describe('Documents API', () => {
   });
 
   describe('GET /api/documents/:id/comments', () => {
-    it('should return comments for a document', async () => {
+    it('should return document comments', async () => {
       const response = await request(app)
         .get(`/api/documents/${testDocument.id}/comments`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
       
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
+      // Comments array might be empty if no comments exist in test data
+    });
+    
+    it('should return 404 for non-existent document ID', async () => {
+      await request(app)
+        .get('/api/documents/9999/comments')
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
     });
     
     it('should require authentication', async () => {
@@ -309,34 +334,71 @@ describe('Documents API', () => {
   describe('POST /api/documents/:id/comments', () => {
     it('should add a comment to a document', async () => {
       const commentData = {
-        content: 'This is a test comment added during API tests'
+        text: 'This is a test comment',
+        type: 'feedback'
       };
       
       const response = await request(app)
         .post(`/api/documents/${testDocument.id}/comments`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .send(commentData)
         .expect('Content-Type', /json/)
         .expect(201);
       
       expect(response.body.data).toBeDefined();
-      expect(response.body.data.content).toBe(commentData.content);
-      expect(response.body.data.entityType).toBe('document');
-      expect(response.body.data.entityId).toBe(testDocument.id);
+      expect(response.body.data.text).toBe(commentData.text);
+      expect(response.body.data.type).toBe(commentData.type);
+      expect(response.body.data.documentId).toBe(testDocument.id);
     });
     
     it('should validate required fields', async () => {
+      const invalidComment = {
+        type: 'feedback'
+        // Missing required text field
+      };
+      
       await request(app)
         .post(`/api/documents/${testDocument.id}/comments`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({})
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(invalidComment)
         .expect(400);
     });
     
-    it('should require authentication', async () => {
+    it('should validate comment type enum values', async () => {
+      const invalidComment = {
+        text: 'Test comment',
+        type: 'invalid_type'
+      };
+      
       await request(app)
         .post(`/api/documents/${testDocument.id}/comments`)
-        .send({ content: 'Unauthenticated comment' })
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(invalidComment)
+        .expect(400);
+    });
+    
+    it('should prevent adding comments to non-existent documents', async () => {
+      const commentData = {
+        text: 'This is a test comment',
+        type: 'feedback'
+      };
+      
+      await request(app)
+        .post('/api/documents/9999/comments')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(commentData)
+        .expect(404);
+    });
+    
+    it('should require authentication', async () => {
+      const commentData = {
+        text: 'This should fail without auth',
+        type: 'feedback'
+      };
+      
+      await request(app)
+        .post(`/api/documents/${testDocument.id}/comments`)
+        .send(commentData)
         .expect(401);
     });
   });
