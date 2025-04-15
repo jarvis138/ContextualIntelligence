@@ -242,19 +242,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Team routes
-  router.get("/teams", async (req, res) => {
+  router.get("/teams", authenticateToken, async (req, res) => {
     const teams = await storage.getTeams();
     res.json(teams);
   });
 
-  router.get("/teams/:id", async (req, res) => {
+  router.get("/teams/:id", authenticateToken, async (req, res) => {
     const id = parseInt(req.params.id);
     const team = await storage.getTeam(id);
     if (!team) return res.status(404).json({ message: "Team not found" });
     res.json(team);
   });
 
-  router.post("/teams", async (req, res) => {
+  router.post("/teams", authenticateToken, async (req, res) => {
     try {
       const team = insertTeamSchema.parse(req.body);
       const newTeam = await storage.createTeam(team);
@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Team Members routes
-  router.get("/teams/:teamId/members", async (req, res) => {
+  router.get("/teams/:teamId/members", authenticateToken, async (req, res) => {
     const teamId = parseInt(req.params.teamId);
     const teamMembers = await storage.getTeamMembers(teamId);
     
@@ -280,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(members);
   });
 
-  router.post("/teams/:teamId/members", async (req, res) => {
+  router.post("/teams/:teamId/members", authenticateToken, async (req, res) => {
     try {
       const teamId = parseInt(req.params.teamId);
       const teamMember = insertTeamMemberSchema.parse({ ...req.body, teamId });
@@ -292,19 +292,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task routes
-  router.get("/projects/:projectId/tasks", async (req, res) => {
+  router.get("/projects/:projectId/tasks", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const tasks = await storage.getTasks(projectId);
     res.json(tasks);
   });
 
-  router.get("/teams/:teamId/tasks", async (req, res) => {
+  router.get("/teams/:teamId/tasks", authenticateToken, async (req, res) => {
     const teamId = parseInt(req.params.teamId);
     const tasks = await storage.getTasksByTeam(teamId);
     res.json(tasks);
   });
 
-  router.post("/projects/:projectId/tasks", async (req, res) => {
+  router.post("/projects/:projectId/tasks", authenticateToken, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const task = insertTaskSchema.parse({ ...req.body, projectId });
@@ -316,13 +316,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document routes
-  router.get("/projects/:projectId/documents", async (req, res) => {
+  router.get("/projects/:projectId/documents", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const documents = await storage.getDocuments(projectId);
     res.json(documents);
   });
 
-  router.get("/documents/recent", async (req, res) => {
+  router.get("/documents/recent", authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit as string || "3");
     const documents = await storage.getRecentDocuments(limit);
     
@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(enrichedDocuments);
   });
 
-  router.post("/projects/:projectId/documents", async (req, res) => {
+  router.post("/projects/:projectId/documents", authenticateToken, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const document = insertDocumentSchema.parse({ ...req.body, projectId });
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Activity routes
-  router.get("/projects/:projectId/activities", async (req, res) => {
+  router.get("/projects/:projectId/activities", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
     const activities = await storage.getActivities(projectId, limit);
@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(enrichedActivities);
   });
 
-  router.post("/projects/:projectId/activities", async (req, res) => {
+  router.post("/projects/:projectId/activities", authenticateToken, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const activity = insertActivitySchema.parse({ ...req.body, projectId });
@@ -377,15 +377,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Integration routes
-  router.get("/users/:userId/integrations", async (req, res) => {
+  router.get("/users/:userId/integrations", authenticateToken, async (req, res) => {
     const userId = parseInt(req.params.userId);
+    
+    // Verify user has access to this user's integrations
+    if (req.user && req.user.id !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Unauthorized access to another user's integrations" });
+    }
+    
     const integrations = await storage.getIntegrations(userId);
     res.json(integrations);
   });
 
-  router.post("/users/:userId/integrations", async (req, res) => {
+  router.post("/users/:userId/integrations", authenticateToken, async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
+      
+      // Verify user has access to add integrations for this user
+      if (req.user && req.user.id !== userId && req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized access to add another user's integrations" });
+      }
+      
       const integration = insertIntegrationSchema.parse({ ...req.body, userId });
       const newIntegration = await storage.createIntegration(integration);
       res.status(201).json(newIntegration);
@@ -394,9 +406,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.patch("/integrations/:id", async (req, res) => {
+  router.patch("/integrations/:id", authenticateToken, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Get integration to check ownership
+      const existingIntegration = await storage.getIntegration(id);
+      if (!existingIntegration) return res.status(404).json({ message: "Integration not found" });
+      
+      // Verify user has access to modify this integration
+      if (req.user && req.user.id !== existingIntegration.userId && req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized access to modify another user's integration" });
+      }
+      
       const integration = insertIntegrationSchema.partial().parse(req.body);
       const updatedIntegration = await storage.updateIntegration(id, integration);
       if (!updatedIntegration) return res.status(404).json({ message: "Integration not found" });
@@ -406,8 +428,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  router.delete("/integrations/:id", async (req, res) => {
+  router.delete("/integrations/:id", authenticateToken, async (req, res) => {
     const id = parseInt(req.params.id);
+    
+    // Get integration to check ownership
+    const existingIntegration = await storage.getIntegration(id);
+    if (!existingIntegration) return res.status(404).json({ message: "Integration not found" });
+    
+    // Verify user has access to delete this integration
+    if (req.user && req.user.id !== existingIntegration.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Unauthorized access to delete another user's integration" });
+    }
+    
     const success = await storage.deleteIntegration(id);
     if (!success) return res.status(404).json({ message: "Integration not found" });
     res.status(204).send();
@@ -515,8 +547,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Slack integration specific routes
-  router.post("/integrations/slack/verify", async (req, res) => {
+  router.post("/integrations/slack/verify", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const { token } = req.body;
       
       if (!token) {
@@ -543,8 +579,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  router.post("/integrations/slack/channels", async (req, res) => {
+  router.post("/integrations/slack/channels", authenticateToken, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "Authentication required" });
+      }
+      
       const { token } = req.body;
       
       if (!token) {
@@ -693,13 +733,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Insight routes
-  router.get("/projects/:projectId/insights", async (req, res) => {
+  router.get("/projects/:projectId/insights", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const insights = await storage.getInsights(projectId);
     res.json(insights);
   });
 
-  router.post("/projects/:projectId/insights", async (req, res) => {
+  router.post("/projects/:projectId/insights", authenticateToken, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const insight = insertInsightSchema.parse({ ...req.body, projectId });
@@ -711,13 +751,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Relationship routes
-  router.get("/projects/:projectId/relationships", async (req, res) => {
+  router.get("/projects/:projectId/relationships", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const relationships = await storage.getRelationships(projectId);
     res.json(relationships);
   });
 
-  router.post("/relationships", async (req, res) => {
+  router.post("/relationships", authenticateToken, async (req, res) => {
     try {
       const relationship = insertRelationshipSchema.parse(req.body);
       const newRelationship = await storage.createRelationship(relationship);
@@ -969,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Analysis routes
-  router.get("/projects/:projectId/analyze", async (req, res) => {
+  router.get("/projects/:projectId/analyze", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const project = await storage.getProject(projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -984,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(analysis);
   });
 
-  router.post("/projects/:projectId/generate-insights", async (req, res) => {
+  router.post("/projects/:projectId/generate-insights", authenticateToken, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const project = await storage.getProject(projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -1011,10 +1051,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Integration actions routes
-  router.post("/integrations/:id/sync", async (req, res) => {
+  router.post("/integrations/:id/sync", authenticateToken, async (req, res) => {
     const id = parseInt(req.params.id);
     const integration = await storage.getIntegration(id);
     if (!integration) return res.status(404).json({ message: "Integration not found" });
+    
+    // Check if the authenticated user owns this integration
+    if (req.user && req.user.id !== integration.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Unauthorized: You don't have permission to sync this integration" });
+    }
     
     try {
       const data = await fetchExternalProjectData(integration);
