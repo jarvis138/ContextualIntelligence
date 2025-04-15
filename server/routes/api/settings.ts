@@ -5,6 +5,7 @@
  */
 
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { authenticateToken, authorizeRoles } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validation';
 import { createSuccessResponse } from '../../utils/apiResponse';
@@ -31,7 +32,7 @@ const oauthProvidersSettingsSchema = z.array(oauthProviderSettingSchema);
 /**
  * Get OAuth provider settings
  */
-async function getOAuthProviderSettings(req, res, next) {
+async function getOAuthProviderSettings(req: Request, res: Response, next: NextFunction) {
   try {
     // Check if user has admin role
     if (req.user?.role !== 'admin') {
@@ -50,7 +51,7 @@ async function getOAuthProviderSettings(req, res, next) {
 /**
  * Update OAuth provider settings
  */
-async function updateOAuthProviderSettings(req, res, next) {
+async function updateOAuthProviderSettings(req: Request, res: Response, next: NextFunction) {
   try {
     // Check if user has admin role
     if (req.user?.role !== 'admin') {
@@ -90,7 +91,7 @@ async function updateOAuthProviderSettings(req, res, next) {
 /**
  * Get application settings
  */
-async function getApplicationSettings(req, res, next) {
+async function getApplicationSettings(req: Request, res: Response, next: NextFunction) {
   try {
     // Get application settings
     // Assuming getApplicationSettings will be implemented in storage
@@ -105,7 +106,7 @@ async function getApplicationSettings(req, res, next) {
 /**
  * Update application settings
  */
-async function updateApplicationSettings(req, res, next) {
+async function updateApplicationSettings(req: Request, res: Response, next: NextFunction) {
   try {
     // Check if user has admin role
     if (req.user?.role !== 'admin') {

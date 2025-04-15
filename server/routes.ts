@@ -2,6 +2,7 @@ import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import cookieParser from "cookie-parser";
+import cors from "express";
 import { z } from "zod";
 import { storage } from "./storage";
 import { 
@@ -50,9 +51,14 @@ import { integrationManager, SUPPORTED_INTEGRATIONS } from "./services/integrati
 import { documentProcessingService } from "./services/documentProcessingService.fixed";
 import { adminService } from "./services/adminService";
 
+// Import the API router
+import { apiRouter } from "./routes/api";
+import { errorHandler } from "./middleware/errorHandler";
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup middleware
   app.use(cookieParser());
+  app.use(cors());
   
   // Setup OAuth Authentication (with Passport)
   setupAuth(app);
@@ -2026,7 +2032,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.get("/auth/connected", authenticateToken, oauthController.getUserConnectedProviders);
 
   // Register the router with /api prefix
-  app.use("/api", router);
+  // Mount the structured API router
+  app.use("/api", apiRouter);
+  
+  // Keep the original router for backward compatibility
+  // app.use("/api", router);
 
   // Create HTTP server
   const httpServer = createServer(app);
