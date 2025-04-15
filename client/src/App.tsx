@@ -23,6 +23,7 @@ import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Workspace from "@/pages/Workspace";
 import Insights from "@/pages/Insights";
 import TokenRefreshTestPage from "@/pages/TokenRefreshTestPage";
+import WebSocketTestPage from "@/pages/WebSocketTestPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -67,6 +68,7 @@ function ProtectedContent() {
         <Route path="/integrations/slack" component={Integrations} />
         <Route path="/integrations/gsuite" component={Integrations} />
         <Route path="/token-refresh-test" component={TokenRefreshTestPage} />
+        <Route path="/websocket-test" component={WebSocketTestPage} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>
@@ -78,8 +80,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      {/* Temporarily add direct route to admin dashboard for development purposes */}
+      {/* Temporarily add direct routes for development and testing purposes */}
       <Route path="/admin-dev" component={AdminDashboardDev} />
+      <Route path="/websocket-test" component={WebSocketTestPage} />
       <ProtectedRoute path="/" component={ProtectedContent} />
     </Switch>
   );

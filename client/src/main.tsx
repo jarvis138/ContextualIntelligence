@@ -14,14 +14,40 @@ if (import.meta.hot) {
   
   class CustomWebSocket extends originalWebSocket {
     constructor(url: string | URL, protocols?: string | string[]) {
-      // Check if this is a Vite HMR WebSocket connection
-      if (typeof url === 'string' && url.includes('vite') && url.includes('localhost')) {
-        // Replace localhost with the actual host, maintaining the path and query parameters
-        const urlObj = new URL(url);
-        const newUrl = `${protocol}//${host}${urlObj.pathname}${urlObj.search}`;
-        super(newUrl, protocols);
-      } else {
+      try {
+        // Check if this is a Vite HMR WebSocket connection (even with invalid URL format)
+        if (typeof url === 'string') {
+          if (url.includes('vite')) {
+            // Handle malformed Vite URLs that might have "localhost:undefined"
+            if (url.includes('localhost:undefined') || url.includes('localhost')) {
+              // Extract query parameters if present
+              let search = '';
+              try {
+                const urlParts = url.split('?');
+                if (urlParts.length > 1) {
+                  search = '?' + urlParts[1];
+                }
+              } catch (e) {
+                console.warn('Error parsing WebSocket URL query params:', e);
+              }
+              
+              // Construct a valid WebSocket URL using the current host
+              const newUrl = `${protocol}//${host}/__vite_hmr${search}`;
+              console.log(`Rewrote WebSocket URL from ${url} to ${newUrl}`);
+              super(newUrl, protocols);
+              return;
+            }
+          }
+        }
+        
+        // Default case: use the original URL
         super(url, protocols);
+      } catch (error) {
+        console.error('Error in CustomWebSocket constructor:', error);
+        // Fallback to a default WebSocket connection to the current host
+        const fallbackUrl = `${protocol}//${host}/__vite_hmr`;
+        console.warn(`Using fallback WebSocket URL: ${fallbackUrl}`);
+        super(fallbackUrl, protocols);
       }
     }
   }

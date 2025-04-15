@@ -1,264 +1,256 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { WebSocketMessage } from '@/lib/types';
+import { useState, useEffect, useRef } from 'react';
 
-interface UseWebSocketOptions {
-  onMessage?: (message: WebSocketMessage) => void;
-  reconnectInterval?: number;
-  reconnectAttempts?: number;
-  debugMode?: boolean;
+interface WebSocketMessage {
+  type: string;
+  data?: any;
+  message?: string;
+  timestamp?: string;
 }
 
-export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [reconnectCount, setReconnectCount] = useState(0);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'failed'>('disconnected');
-  
+interface UseWebSocketReturn {
+  connected: boolean;
+  connecting: boolean;
+  messages: WebSocketMessage[];
+  sendMessage: (message: any) => void;
+  lastError: string | null;
+}
+
+/**
+ * Custom hook for interacting with the WebSocket server
+ * 
+ * @returns WebSocket state and methods for interaction
+ */
+export function useWebSocket(): UseWebSocketReturn {
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [messages, setMessages] = useState<WebSocketMessage[]>([]);
+  const [lastError, setLastError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const heartbeatIntervalRef = useRef<number | null>(null);
-  const pingTimeoutRef = useRef<number | null>(null);
   
-  const { 
-    onMessage,
-    reconnectInterval = 5000,
-    reconnectAttempts = 5,
-    debugMode = true // Enable debug mode by default during development
-  } = options;
-
-  // Setup a heartbeat mechanism to keep the connection alive
-  const setupHeartbeat = useCallback((socket: WebSocket) => {
-    // Clear any existing interval/timeout
-    if (heartbeatIntervalRef.current) {
-      window.clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-    
-    if (pingTimeoutRef.current) {
-      window.clearTimeout(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
-    }
-    
-    // Set up a heartbeat every 30 seconds
-    const heartbeatInterval = window.setInterval(() => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        if (debugMode) console.log('[WebSocket] Sending heartbeat ping');
-        
-        // Send a ping to the server
-        socket.send(JSON.stringify({ type: 'ping', data: { timestamp: Date.now() } }));
-        
-        // Set a timeout for the pong response
-        pingTimeoutRef.current = window.setTimeout(() => {
-          if (debugMode) console.log('[WebSocket] No heartbeat response received, reconnecting');
-          
-          // If we don't get a pong back, close the connection and reconnect
-          if (socket) {
-            socket.close();
-            connect();
-          }
-        }, 5000); // Wait 5 seconds for a response
-      }
-    }, 30000); // Send a heartbeat every 30 seconds
-    
-    heartbeatIntervalRef.current = heartbeatInterval;
-  }, [debugMode]);
-  
-  const connect = useCallback(() => {
-    // Clean up any existing intervals or timeouts
-    if (heartbeatIntervalRef.current) {
-      window.clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-    
-    if (pingTimeoutRef.current) {
-      window.clearTimeout(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
-    }
-    
-    // Close existing socket if it exists
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
-
-    try {
-      setConnectionStatus('connecting');
-      
-      // Determine WebSocket protocol based on page protocol
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Use the same host as the current page to ensure port is included
-      // Make sure the port is correctly included
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws`;
-      
-      if (debugMode) {
-        console.log(`[WebSocket] Connecting to: ${wsUrl}`);
-        console.log(`[WebSocket] Protocol: ${protocol}`);
-        console.log(`[WebSocket] Host: ${host}`);
-      }
-      
-      const socket = new WebSocket(wsUrl);
-      socketRef.current = socket;
-
-      socket.onopen = () => {
-        if (debugMode) console.log('[WebSocket] Connection established');
-        setIsConnected(true);
-        setError(null);
-        setReconnectCount(0);
-        setConnectionStatus('connected');
-        
-        // Setup the heartbeat once connected
-        setupHeartbeat(socket);
-      };
-
-      socket.onclose = (event) => {
-        if (debugMode) {
-          console.log(`[WebSocket] Connection closed: ${event.code} ${event.reason}`);
-          console.log(`[WebSocket] Was clean close: ${event.wasClean}`);
-        }
-        
-        setIsConnected(false);
-        
-        // Clear heartbeat interval/timeout on close
-        if (heartbeatIntervalRef.current) {
-          window.clearInterval(heartbeatIntervalRef.current);
-          heartbeatIntervalRef.current = null;
-        }
-        
-        if (pingTimeoutRef.current) {
-          window.clearTimeout(pingTimeoutRef.current);
-          pingTimeoutRef.current = null;
-        }
-        
-        // If connection was closed abnormally and we haven't exceeded reconnect attempts
-        if (!event.wasClean && reconnectCount < reconnectAttempts) {
-          if (debugMode) console.log(`[WebSocket] Reconnecting in ${reconnectInterval}ms (attempt ${reconnectCount + 1}/${reconnectAttempts})`);
-          
-          setConnectionStatus('disconnected');
-          
-          const timeout = window.setTimeout(() => {
-            setReconnectCount(prev => prev + 1);
-            connect();
-          }, reconnectInterval);
-          
-          reconnectTimeoutRef.current = timeout;
-        } else {
-          setConnectionStatus('failed');
-        }
-      };
-
-      socket.onerror = (event) => {
-        const wsError = new Error('WebSocket connection error');
-        if (debugMode) {
-          console.error('[WebSocket] Error:', wsError);
-          console.error('[WebSocket] Event:', event);
-        }
-        setError(wsError);
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          // Handle special case for pong response
-          if (event.data === 'pong' || event.data === '"pong"') {
-            if (debugMode) console.log('[WebSocket] Received heartbeat pong');
-            
-            // Clear the ping timeout since we got a response
-            if (pingTimeoutRef.current) {
-              window.clearTimeout(pingTimeoutRef.current);
-              pingTimeoutRef.current = null;
-            }
-            return;
-          }
-          
-          const data = JSON.parse(event.data) as WebSocketMessage;
-          
-          // Check if message is a pong response
-          if (data.type === 'pong') {
-            if (debugMode) console.log('[WebSocket] Received heartbeat pong');
-            
-            // Clear the ping timeout since we got a response
-            if (pingTimeoutRef.current) {
-              window.clearTimeout(pingTimeoutRef.current);
-              pingTimeoutRef.current = null;
-            }
-            return;
-          }
-          
-          if (debugMode) console.log('[WebSocket] Message received:', data);
-          
-          if (onMessage) {
-            onMessage(data);
-          }
-        } catch (err) {
-          console.error('[WebSocket] Error parsing message:', err);
-          console.error('[WebSocket] Raw message:', event.data);
-        }
-      };
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown WebSocket error');
-      console.error('[WebSocket] Connection error:', error);
-      setError(error);
-      setConnectionStatus('failed');
-    }
-  }, [reconnectCount, reconnectAttempts, reconnectInterval, onMessage, debugMode, setupHeartbeat]);
-
-  const sendMessage = useCallback((type: string, data: any) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({ type, data });
-      socketRef.current.send(message);
-      if (options.debugMode) console.log('[WebSocket] Message sent:', { type, data });
-      return true;
-    }
-    if (options.debugMode) console.log('[WebSocket] Failed to send message - socket not connected');
-    return false;
-  }, [options.debugMode]);
-
-  const disconnect = useCallback(() => {
-    // Clear any pending timeouts or intervals
-    if (reconnectTimeoutRef.current) {
-      window.clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    
-    if (heartbeatIntervalRef.current) {
-      window.clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-    
-    if (pingTimeoutRef.current) {
-      window.clearTimeout(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
-    }
-    
-    if (socketRef.current) {
-      if (debugMode) console.log('[WebSocket] Manually disconnecting');
-      socketRef.current.close();
-      socketRef.current = null;
-      setConnectionStatus('disconnected');
-      setIsConnected(false);
-    }
-  }, [debugMode]);
-
-  // Use empty dependency array to only connect on mount and disconnect on unmount
-  // The actual implementations of connect and disconnect already have proper dependencies
+  // Connect to the WebSocket server on mount
   useEffect(() => {
-    if (debugMode) console.log('[WebSocket] Component mounted, initiating connection');
+    if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
+      return; // Already connected or connecting
+    }
+    
+    // Setup WebSocket connection
+    const connect = () => {
+      try {
+        setConnecting(true);
+        
+        // Use wss:// for https, ws:// for http
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        console.log('Connecting to WebSocket server at:', wsUrl);
+        
+        const socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
+        
+        // Connection opened
+        socket.addEventListener('open', () => {
+          console.log('WebSocket connection established');
+          setConnected(true);
+          setConnecting(false);
+          setLastError(null);
+          
+          // Send a ping to test the connection
+          socket.send(JSON.stringify({ type: 'ping' }));
+        });
+        
+        // Listen for messages
+        socket.addEventListener('message', (event) => {
+          try {
+            // Check if it's a simple pong message
+            if (event.data === 'pong') {
+              console.log('Received simple pong');
+              return;
+            }
+            
+            // Parse JSON messages
+            const message = JSON.parse(event.data);
+            console.log('WebSocket message received:', message);
+            
+            // Add to messages state (except pings/pongs)
+            if (message.type !== 'ping' && message.type !== 'pong') {
+              setMessages((prevMessages) => [...prevMessages, message]);
+            }
+          } catch (e) {
+            console.error('Error parsing WebSocket message:', e);
+            console.log('Raw message:', event.data);
+          }
+        });
+        
+        // Connection closed
+        socket.addEventListener('close', (event) => {
+          console.log('WebSocket connection closed, code:', event.code, 'reason:', event.reason);
+          setConnected(false);
+          setConnecting(false);
+          
+          // Don't treat normal closure as an error
+          if (event.code !== 1000) {
+            setLastError(`Connection closed (${event.code}): ${event.reason || 'No reason provided'}`);
+          }
+          
+          // Attempt to reconnect after a delay if not a normal closure or if the page is still active
+          if (event.code !== 1000 && document.visibilityState === 'visible') {
+            setTimeout(connect, 3000);
+          }
+        });
+        
+        // Connection error
+        socket.addEventListener('error', (event) => {
+          console.error('WebSocket error:', event);
+          setLastError('Connection error occurred');
+          setConnecting(false);
+          
+          // The error event is usually followed by a close event, so we'll handle reconnection there
+        });
+        
+      } catch (error) {
+        console.error('Error setting up WebSocket:', error);
+        setLastError(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setConnecting(false);
+        
+        // Attempt to reconnect after a delay
+        setTimeout(connect, 3000);
+      }
+    };
+    
+    // Initial connection
     connect();
     
+    // Cleanup on unmount
     return () => {
-      if (debugMode) console.log('[WebSocket] Component unmounted, closing connection');
-      disconnect();
+      if (socketRef.current) {
+        // Use code 1000 for normal closure
+        socketRef.current.close(1000, 'Component unmounting');
+      }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  return {
-    isConnected,
-    error,
-    sendMessage,
-    reconnectCount,
-    connect,
-    disconnect,
-    status: connectionStatus
+  
+  // Function to send a message to the server
+  const sendMessage = (message: any) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      setLastError('Cannot send message: WebSocket not connected');
+      return;
+    }
+    
+    try {
+      const messageString = typeof message === 'string' ? message : JSON.stringify(message);
+      socketRef.current.send(messageString);
+    } catch (error) {
+      console.error('Error sending WebSocket message:', error);
+      setLastError(`Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
+  
+  return {
+    connected,
+    connecting,
+    messages,
+    sendMessage,
+    lastError
+  };
+}
+
+// Create a component to test the WebSocket connection
+export function WebSocketTester() {
+  const { connected, connecting, messages, sendMessage, lastError } = useWebSocket();
+  const [message, setMessage] = useState('');
+  
+  const handleSendMessage = () => {
+    if (message) {
+      sendMessage({
+        type: 'chat',
+        sender: 'UI Tester',
+        content: message
+      });
+      setMessage('');
+    }
+  };
+  
+  return (
+    <div className="p-4 border rounded-lg shadow-sm">
+      <h2 className="text-lg font-semibold mb-2">WebSocket Connection Tester</h2>
+      
+      <div className="flex items-center mb-4">
+        <span className="mr-2">Status:</span>
+        {connecting ? (
+          <span className="text-yellow-500">Connecting...</span>
+        ) : connected ? (
+          <span className="text-green-500">Connected</span>
+        ) : (
+          <span className="text-red-500">Disconnected</span>
+        )}
+      </div>
+      
+      {lastError && (
+        <div className="p-2 mb-4 bg-red-50 text-red-700 rounded border border-red-200">
+          Error: {lastError}
+        </div>
+      )}
+      
+      <div className="mb-4">
+        <div className="flex mb-2">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 p-2 border rounded-l"
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!connected || !message}
+            className="px-4 py-2 bg-blue-500 text-white rounded-r disabled:opacity-50"
+          >
+            Send
+          </button>
+        </div>
+        
+        <div className="flex space-x-2">
+          <button
+            onClick={() => sendMessage({ type: 'ping' })}
+            disabled={!connected}
+            className="px-3 py-1 text-sm bg-gray-200 rounded disabled:opacity-50"
+          >
+            Send Ping
+          </button>
+          
+          <button
+            onClick={() => sendMessage({ type: 'notification', title: 'Test Notification', body: 'This is a test notification' })}
+            disabled={!connected}
+            className="px-3 py-1 text-sm bg-gray-200 rounded disabled:opacity-50"
+          >
+            Test Notification
+          </button>
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="font-medium mb-2">Messages:</h3>
+        <div className="border rounded bg-gray-50 p-2 h-60 overflow-y-auto">
+          {messages.length === 0 ? (
+            <p className="text-gray-500 italic">No messages yet</p>
+          ) : (
+            <div className="space-y-2">
+              {messages.map((msg, index) => (
+                <div key={index} className="p-2 bg-white rounded border text-sm">
+                  <div className="font-medium">{msg.type}</div>
+                  <div className="text-xs text-gray-500">
+                    {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'No timestamp'}
+                  </div>
+                  <pre className="mt-1 text-xs whitespace-pre-wrap overflow-auto max-h-20">
+                    {JSON.stringify(msg.data || msg, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
