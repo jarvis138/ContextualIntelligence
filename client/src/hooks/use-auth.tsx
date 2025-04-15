@@ -38,6 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  const refreshToken = useCallback(async (refreshToken: string): Promise<{accessToken: string; user: User}> => {
+    try {
+      const res = await apiRequest("POST", "/auth/refresh-token", { refreshToken });
+      const data = await res.json();
+      
+      // Update the user in the cache
+      queryClient.setQueryData(["/auth/me"], data.user);
+      
+      return data;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      throw error;
+    }
+  }, []);
+
   const loginMutation = useMutation<User, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/auth/login", credentials);
@@ -110,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        refreshToken,
       }}
     >
       {children}

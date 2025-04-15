@@ -11,6 +11,7 @@ import { User, InsertUser } from '@shared/schema';
 import { storage } from './storage';
 import { configureOAuthStrategies } from './services/oauth';
 import { pool } from './db';
+import { refreshAccessToken } from './services/tokenService';
 
 // Environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-for-development-only';
