@@ -2020,33 +2020,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // Setup WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    // The client should connect to ws://hostname:port/ws
+    // Adding perMessageDeflate to improve performance
+    perMessageDeflate: {
+      zlibDeflateOptions: {
+        chunkSize: 1024,
+        memLevel: 7,
+        level: 3
+      },
+      zlibInflateOptions: {
+        chunkSize: 10 * 1024
+      },
+      // Other options
+      serverNoContextTakeover: true,
+      clientNoContextTakeover: true,
+      serverMaxWindowBits: 10,
+      clientMaxWindowBits: 10
+    }
+  });
 
-  wss.on('connection', (ws) => {
-    console.log('Client connected');
+  // Add connection heartbeat to keep connections alive
+  function heartbeat(this: WebSocket) {
+    (this as any).isAlive = true;
+  }
+
+  // Handle client connections
+  wss.on('connection', (ws, req) => {
+    console.log('WebSocket client connected from', req.socket.remoteAddress);
     
+    // Mark the client as alive
+    (ws as any).isAlive = true;
+    
+    // Setup heartbeat
+    ws.on('pong', heartbeat);
+    
+    // Welcome message to confirm connection
+    ws.send(JSON.stringify({
+      type: 'system',
+      message: 'Connected to CPI Hub WebSocket server',
+      timestamp: new Date().toISOString()
+    }));
+    
+    // Handle incoming messages
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message.toString());
+        console.log('WebSocket message received:', data.type || 'unknown type');
         
-        // Broadcast to all clients
-        wss.clients.forEach((client) => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-              type: 'update',
-              data
-            }));
-          }
-        });
+        if (data.type === 'ping') {
+          // Respond to ping messages directly
+          ws.send(JSON.stringify({
+            type: 'pong',
+            timestamp: new Date().toISOString()
+          }));
+          return;
+        }
+        
+        // Process other message types
+        handleWebSocketMessage(ws, data, wss);
       } catch (error: any) {
         console.error('WebSocket message error:', error?.message || 'Unknown error');
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Failed to process message',
+          error: error?.message || 'Unknown error'
+        }));
       }
     });
     
-    ws.on('close', () => {
-      console.log('Client disconnected');
+    // Handle connection close
+    ws.on('close', (code, reason) => {
+      console.log(`WebSocket client disconnected. Code: ${code}. Reason: ${reason || 'No reason provided'}`);
+    });
+    
+    // Handle connection errors
+    ws.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
     });
   });
+
+  // Handle WebSocket server errors
+  wss.on('error', (error) => {
+    console.error('WebSocket server error:', error);
+  });
+  
+  // Check for dead connections every 30 seconds
+  const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if ((ws as any).isAlive === false) {
+        console.log('Terminating inactive WebSocket connection');
+        return ws.terminate();
+      }
+      
+      (ws as any).isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+  
+  // Clear interval when server is closed
+  wss.on('close', () => {
+    clearInterval(interval);
+  });
+  
+  // Function to handle different types of WebSocket messages
+  function handleWebSocketMessage(ws: WebSocket, data: any, wss: WebSocketServer) {
+    // Handle different message types
+    switch (data.type) {
+      case 'chat':
+        // Broadcast chat messages to all clients
+        broadcastMessage(ws, {
+          type: 'chat',
+          data: {
+            sender: data.sender || 'Anonymous',
+            content: data.content,
+            timestamp: new Date().toISOString()
+          }
+        }, wss);
+        break;
+        
+      case 'notification':
+        // Broadcast notifications to all clients
+        broadcastMessage(ws, {
+          type: 'notification',
+          data: {
+            ...data,
+            timestamp: new Date().toISOString()
+          }
+        }, wss);
+        break;
+        
+      case 'project_update':
+        // Broadcast project updates to all clients
+        broadcastMessage(ws, {
+          type: 'project_update',
+          data: {
+            ...data,
+            timestamp: new Date().toISOString()
+          }
+        }, wss);
+        break;
+        
+      default:
+        // Handle unknown message types
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: `Unknown message type: ${data.type}`
+        }));
+    }
+  }
+  
+  // Helper function to broadcast messages to all clients
+  function broadcastMessage(sender: WebSocket, message: any, wss: WebSocketServer) {
+    const messageString = JSON.stringify(message);
+    
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(messageString);
+      }
+    });
+  }
 
   return httpServer;
 }
