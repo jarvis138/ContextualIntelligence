@@ -1,4 +1,5 @@
-import { Switch, Route, useRoute } from "wouter";
+import React, { useEffect } from "react";
+import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
@@ -12,9 +13,6 @@ import Conversations from "@/pages/Conversations";
 import Search from "@/pages/Search";
 import Integrations from "@/pages/Integrations";
 import ErrorBoundary from "@/components/ErrorBoundary";
-
-// Import CSS to fix timeline styling
-import { useEffect } from "react";
 
 function Router() {
   return (

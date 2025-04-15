@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { 
   Card, 
   CardContent, 
@@ -64,7 +64,7 @@ export function SearchResults({
   onResultClick,
   selectedFilters = [],
 }: SearchResultsProps) {
-  const navigate = useNavigate();
+  const [_, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -105,7 +105,7 @@ export function SearchResults({
     if (onResultClick) {
       onResultClick(result);
     } else if (result.url) {
-      navigate(result.url);
+      setLocation(result.url);
     }
   };
 
