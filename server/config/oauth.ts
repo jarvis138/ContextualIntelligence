@@ -11,6 +11,10 @@ export interface OAuthProviderConfig {
   callbackURL: string;
   scope: string[];
   profileFields?: string[];
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  revokeUrl?: string;
+  userInfoUrl?: string;
 }
 
 export interface OAuthConfig {
@@ -33,7 +37,11 @@ export const oauthConfig: OAuthConfig = {
       'email',
       'https://www.googleapis.com/auth/drive.readonly',
       'https://www.googleapis.com/auth/gmail.readonly'
-    ]
+    ],
+    authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    revokeUrl: 'https://oauth2.googleapis.com/revoke',
+    userInfoUrl: 'https://www.googleapis.com/oauth2/v3/userinfo'
   },
   microsoft: {
     clientID: process.env.MICROSOFT_CLIENT_ID || '',
@@ -43,7 +51,11 @@ export const oauthConfig: OAuthConfig = {
       'user.read',
       'mail.read',
       'files.read'
-    ]
+    ],
+    authorizeUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    revokeUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout',
+    userInfoUrl: 'https://graph.microsoft.com/v1.0/me'
   },
   slack: {
     clientID: process.env.SLACK_CLIENT_ID || '',
@@ -54,7 +66,11 @@ export const oauthConfig: OAuthConfig = {
       'channels:history',
       'users:read',
       'files:read'
-    ]
+    ],
+    authorizeUrl: 'https://slack.com/oauth/v2/authorize',
+    tokenUrl: 'https://slack.com/api/oauth.v2.access',
+    revokeUrl: 'https://slack.com/api/auth.revoke',
+    userInfoUrl: 'https://slack.com/api/users.identity'
   }
 };
 
