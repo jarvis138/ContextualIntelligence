@@ -7,53 +7,73 @@ import { queryClient } from "./lib/queryClient";
 
 // Fix for Vite WebSocket connection in Replit environment
 // This prevents the "Failed to construct WebSocket: The URL is invalid" error
-if (import.meta.hot) {
+
+// Define a function to correctly format WebSocket URL
+function getProperWebSocketUrl(wsUrl: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
-  const originalWebSocket = window.WebSocket;
   
-  class CustomWebSocket extends originalWebSocket {
-    constructor(url: string | URL, protocols?: string | string[]) {
-      try {
-        // Check if this is a Vite HMR WebSocket connection (even with invalid URL format)
-        if (typeof url === 'string') {
-          if (url.includes('vite')) {
-            // Handle malformed Vite URLs that might have "localhost:undefined"
-            if (url.includes('localhost:undefined') || url.includes('localhost')) {
-              // Extract query parameters if present
-              let search = '';
-              try {
-                const urlParts = url.split('?');
-                if (urlParts.length > 1) {
-                  search = '?' + urlParts[1];
-                }
-              } catch (e) {
-                console.warn('Error parsing WebSocket URL query params:', e);
-              }
-              
-              // Construct a valid WebSocket URL using the current host
-              const newUrl = `${protocol}//${host}/__vite_hmr${search}`;
-              console.log(`Rewrote WebSocket URL from ${url} to ${newUrl}`);
-              super(newUrl, protocols);
-              return;
-            }
-          }
-        }
-        
-        // Default case: use the original URL
-        super(url, protocols);
-      } catch (error) {
-        console.error('Error in CustomWebSocket constructor:', error);
-        // Fallback to a default WebSocket connection to the current host
-        const fallbackUrl = `${protocol}//${host}/__vite_hmr`;
-        console.warn(`Using fallback WebSocket URL: ${fallbackUrl}`);
-        super(fallbackUrl, protocols);
-      }
+  // Extract query parameters if present
+  let search = '';
+  try {
+    const urlParts = wsUrl.split('?');
+    if (urlParts.length > 1) {
+      search = '?' + urlParts[1];
     }
+  } catch (e) {
+    console.warn('Error parsing WebSocket URL query params:', e);
   }
   
-  // Override the WebSocket constructor for Vite's HMR connections
-  window.WebSocket = CustomWebSocket;
+  // If it's a Vite HMR WebSocket
+  if (wsUrl.includes('vite') || wsUrl.includes('hmr')) {
+    return `${protocol}//${host}/__vite_hmr${search}`;
+  }
+  
+  // For other WebSockets, use the host with the original path
+  try {
+    // Try to parse the URL to extract the path
+    const urlObj = new URL(wsUrl);
+    return `${protocol}//${host}${urlObj.pathname}${search}`;
+  } catch {
+    // If parsing fails, just use the base connection
+    return `${protocol}//${host}/ws${search}`;
+  }
+}
+
+// Only patch WebSocket if we're running in development mode with HMR
+if (import.meta.hot) {
+  try {
+    const originalWebSocket = window.WebSocket;
+    
+    class PatchedWebSocket extends originalWebSocket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        try {
+          let finalUrl = url;
+          
+          // Only rewrite string URLs
+          if (typeof url === 'string') {
+            if (url.includes('localhost') || url.includes('undefined')) {
+              finalUrl = getProperWebSocketUrl(url);
+              console.log(`WebSocket URL rewritten from ${url} to ${finalUrl}`);
+            }
+          }
+          
+          super(finalUrl, protocols);
+        } catch (error) {
+          console.error('Error in PatchedWebSocket constructor:', error);
+          // Create a dummy WebSocket that doesn't throw but doesn't connect either
+          // This allows the app to continue running even if WebSocket fails
+          super(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}://${window.location.host}/ws`);
+        }
+      }
+    }
+    
+    // Override the WebSocket constructor
+    window.WebSocket = PatchedWebSocket as any;
+    console.log('WebSocket constructor patched for Replit environment');
+  } catch (error) {
+    console.error('Failed to patch WebSocket:', error);
+  }
 }
 
 // Import remix icon CSS from CDN
