@@ -37,7 +37,7 @@ export async function generateSampleData(req: Request, res: Response) {
         name: 'api_response_time',
         value: (Math.random() * 300 + 50).toFixed(0),
         unit: 'ms',
-        labels: { endpoint: '/api/documents' }
+        metadata: { endpoint: '/api/documents' }
       });
     }
 
@@ -112,10 +112,8 @@ export async function generateSampleData(req: Request, res: Response) {
         action,
         entityType,
         entityId,
-        details: { 
-          ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       });
     }
 
@@ -131,7 +129,8 @@ export async function generateSampleData(req: Request, res: Response) {
         filename: `backup_${date.toISOString().split('T')[0]}.zip`,
         status,
         size: Math.floor(Math.random() * 1000) + 500,
-        location: '/backups/',
+        path: '/backups/',
+        type: 'full',
         createdBy: 1
       });
     }
