@@ -13,7 +13,7 @@ import {
   insights, type Insight, type InsertInsight,
   relationships, type Relationship, type InsertRelationship,
   refreshTokens, type RefreshToken, type InsertRefreshToken,
-  pkceCodeVerifiers, type InsertPkceCodeVerifier
+  pkceCodeVerifiers, type PkceCodeVerifier, type InsertPkceCodeVerifier
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, sql, lt } from "drizzle-orm";
@@ -148,6 +148,7 @@ export class MemStorage implements IStorage {
     insights: number;
     relationships: number;
     refreshTokens: number;
+    pkceCodeVerifiers: number;
   };
 
   constructor() {
