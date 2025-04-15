@@ -12,6 +12,7 @@ import { documentRoutes } from './documents';
 import { taskRoutes } from './tasks';
 import { teamRoutes } from './teams';
 import { settingsRoutes } from './settings';
+import dataFetchingRoutes from './dataFetching';
 import { errorHandler } from '../../middleware/errorHandler';
 
 // Create API router
@@ -33,6 +34,7 @@ apiRouter.use('/documents', documentRoutes);
 apiRouter.use('/tasks', taskRoutes);
 apiRouter.use('/teams', teamRoutes);
 apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/data-fetching', dataFetchingRoutes);
 
 // Apply error handler to all API routes
 apiRouter.use(errorHandler);
