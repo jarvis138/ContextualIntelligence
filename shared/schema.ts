@@ -50,6 +50,11 @@ export const activityTypeEnum = pgEnum("activity_type", ["create", "update", "de
 export const integrationTypeEnum = pgEnum("integration_type", ["slack", "github", "jira", "google", "microsoft", "trello", "asana", "custom"]);
 export const insightTypeEnum = pgEnum("insight_type", ["warning", "info", "success", "alert"]);
 
+// System monitoring related enums
+export const systemMetricTypeEnum = pgEnum("system_metric_type", ["cpu", "memory", "disk", "network", "api", "database", "queue", "custom"]);
+export const systemEventSeverityEnum = pgEnum("system_event_severity", ["critical", "error", "warning", "info", "debug"]);
+export const backupStatusEnum = pgEnum("backup_status", ["pending", "in_progress", "completed", "failed", "restored"]);
+
 // Document processing related enums
 export const documentSourceEnum = pgEnum("document_source", [
   "google_drive", 
