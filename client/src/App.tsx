@@ -12,6 +12,7 @@ import InsightsPage from "@/pages/insights-page";
 import SearchPage from "@/pages/search-page";
 import SettingsPage from "@/pages/settings-page";
 import AdminPage from "@/pages/admin-page";
+import AdminLoginPage from "@/pages/admin-login";
 import SystemPage from "@/pages/system-page";
 import PlaceholderPage from "@/pages/placeholder-page";
 import NotFound from "@/pages/not-found";
@@ -100,9 +101,26 @@ function App() {
       <TourContextProvider>
         <ProjectAssistantProvider>
           <Switch>
-            {/* Admin route outside of MainLayout */}
-            <Route path="/admin">
+            {/* Admin routes outside of MainLayout */}
+            <Route path="/admin/login">
+              <AdminLoginPage />
+            </Route>
+            
+            <Route path="/admin/dashboard">
               <AdminPage />
+            </Route>
+            
+            <Route path="/admin">
+              {/* Redirect /admin to either login or dashboard based on auth status */}
+              {() => {
+                const isAuthenticated = localStorage.getItem("admin_authenticated") === "true";
+                if (isAuthenticated) {
+                  window.location.href = "/admin/dashboard";
+                } else {
+                  window.location.href = "/admin/login";
+                }
+                return null;
+              }}
             </Route>
             
             {/* All other routes with MainLayout */}
@@ -128,8 +146,6 @@ function App() {
               </MainLayout>
             </Route>
           </Switch>
-          <TourManager />
-          <ChatInterface />
           <Toaster />
         </ProjectAssistantProvider>
       </TourContextProvider>

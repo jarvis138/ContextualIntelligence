@@ -38,17 +38,20 @@ export default function AdminPage() {
     <header className="sticky top-0 z-40 border-b bg-background">
       <div className="container flex h-14 items-center">
         <div className="flex items-center gap-2 md:gap-4">
-          <Link 
-            href="/"
-            className="flex items-center gap-2"
-          >
+          <div className="flex items-center gap-2">
             <Shield className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg">CPI Hub Admin</span>
-          </Link>
+          </div>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" onClick={() => window.location.href = "/"}>
-            Return to Dashboard
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              localStorage.removeItem("admin_authenticated");
+              window.location.href = "/admin/login";
+            }}
+          >
+            Logout
           </Button>
         </div>
       </div>
@@ -81,8 +84,8 @@ export default function AdminPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => window.location.href = "/"}>
-                Return to Dashboard
+              <Button onClick={() => window.location.href = "/admin/login"}>
+                Go to Login
               </Button>
             </CardContent>
           </Card>
