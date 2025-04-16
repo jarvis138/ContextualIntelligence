@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { SiSlack, SiGoogle } from "react-icons/si";
 import { BsMicrosoft } from "react-icons/bs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ConnectorDialogProps {
   open: boolean;
@@ -29,7 +30,18 @@ const connectorFormSchema = z.object({
   }),
 });
 
+// Schema for direct credential input
+const credentialFormSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+  email: z.string().email("Please enter a valid email").optional(),
+  workspaceUrl: z.string().optional(),
+  tokenName: z.string().min(2, "Token name is required"),
+  rememberMe: z.boolean().default(false)
+});
+
 type ConnectorFormValues = z.infer<typeof connectorFormSchema>;
+type CredentialFormValues = z.infer<typeof credentialFormSchema>;
 
 export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDialogProps) {
   const [step, setStep] = useState<"select" | "authorize">("select");
@@ -42,7 +54,20 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
       name: "",
     },
   });
+  
+  const credentialForm = useForm<CredentialFormValues>({
+    resolver: zodResolver(credentialFormSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      email: "",
+      workspaceUrl: "",
+      tokenName: "",
+      rememberMe: false
+    },
+  });
 
+  // Mutation for creating OAuth authorization URL
   const createAuthUrlMutation = useMutation({
     mutationFn: async (values: ConnectorFormValues) => {
       const res = await apiRequest("POST", "/api/connectors/auth-url", values);
@@ -64,6 +89,30 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutation for creating credentials directly
+  const createDirectCredentialsMutation = useMutation({
+    mutationFn: async (values: CredentialFormValues & { connectorType: string, name: string }) => {
+      const res = await apiRequest("POST", "/api/connectors/direct-auth", values);
+      return await res.json();
+    },
+    onSuccess: () => {
+      onOpenChange(false);
+      onSuccess();
+      toast({
+        title: "Success",
+        description: "Connector successfully connected with your credentials",
+        variant: "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to authenticate: ${error.message}`,
         variant: "destructive",
       });
     },

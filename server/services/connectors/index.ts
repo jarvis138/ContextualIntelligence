@@ -387,6 +387,67 @@ export class ConnectorService {
       throw new Error(`Connector operation failed: ${error.message}`);
     }
   }
+
+  /**
+   * Revoke a connector token
+   * 
+   * @param tokenId The ID of the token to revoke
+   * @param userId The user ID (for authorization)
+   * @returns True if the token was revoked successfully
+   */
+  async revokeToken(tokenId: number, userId: number): Promise<boolean> {
+    try {
+      // Verify the token belongs to the user
+      const token = await db.select()
+        .from(apiTokens)
+        .where(
+          and(
+            eq(apiTokens.id, tokenId),
+            eq(apiTokens.userId, userId)
+          )
+        )
+        .limit(1);
+      
+      if (!token.length) {
+        return false;
+      }
+      
+      // Get the connector implementation to handle any service-side revocation
+      const connectorType = token[0].connectorType;
+      if (connectorType && connectorMap[connectorType]) {
+        try {
+          // Try to revoke the token on the service side
+          const ConnectorClass = connectorMap[connectorType];
+          const connector = new ConnectorClass();
+          
+          if (typeof connector.revokeToken === 'function') {
+            await connector.revokeToken({
+              userId,
+              tokenId,
+              token: token[0]
+            });
+          }
+        } catch (error) {
+          // Log but continue - we still want to remove from our database
+          logger.error('Error revoking token on service side', { error, tokenId, connectorType });
+        }
+      }
+      
+      // Delete the token from the database
+      const result = await db.delete(apiTokens)
+        .where(
+          and(
+            eq(apiTokens.id, tokenId),
+            eq(apiTokens.userId, userId)
+          )
+        );
+      
+      return result.count > 0;
+    } catch (error) {
+      logger.error('Error revoking token', { error, tokenId, userId });
+      throw new Error(`Failed to revoke token: ${error.message}`);
+    }
+  }
 }
 
 export const connectorService = new ConnectorService();

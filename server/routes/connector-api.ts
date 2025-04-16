@@ -229,4 +229,150 @@ function getConnectorDescription(type: string): string {
   }
 }
 
+// Generate authorization URL for OAuth flow
+router.post("/auth-url", ensureAuthenticated, async (req, res) => {
+  try {
+    const { connectorType, name } = req.body;
+    
+    if (!connectorType || !connectorTypeEnum.enumValues.includes(connectorType)) {
+      return res.status(400).json({ error: 'Invalid connector type' });
+    }
+    
+    // Generate a state parameter for OAuth security
+    const state = crypto.randomBytes(16).toString('hex');
+    
+    // Store the state in the session for verification when callback occurs
+    req.session.oauthState = state;
+    req.session.connectorType = connectorType;
+    req.session.connectorName = name;
+    
+    // Call the appropriate connector to get authorization URL
+    const result = await connectorService.executeConnector(
+      connectorType,
+      'getAuthorizationUrl',
+      { 
+        userId: req.user.id,
+        state,
+        callbackUrl: `${process.env.APP_URL || 'http://localhost:3000'}/api/connectors/callback/${connectorType}`
+      }
+    );
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Error generating auth URL', { error });
+    res.status(500).json({ error: 'Failed to generate authorization URL' });
+  }
+});
+
+// Handle OAuth callback from external service
+router.get("/callback/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { code, state } = req.query;
+    
+    // Validate state parameter to prevent CSRF attacks
+    if (!req.session.oauthState || req.session.oauthState !== state) {
+      return res.status(400).send(
+        '<html><body><h3>Authentication failed: Invalid state parameter</h3><p>Please close this window and try again.</p></body></html>'
+      );
+    }
+    
+    if (!req.session.connectorType || req.session.connectorType !== type) {
+      return res.status(400).send(
+        '<html><body><h3>Authentication failed: Connector type mismatch</h3><p>Please close this window and try again.</p></body></html>'
+      );
+    }
+    
+    if (!req.user || !req.user.id) {
+      return res.status(401).send(
+        '<html><body><h3>Authentication failed: User not authenticated</h3><p>Please log in and try again.</p></body></html>'
+      );
+    }
+    
+    // Exchange the authorization code for tokens
+    const result = await connectorService.executeConnector(
+      type,
+      'handleAuthCallback',
+      { 
+        userId: req.user.id,
+        code,
+        state,
+        connectorName: req.session.connectorName
+      }
+    );
+    
+    if (result.success) {
+      // Clear the state from session
+      delete req.session.oauthState;
+      delete req.session.connectorType;
+      delete req.session.connectorName;
+      
+      // Return success page that will trigger the parent window to update
+      res.send(`
+        <html>
+          <body>
+            <h3>Authentication successful!</h3>
+            <p>You can close this window and return to the application.</p>
+            <script>
+              window.opener && window.opener.postMessage({ type: 'oauth-success', connectorType: '${type}' }, '*');
+              setTimeout(() => window.close(), 2000);
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      res.status(400).send(
+        '<html><body><h3>Authentication failed</h3><p>Please close this window and try again.</p></body></html>'
+      );
+    }
+  } catch (error) {
+    logger.error('Error handling OAuth callback', { error });
+    res.status(500).send(
+      '<html><body><h3>Authentication failed</h3><p>An error occurred during authentication. Please close this window and try again.</p></body></html>'
+    );
+  }
+});
+
+// Check if a recent token was added (used for polling after OAuth)
+router.get("/check-auth", ensureAuthenticated, async (req, res) => {
+  try {
+    // Simple check if a token was recently added in the last minute
+    const userId = req.user.id;
+    const tokens = await connectorService.getApiTokensByUser(userId);
+    
+    // Find a token created in the last minute
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+    
+    const recentToken = tokens.find(token => 
+      token.createdAt && new Date(token.createdAt) > oneMinuteAgo
+    );
+    
+    res.json({ success: !!recentToken });
+  } catch (error) {
+    logger.error('Error checking for recent auth', { error });
+    res.status(500).json({ error: 'Failed to check authentication status' });
+  }
+});
+
+// Revoke a connector token
+router.delete("/tokens/:id", ensureAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tokenId = parseInt(id);
+    
+    if (isNaN(tokenId)) {
+      return res.status(400).json({ error: 'Invalid token ID' });
+    }
+    
+    // Call the connector service to revoke the token
+    const result = await connectorService.revokeToken(tokenId, req.user.id);
+    
+    res.json({ success: result });
+  } catch (error) {
+    logger.error('Error revoking token', { error });
+    res.status(500).json({ error: 'Failed to revoke token' });
+  }
+});
+
 export const connectorApiRouter = router;

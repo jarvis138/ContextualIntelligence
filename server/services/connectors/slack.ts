@@ -8,7 +8,8 @@
 import { WebClient } from '@slack/web-api';
 import { logger, metrics } from '../observability';
 import { connectorService } from './index';
-import { InsertFetchedData } from '@shared/schema';
+import { InsertFetchedData, InsertApiToken } from '@shared/schema';
+import fetch from 'isomorphic-fetch';
 
 export class SlackConnector {
   /**
@@ -339,6 +340,160 @@ export class SlackConnector {
         count: 0,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Generate an OAuth authorization URL for Slack
+   */
+  async getAuthorizationUrl(params: { 
+    userId: number, 
+    state: string, 
+    callbackUrl: string 
+  }): Promise<{ success: boolean, authUrl: string }> {
+    try {
+      // Get client ID from environment variables
+      const clientId = process.env.SLACK_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Slack client ID not configured');
+      }
+      
+      // Define required scopes
+      const scopes = [
+        'channels:read',
+        'channels:history',
+        'groups:read',
+        'groups:history',
+        'users:read',
+        'chat:write'
+      ].join(',');
+      
+      // Construct the authorization URL
+      const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&state=${params.state}&redirect_uri=${encodeURIComponent(params.callbackUrl)}`;
+      
+      return {
+        success: true,
+        authUrl
+      };
+    } catch (error) {
+      logger.error('Error generating Slack authorization URL', { error, userId: params.userId });
+      throw error;
+    }
+  }
+  
+  /**
+   * Handle OAuth callback from Slack
+   */
+  async handleAuthCallback(params: { 
+    userId: number, 
+    code: string, 
+    state: string,
+    connectorName: string
+  }): Promise<{ success: boolean, error?: string }> {
+    try {
+      // Get client credentials from environment variables
+      const clientId = process.env.SLACK_CLIENT_ID;
+      const clientSecret = process.env.SLACK_CLIENT_SECRET;
+      
+      if (!clientId || !clientSecret) {
+        throw new Error('Slack client credentials not configured');
+      }
+      
+      // Exchange code for access token
+      const response = await fetch('https://slack.com/api/oauth.v2.access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: params.code as string,
+          redirect_uri: `${process.env.APP_URL || 'http://localhost:3000'}/api/connectors/callback/slack`
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Slack API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.ok) {
+        throw new Error(`Slack OAuth error: ${data.error}`);
+      }
+      
+      // Store the token
+      const tokenData: InsertApiToken = {
+        userId: params.userId,
+        connectorType: 'slack',
+        name: params.connectorName || 'Slack Workspace',
+        accessToken: data.access_token,
+        refreshToken: null, // Slack doesn't use refresh tokens in the same way
+        tokenSecret: null,
+        scope: data.scope,
+        expiresAt: null, // Slack tokens don't expire unless revoked
+        metadata: {
+          team_id: data.team?.id,
+          team_name: data.team?.name,
+          authed_user: data.authed_user
+        }
+      };
+      
+      await connectorService.storeApiToken(tokenData);
+      
+      return { success: true };
+    } catch (error) {
+      logger.error('Error handling Slack OAuth callback', { 
+        error, 
+        userId: params.userId
+      });
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    }
+  }
+
+  /**
+   * Revoke a Slack token
+   */
+  async revokeToken(params: { userId: number, tokenId: number, token: any }): Promise<boolean> {
+    try {
+      const token = params.token;
+      
+      if (!token.accessToken) {
+        throw new Error('No access token to revoke');
+      }
+      
+      // Revoke the token on Slack's side
+      const response = await fetch('https://slack.com/api/auth.revoke', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${token.accessToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.ok && data.error !== 'token_revoked') {
+        // If error is not 'token_revoked', it's an actual error
+        throw new Error(`Slack API error: ${data.error}`);
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error('Error revoking Slack token', { 
+        error, 
+        userId: params.userId,
+        tokenId: params.tokenId
+      });
+      return false;
     }
   }
 }
