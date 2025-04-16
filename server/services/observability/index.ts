@@ -14,6 +14,7 @@ import { logger, requestLoggerMiddleware, getComponentLogger } from './logger';
 import { metricsService, measureExecutionTime } from './metrics';
 import { tracingService, Trace } from './tracing';
 import { initializeMetrics } from './init-metrics';
+import { metrics } from './metrics-util';
 import { Express, Request, Response, NextFunction } from 'express';
 
 // Re-export individual components
@@ -25,7 +26,8 @@ export {
   measureExecutionTime,
   tracingService,
   Trace,
-  initializeMetrics
+  initializeMetrics,
+  metrics
 };
 
 /**

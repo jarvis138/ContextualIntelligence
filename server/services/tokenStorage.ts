@@ -10,6 +10,24 @@ import { oauthTokens } from '@shared/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import * as encryption from '../utils/encryption';
 
+/**
+ * Encrypt a token using AES-256
+ * @param token The token to encrypt
+ * @returns The encrypted token string
+ */
+export function encryptToken(token: string): string {
+  return encryption.Encryption.encrypt(token);
+}
+
+/**
+ * Decrypt a token that was encrypted with AES-256
+ * @param encryptedToken The encrypted token string
+ * @returns The decrypted token
+ */
+export function decryptToken(encryptedToken: string): string {
+  return encryption.Encryption.decrypt(encryptedToken);
+}
+
 export class TokenStorage {
   /**
    * Store an OAuth token in the database

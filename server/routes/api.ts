@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import featureFlagsRouter from './feature-flags';
+import { connectorApiRouter } from './connector-api';
 import { logger } from '../services/observability';
 
 // Create the main API router
@@ -15,6 +16,7 @@ const apiLogger = logger.createChildLogger({ component: 'APIRouter' });
 
 // Register routes
 apiRouter.use('/feature-flags', featureFlagsRouter);
+apiRouter.use('/connectors', connectorApiRouter);
 
 // Add version information endpoint
 apiRouter.get('/version', (req, res) => {
