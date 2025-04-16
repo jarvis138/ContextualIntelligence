@@ -4,6 +4,14 @@ import Projects from "@/pages/Projects";
 import Dashboard from "@/pages/Dashboard";
 import DocumentsPage from "@/pages/documents-page";
 import ConnectorsPage from "@/pages/connectors-page";
+import TeamsPage from "@/pages/teams-page";
+import WorkspacePage from "@/pages/workspace-page";
+import AnalyticsPage from "@/pages/analytics-page";
+import InsightsPage from "@/pages/insights-page";
+import SearchPage from "@/pages/search-page";
+import SettingsPage from "@/pages/settings-page";
+import AdminPage from "@/pages/admin-page";
+import SystemPage from "@/pages/system-page";
 import PlaceholderPage from "@/pages/placeholder-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
@@ -73,16 +81,16 @@ function App() {
           <Route path="/" component={Dashboard} />
           <Route path="/projects" component={Projects} />
           <Route path="/documents" component={DocumentsPage} />
-          <Route path="/teams" component={PlaceholderPage} />
-          <Route path="/workspace" component={PlaceholderPage} />
-          <Route path="/analytics" component={PlaceholderPage} />
-          <Route path="/insights" component={PlaceholderPage} />
+          <Route path="/teams" component={TeamsPage} />
+          <Route path="/workspace" component={WorkspacePage} />
+          <Route path="/analytics" component={AnalyticsPage} />
+          <Route path="/insights" component={InsightsPage} />
           <Route path="/integrations" component={ConnectorsPage} />
           <Route path="/connectors" component={ConnectorsPage} />
-          <Route path="/search" component={PlaceholderPage} />
-          <Route path="/settings" component={PlaceholderPage} />
-          <Route path="/admin" component={PlaceholderPage} />
-          <Route path="/system" component={PlaceholderPage} />
+          <Route path="/search" component={SearchPage} />
+          <Route path="/settings" component={SettingsPage} />
+          <Route path="/admin" component={AdminPage} />
+          <Route path="/system" component={SystemPage} />
           <Route path="/profile" component={PlaceholderPage} />
           <Route component={NotFound} />
         </Switch>
