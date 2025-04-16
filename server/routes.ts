@@ -165,7 +165,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const router = express.Router();
 
-  // API Routes are prefixed with '/api' to distinguish them from auth routes
+  // Set up the API router
+  app.use("/api", apiRouter);
 
   // User routes
   router.get("/users", authenticateToken, async (req, res) => {
@@ -2031,10 +2032,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.delete("/auth/:provider/revoke", authenticateToken, oauthController.revokeOAuthToken);
   router.get("/auth/connected", authenticateToken, oauthController.getUserConnectedProviders);
 
-  // Register the router with /api prefix
-  // Mount the structured API router
-  app.use("/api", apiRouter);
-  
   // Keep the original router for backward compatibility
   // app.use("/api", router);
 
