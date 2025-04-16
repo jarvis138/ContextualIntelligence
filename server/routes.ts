@@ -28,6 +28,7 @@ import {
 } from "./services/aiService";
 import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
+import { registerAdminRoutes } from "./routes/admin-api";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
 import { TokenRefresh } from "./services/tokenRefresh";
@@ -2235,6 +2236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+  
+  // Register admin API routes
+  registerAdminRoutes(app);
 
   return httpServer;
 }
