@@ -1,18 +1,11 @@
-import React from 'react';
-
-interface TourStep {
-  selector?: string;
-  content: React.ReactNode;
-  action?: () => void;
-  position?: 'top' | 'right' | 'bottom' | 'left' | 'center';
-}
+import { StepType } from 'reactour';
 
 interface TourConfig {
-  [key: string]: TourStep[];
+  [key: string]: StepType[];
 }
 
 // Welcome Tour - First time user experience
-export const welcomeTour: TourStep[] = [
+export const welcomeTour: StepType[] = [
   {
     selector: 'body',
     content: 'Welcome to CPI Hub! This quick tour will help you get started with the main features of the platform.',
@@ -71,7 +64,7 @@ export const welcomeTour: TourStep[] = [
 ];
 
 // Connector Tour - Guide for setting up integrations
-export const connectorTour: TourStep[] = [
+export const connectorTour: StepType[] = [
   {
     selector: '[data-tour="connectors-page"]',
     content: 'Welcome to the Connectors page! This is where you can integrate CPI Hub with external services.',
@@ -105,7 +98,7 @@ export const connectorTour: TourStep[] = [
 ];
 
 // Analytics Tour - Guide for analytics features
-export const analyticsTour: TourStep[] = [
+export const analyticsTour: StepType[] = [
   {
     selector: '[data-tour="analytics-page"]',
     content: 'Welcome to the Analytics dashboard! Here you can view insights about your projects and activities.',
@@ -139,7 +132,7 @@ export const analyticsTour: TourStep[] = [
 ];
 
 // Document Tour - Guide for document management
-export const documentTour: TourStep[] = [
+export const documentTour: StepType[] = [
   {
     selector: '[data-tour="documents-page"]',
     content: 'Welcome to the Documents page! Here you can manage all your project documents and files.',

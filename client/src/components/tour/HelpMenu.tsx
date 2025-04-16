@@ -1,84 +1,44 @@
 import React from 'react';
-import { 
-  HelpCircle, 
-  MessageSquare, 
-  BookOpen, 
-  LifeBuoy, 
-  Lightbulb, 
-  PlayCircle 
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { HelpCircle } from 'lucide-react';
 import { useTourContext } from '@/contexts/TourContext';
 
-/**
- * HelpMenu - Provides access to help resources including guided tours
- */
 export function HelpMenu() {
   const { startTour } = useTourContext();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" data-tour="help-menu">
+        <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
           <HelpCircle className="h-5 w-5" />
-          <span className="sr-only">Help</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Help & Resources</DropdownMenuLabel>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => startTour('welcome')}>
+          Platform Tour
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2 py-1.5 mb-1">
-            Tours
-          </DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => startTour('welcome')}>
-            <PlayCircle className="mr-2 h-4 w-4" />
-            <span>Getting Started</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => startTour('connectors')}>
-            <PlayCircle className="mr-2 h-4 w-4" />
-            <span>Integrations Guide</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => startTour('analytics')}>
-            <PlayCircle className="mr-2 h-4 w-4" />
-            <span>Analytics Features</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => startTour('documents')}>
-            <PlayCircle className="mr-2 h-4 w-4" />
-            <span>Document Management</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        
+        <DropdownMenuItem onSelect={() => startTour('connectors')}>
+          Connector Guide
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => startTour('analytics')}>
+          Analytics Guide
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => startTour('documents')}>
+          Document Management Guide
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2 py-1.5 mb-1">
-          Resources
-        </DropdownMenuLabel>
-        <DropdownMenuItem>
-          <BookOpen className="mr-2 h-4 w-4" />
-          <span>Documentation</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Lightbulb className="mr-2 h-4 w-4" />
-          <span>Tips & Tricks</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <MessageSquare className="mr-2 h-4 w-4" />
-          <span>Chat Support</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <LifeBuoy className="mr-2 h-4 w-4" />
-          <span>Contact Support</span>
+        <DropdownMenuItem asChild>
+          <a href="https://example.com/help" target="_blank" rel="noopener noreferrer">
+            Help Center
+          </a>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

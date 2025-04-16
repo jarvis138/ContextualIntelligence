@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import tourConfig from '@/config/tourSteps';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
 interface TourContextType {
   isTourOpen: boolean;
@@ -8,7 +7,12 @@ interface TourContextType {
   closeTour: () => void;
 }
 
-const TourContext = createContext<TourContextType | undefined>(undefined);
+const TourContext = createContext<TourContextType>({
+  isTourOpen: false,
+  activeTour: null,
+  startTour: () => {},
+  closeTour: () => {},
+});
 
 interface TourContextProviderProps {
   children: ReactNode;
@@ -18,19 +22,18 @@ export const TourContextProvider = ({ children }: TourContextProviderProps) => {
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [activeTour, setActiveTour] = useState<string | null>(null);
 
-  const startTour = (tourName: string) => {
-    if (tourConfig[tourName]) {
-      setActiveTour(tourName);
-      setIsTourOpen(true);
-    } else {
-      console.error(`Tour "${tourName}" not found in config`);
-    }
-  };
+  const startTour = useCallback((tourName: string) => {
+    setActiveTour(tourName);
+    setIsTourOpen(true);
+  }, []);
 
-  const closeTour = () => {
+  const closeTour = useCallback(() => {
     setIsTourOpen(false);
-    // Keep the active tour in state so we can restart it if needed
-  };
+    // We don't reset activeTour immediately to allow for exit animations
+    setTimeout(() => {
+      setActiveTour(null);
+    }, 300);
+  }, []);
 
   return (
     <TourContext.Provider value={{ isTourOpen, activeTour, startTour, closeTour }}>
