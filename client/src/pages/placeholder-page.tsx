@@ -2,13 +2,16 @@ import { useLocation } from "wouter";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RouteComponentProps } from "wouter";
 
 type PlaceholderPageProps = {
   pageName?: string;
 };
 
-export default function PlaceholderPage({ pageName }: PlaceholderPageProps) {
+// Handle both wouter RouteComponentProps and custom props
+export default function PlaceholderPage(props: RouteComponentProps | PlaceholderPageProps) {
   const [location] = useLocation();
+  const pageName = 'pageName' in props ? props.pageName : undefined;
   const pageTitle = pageName || location.substring(1).charAt(0).toUpperCase() + location.substring(2);
   
   return (

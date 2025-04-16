@@ -213,8 +213,8 @@ Strategic direction and organizational coordination.
             onClick={() => setActiveDocument(doc.id)}
           >
             <CardHeader className="p-4">
-              <CardTitle className="text-md">{doc.title}</CardTitle>
-              <CardDescription>{doc.description}</CardDescription>
+              <CardTitle className="text-md mb-1">{doc.title}</CardTitle>
+              <CardDescription className="text-xs">{doc.description}</CardDescription>
             </CardHeader>
           </Card>
         ))}
