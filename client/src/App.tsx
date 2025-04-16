@@ -21,6 +21,8 @@ import MainLayout from "@/components/layout/MainLayout";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TourContextProvider } from "@/contexts/TourContext";
 import { TourManager } from "@/components/tour/TourManager";
+import { ProjectAssistantProvider } from "@/contexts/ProjectAssistantContext";
+import { ChatInterface } from "@/components/chatbot/ChatInterface";
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -93,28 +95,31 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TourContextProvider>
-        <MainLayout>
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/projects" component={Projects} />
-            <Route path="/documents" component={DocumentsPage} />
-            <Route path="/teams" component={TeamsPage} />
-            <Route path="/workspace" component={WorkspacePage} />
-            <Route path="/analytics" component={AnalyticsPage} />
-            <Route path="/reports-alerts" component={ReportsAlertsPage} />
-            <Route path="/insights" component={InsightsPage} />
-            <Route path="/integrations" component={ConnectorsPage} />
-            <Route path="/connectors" component={ConnectorsPage} />
-            <Route path="/search" component={SearchPage} />
-            <Route path="/settings" component={SettingsPage} />
-            <Route path="/admin" component={AdminPage} />
-            <Route path="/system" component={SystemPage} />
-            <Route path="/profile" component={PlaceholderPage} />
-            <Route component={NotFound} />
-          </Switch>
-        </MainLayout>
-        <TourManager />
-        <Toaster />
+        <ProjectAssistantProvider>
+          <MainLayout>
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/projects" component={Projects} />
+              <Route path="/documents" component={DocumentsPage} />
+              <Route path="/teams" component={TeamsPage} />
+              <Route path="/workspace" component={WorkspacePage} />
+              <Route path="/analytics" component={AnalyticsPage} />
+              <Route path="/reports-alerts" component={ReportsAlertsPage} />
+              <Route path="/insights" component={InsightsPage} />
+              <Route path="/integrations" component={ConnectorsPage} />
+              <Route path="/connectors" component={ConnectorsPage} />
+              <Route path="/search" component={SearchPage} />
+              <Route path="/settings" component={SettingsPage} />
+              <Route path="/admin" component={AdminPage} />
+              <Route path="/system" component={SystemPage} />
+              <Route path="/profile" component={PlaceholderPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </MainLayout>
+          <TourManager />
+          <ChatInterface />
+          <Toaster />
+        </ProjectAssistantProvider>
       </TourContextProvider>
     </QueryClientProvider>
   );

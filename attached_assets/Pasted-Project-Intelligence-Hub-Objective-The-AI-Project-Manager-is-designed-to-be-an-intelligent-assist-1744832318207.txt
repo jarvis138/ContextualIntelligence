@@ -1,0 +1,60 @@
+Project Intelligence Hub
+Objective:
+The AI Project Manager is designed to be an intelligent assistant that follows the user throughout their workday, detecting potential project blockers, suggesting next steps, and providing context-specific guidance across tools, platforms, and documents. It ensures that the user is never stuck and always has a clear view of project progress.
+
+Key Features:
+Seamless Workflow Integration
+
+The AI Project Manager integrates with multiple platforms (Google Workspace, Slack, Trello, Jira, etc.) and follows the user across their daily work environment.
+
+It can respond to questions about the project status, next steps, and blockers, even when the user is in a document, chat, or task management tool.
+
+Contextual Awareness: It understands the context of what the user is working on (e.g., a specific project, task, or document) and can provide insights, make recommendations, and surface relevant information automatically.
+
+Proactive Blocker Detection & Solutions
+
+The AI continuously scans for blockers in the project’s timeline, such as delays, communication gaps, or missing resources, and alerts the user in real time.
+
+It can suggest next steps based on the current project phase, task dependencies, and any issues detected, helping the user overcome roadblocks before they become problems.
+
+Natural Language Querying & Real-Time Assistance
+
+Users can ask the AI specific questions like “What’s blocking Task X?” or “What are the next steps for the design phase?” while they are working within documents or communication tools.
+
+The AI can provide real-time responses based on the latest project data, offering contextualized insights directly in the user’s workflow.
+
+Contextual AI Insights
+
+By analyzing project communications, task statuses, and team collaboration, the AI understands current project health and can generate insights about the project’s status.
+
+It can detect sentiment in team communications, identify potential risks, and flag urgent issues that need attention, helping project managers prioritize effectively.
+
+Adaptive Actionable Recommendations
+
+The AI offers actionable steps based on its understanding of the project. For example, if a task is stuck, the AI may recommend escalating the issue, reallocating resources, or arranging a team discussion.
+
+It also has the ability to suggest new tasks or adjust timelines when unexpected delays or changes occur.
+
+Persistent Memory
+
+The AI maintains a persistent memory of all project activities, helping it continuously track progress and offer up-to-date, real-time insights across documents, emails, and conversations.
+
+It remembers previous interactions and adapts its responses to your evolving needs, providing continuity without having to repeat queries.
+
+Implementation Details:
+Data Integration: The AI will integrate with key project management and collaboration tools like Google Docs, Slack, Jira, and Trello. It will extract relevant context from these sources and build a comprehensive view of the project’s status.
+
+NLP and Sentiment Analysis: Using OpenAI and NLP models, the AI will analyze project conversations, documents, and task updates to detect blockers, risks, and sentiment trends. This allows it to react and provide support dynamically as team interactions unfold.
+
+Real-time Interaction: Through real-time WebSockets and Slack/Microsoft Teams integration, the AI can engage with the user directly in their workspace (e.g., answering questions or providing status updates directly in Slack channels).
+
+UI/UX Features: The AI will be integrated into the user dashboard for direct access. It will be accessible via voice commands, chat interfaces, or as a simple question box. The UI will also include actionable insight notifications and alerts for detected blockers or risks.
+
+Expected Benefits:
+Increased Efficiency: With real-time assistance and proactive task management, teams can work faster, avoid delays, and ensure smooth project execution.
+
+Improved Communication: The AI provides contextual answers to questions, minimizing misunderstandings and keeping all team members aligned on the project’s current status.
+
+Enhanced Decision-Making: By surfacing insights and risks automatically, the AI helps project managers make informed decisions with up-to-date information.
+
+Reduced Overhead: By tracking tasks, detecting blockers, and suggesting next steps, the AI reduces the cognitive load on project managers and teams, freeing them to focus on high-level work.
