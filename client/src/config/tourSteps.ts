@@ -105,24 +105,64 @@ export const analyticsTour: StepType[] = [
     position: 'top',
   },
   {
-    selector: '[data-tour="metrics-overview"]',
-    content: 'These cards show key performance metrics for your projects and team activities.',
+    selector: '[data-tour="time-range-selector"]',
+    content: 'Select different time periods to analyze your data across various timeframes.',
     position: 'bottom',
   },
   {
-    selector: '[data-tour="trend-charts"]',
-    content: 'These charts visualize trends over time, helping you identify patterns and make data-driven decisions.',
+    selector: '[data-tour="refresh-analytics"]',
+    content: 'Click here to refresh the analytics data and get the latest insights.',
+    position: 'bottom',
+  },
+  {
+    selector: '[data-tour="analytics-tabs"]',
+    content: 'Navigate between different views using these tabs to explore various aspects of your analytics.',
     position: 'top',
   },
   {
-    selector: '[data-tour="reports-section"]',
-    content: 'Generate custom reports based on various dimensions like projects, teams, and time periods.',
+    selector: '[data-tour="analytics-overview"]',
+    content: 'The Overview tab provides a summary of key metrics and activities.',
     position: 'top',
   },
   {
-    selector: '[data-tour="alerts-section"]',
-    content: 'Set up alerts to get notified when certain metrics reach specified thresholds.',
+    selector: '[data-tour="analytics-kpi-cards"]',
+    content: 'These cards show key performance indicators for your projects, documents, users, and completion rate.',
+    position: 'bottom',
+  },
+  {
+    selector: '[data-tour="analytics-charts"]',
+    content: 'These charts visualize project progress and team performance over time.',
     position: 'top',
+  },
+  {
+    selector: '[data-tour="project-progress-chart"]',
+    content: 'Track the progress of your projects with this detailed timeline view.',
+    position: 'bottom',
+  },
+  {
+    selector: '[data-tour="team-progress-chart"]',
+    content: 'Monitor how your teams are performing and identify top contributors.',
+    position: 'bottom',
+  },
+  {
+    selector: '[data-tour="analytics-anomalies"]',
+    content: 'Switch to the Anomaly Detection tab to identify unusual patterns that may require attention.',
+    position: 'top',
+  },
+  {
+    selector: '[data-tour="analytics-predictions"]',
+    content: 'The Predictive Insights tab shows AI-powered forecasts based on your project data.',
+    position: 'top',
+  },
+  {
+    selector: '[data-tour="predictions-card"]',
+    content: 'Review predictions about project completion, resource utilization, and budget projections.',
+    position: 'top',
+  },
+  {
+    selector: '[data-tour="prediction-item"]',
+    content: 'Each prediction provides actionable insights to help you make informed decisions.',
+    position: 'bottom',
   },
   {
     selector: 'body',
