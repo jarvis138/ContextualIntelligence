@@ -1198,3 +1198,100 @@ export type InsertReport = z.infer<typeof insertReportSchema>;
 
 export type ReportSubscription = typeof reportSubscriptions.$inferSelect;
 export type InsertReportSubscription = z.infer<typeof insertReportSubscriptionSchema>;
+
+// Context Graph Schema - For Knowledge Graph Generation
+
+// Edge type enum for graph relationships
+export const graphEdgeTypeEnum = pgEnum("graph_edge_type", [
+  "CONTAINS",
+  "MENTIONED_IN",
+  "DISCUSSES",
+  "AUTHORED_BY",
+  "REPLIED",
+  "RELATED",
+  "DEPENDS_ON",
+  "REFERS_TO",
+  "SIMILAR_TO",
+  "ASSOCIATED_WITH",
+  "PART_OF"
+]);
+
+// Node type enum for graph nodes
+export const graphNodeTypeEnum = pgEnum("graph_node_type", [
+  "DOCUMENT",
+  "MESSAGE",
+  "ENTITY",
+  "TOPIC",
+  "USER",
+  "PROJECT",
+  "TASK"
+]);
+
+// Graph nodes table
+export const graphNodes = pgTable("graph_nodes", {
+  id: serial("id").primaryKey(),
+  externalId: varchar("external_id", { length: 255 }).notNull().unique(),
+  type: graphNodeTypeEnum("type").notNull(),
+  label: text("label").notNull(),
+  properties: jsonb("properties"),
+  embeddings: jsonb("embeddings"),
+  importance: integer("importance").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    typeIdx: index("node_type_idx").on(table.type),
+    labelIdx: index("node_label_idx").on(table.label),
+    importanceIdx: index("node_importance_idx").on(table.importance),
+  };
+});
+
+// Graph edges table
+export const graphEdges = pgTable("graph_edges", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => graphNodes.id, { onDelete: "cascade" }),
+  targetId: integer("target_id").notNull().references(() => graphNodes.id, { onDelete: "cascade" }),
+  type: graphEdgeTypeEnum("type").notNull(),
+  weight: integer("weight").notNull().default(100), // Storing as integer (100 = weight of 1.0)
+  properties: jsonb("properties"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    sourceTargetTypeIdx: index("edge_source_target_type_idx").on(table.sourceId, table.targetId, table.type),
+    weightIdx: index("edge_weight_idx").on(table.weight),
+  };
+});
+
+// Graph relations
+export const graphNodesRelations = relations(graphNodes, ({ many }) => ({
+  outgoingEdges: many(graphEdges, { relationName: "sourceNode" }),
+  incomingEdges: many(graphEdges, { relationName: "targetNode" }),
+}));
+
+export const graphEdgesRelations = relations(graphEdges, ({ one }) => ({
+  sourceNode: one(graphNodes, {
+    fields: [graphEdges.sourceId],
+    references: [graphNodes.id],
+    relationName: "sourceNode"
+  }),
+  targetNode: one(graphNodes, {
+    fields: [graphEdges.targetId],
+    references: [graphNodes.id],
+    relationName: "targetNode"
+  }),
+}));
+
+// Create insert schemas for graph nodes and edges
+export const insertGraphNodeSchema = createInsertSchema(graphNodes)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertGraphEdgeSchema = createInsertSchema(graphEdges)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+// Export types for graph nodes and edges
+export type GraphNode = typeof graphNodes.$inferSelect;
+export type InsertGraphNode = z.infer<typeof insertGraphNodeSchema>;
+
+export type GraphEdge = typeof graphEdges.$inferSelect;
+export type InsertGraphEdge = z.infer<typeof insertGraphEdgeSchema>;

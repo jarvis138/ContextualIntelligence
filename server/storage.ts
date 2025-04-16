@@ -14,7 +14,9 @@ import {
   relationships, type Relationship, type InsertRelationship,
   refreshTokens, type RefreshToken, type InsertRefreshToken,
   pkceCodeVerifiers, type PkceCodeVerifier, type InsertPkceCodeVerifier,
-  oauthProviderSettings, type OAuthProviderSetting, type InsertOAuthProviderSetting
+  oauthProviderSettings, type OAuthProviderSetting, type InsertOAuthProviderSetting,
+  graphNodes, type GraphNode, type InsertGraphNode,
+  graphEdges, type GraphEdge, type InsertGraphEdge
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, sql, lt } from "drizzle-orm";
