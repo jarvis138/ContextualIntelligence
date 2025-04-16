@@ -98,7 +98,6 @@ function App() {
         <ProjectAssistantProvider>
           <MainLayout>
             <Switch>
-              <Route path="/" component={Dashboard} />
               <Route path="/projects" component={Projects} />
               <Route path="/documents" component={DocumentsPage} />
               <Route path="/teams" component={TeamsPage} />
@@ -113,6 +112,7 @@ function App() {
               <Route path="/admin" component={AdminPage} />
               <Route path="/system" component={SystemPage} />
               <Route path="/profile" component={PlaceholderPage} />
+              <Route path="/" component={Dashboard} />
               <Route component={NotFound} />
             </Switch>
           </MainLayout>
