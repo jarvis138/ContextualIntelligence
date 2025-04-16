@@ -122,6 +122,18 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
     createAuthUrlMutation.mutate(values);
   }
   
+  function handleCredentialSubmit(values: CredentialFormValues) {
+    // Combine credential form values with connector type and name
+    const combinedValues = {
+      ...values,
+      connectorType: form.getValues("connectorType"),
+      name: form.getValues("name")
+    };
+    
+    // Submit the credentials directly
+    createDirectCredentialsMutation.mutate(combinedValues);
+  }
+  
   function handleAuthorize() {
     if (authUrl) {
       // Open the authorization URL in a new window
@@ -160,6 +172,7 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
     setStep("select");
     setAuthUrl(null);
     form.reset();
+    credentialForm.reset();
   }
 
   return (
@@ -270,19 +283,146 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
           </Form>
         ) : (
           <div className="space-y-4">
-            <div className="text-center py-4">
-              <p className="mb-4">
-                Click the button below to authorize access to your{" "}
-                {form.getValues("connectorType").replace("_", " ")} account.
-              </p>
-              <p className="text-sm text-muted-foreground mb-6">
-                You will be redirected to the service to grant permission.
-              </p>
+            <Tabs defaultValue="oauth" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="oauth">OAuth Authorization</TabsTrigger>
+                <TabsTrigger value="direct">Direct Credentials</TabsTrigger>
+              </TabsList>
               
-              <Button onClick={handleAuthorize} className="w-full">
-                Authorize Connection
-              </Button>
-            </div>
+              <TabsContent value="oauth" className="pt-4">
+                <div className="text-center py-2">
+                  <p className="mb-4">
+                    Click the button below to authorize access to your{" "}
+                    {form.getValues("connectorType").replace("_", " ")} account.
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    You will be redirected to the service to grant permission.
+                  </p>
+                  
+                  <Button onClick={handleAuthorize} className="w-full">
+                    Authorize Connection
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="direct" className="pt-4">
+                <Form {...credentialForm}>
+                  <form onSubmit={credentialForm.handleSubmit(handleCredentialSubmit)} className="space-y-4">
+                    <div className="space-y-4">
+                      <FormField
+                        control={credentialForm.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl>
+                              <Input placeholder="username" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={credentialForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {form.getValues("connectorType") === "slack" && (
+                        <FormField
+                          control={credentialForm.control}
+                          name="workspaceUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Workspace URL</FormLabel>
+                              <FormControl>
+                                <Input placeholder="https://your-workspace.slack.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                      
+                      {(form.getValues("connectorType") === "google_drive" || 
+                        form.getValues("connectorType") === "gmail") && (
+                        <FormField
+                          control={credentialForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="your-email@gmail.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                      
+                      <FormField
+                        control={credentialForm.control}
+                        name="tokenName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Token Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Access Token Name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={credentialForm.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Remember Me</FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Save these credentials for future connections
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <DialogFooter>
+                      <Button
+                        type="submit"
+                        disabled={createDirectCredentialsMutation.isPending}
+                      >
+                        {createDirectCredentialsMutation.isPending ? (
+                          <Spinner className="mr-2" size="sm" />
+                        ) : null}
+                        Connect
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </TabsContent>
+            </Tabs>
             
             <div className="text-center py-2">
               <Button onClick={handleReset} variant="ghost" size="sm">

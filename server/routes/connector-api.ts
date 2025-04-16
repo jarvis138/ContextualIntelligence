@@ -355,6 +355,64 @@ router.get("/check-auth", ensureAuthenticated, async (req, res) => {
   }
 });
 
+// Handle direct credential input
+router.post("/direct-auth", ensureAuthenticated, async (req, res) => {
+  try {
+    const { 
+      connectorType, 
+      name, 
+      username, 
+      password, 
+      email, 
+      workspaceUrl, 
+      tokenName,
+      rememberMe 
+    } = req.body;
+    
+    if (!connectorType || !connectorTypeEnum.enumValues.includes(connectorType)) {
+      return res.status(400).json({ error: 'Invalid connector type' });
+    }
+    
+    if (!username || !password || !tokenName) {
+      return res.status(400).json({ error: 'Missing required credentials' });
+    }
+    
+    // Additional validation for specific connector types
+    if (connectorType === 'slack' && !workspaceUrl) {
+      return res.status(400).json({ error: 'Workspace URL is required for Slack' });
+    }
+    
+    if ((connectorType === 'google_drive' || connectorType === 'gmail') && !email) {
+      return res.status(400).json({ error: 'Email is required for Google services' });
+    }
+    
+    // Call the connector service to authenticate with direct credentials
+    const result = await connectorService.executeConnector(
+      connectorType,
+      'authenticateWithCredentials',
+      { 
+        userId: req.user.id,
+        username,
+        password,
+        email,
+        workspaceUrl,
+        tokenName,
+        connectorName: name,
+        rememberMe
+      }
+    );
+    
+    if (result.success) {
+      res.json({ success: true, tokenId: result.tokenId });
+    } else {
+      res.status(401).json({ error: result.error || 'Authentication failed' });
+    }
+  } catch (error) {
+    logger.error('Error with direct authentication', { error });
+    res.status(500).json({ error: 'Failed to authenticate with credentials' });
+  }
+});
+
 // Revoke a connector token
 router.delete("/tokens/:id", ensureAuthenticated, async (req, res) => {
   try {
