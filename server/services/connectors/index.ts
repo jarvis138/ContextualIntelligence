@@ -316,6 +316,48 @@ export class ConnectorService {
   }
 
   /**
+   * Get all API tokens for a specific user
+   */
+  async getApiTokensByUser(userId: number) {
+    try {
+      const tokens = await db.select()
+        .from(apiTokens)
+        .where(eq(apiTokens.userId, userId));
+        
+      // Return tokens without sensitive info
+      return tokens.map(token => ({
+        id: token.id,
+        userId: token.userId,
+        connectorType: token.connectorType,
+        expiresAt: token.expiresAt,
+        scope: token.scope,
+        createdAt: token.createdAt,
+        updatedAt: token.updatedAt
+      }));
+    } catch (error) {
+      logger.error('Error getting user API tokens', { error, userId });
+      throw new Error(`Failed to get user API tokens: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get fetching jobs for a specific user
+   */
+  async getFetchingJobsByUser(userId: number) {
+    try {
+      const jobs = await db.select()
+        .from(fetchingJobs)
+        .where(eq(fetchingJobs.userId, userId))
+        .orderBy(desc(fetchingJobs.createdAt));
+        
+      return jobs;
+    } catch (error) {
+      logger.error('Error getting user fetching jobs', { error, userId });
+      throw new Error(`Failed to get user fetching jobs: ${error.message}`);
+    }
+  }
+
+  /**
    * Execute a connector operation
    */
   async executeConnector(connectorType: string, operation: string, params: any) {
