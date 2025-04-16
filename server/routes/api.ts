@@ -9,6 +9,7 @@ import { Router } from 'express';
 import featureFlagsRouter from './feature-flags';
 import { connectorApiRouter } from './connector-api';
 import aiApiRouter from './ai-api';
+import { analyticsApiRouter } from './analytics-api';
 import { logger } from '../services/observability';
 
 // Create the main API router
@@ -19,6 +20,7 @@ const apiLogger = logger.createChildLogger({ component: 'APIRouter' });
 apiRouter.use('/feature-flags', featureFlagsRouter);
 apiRouter.use('/connectors', connectorApiRouter);
 apiRouter.use('/ai', aiApiRouter);
+apiRouter.use('/analytics', analyticsApiRouter);
 
 // Add version information endpoint
 apiRouter.get('/version', (req, res) => {
