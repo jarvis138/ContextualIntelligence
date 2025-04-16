@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -117,8 +118,18 @@ export default function SettingsPage() {
 
   const handleDisconnectPlatform = (platform: string) => {
     const updatedSettings = { ...platformSettings };
-    updatedSettings[platform as keyof typeof platformSettings].enabled = false;
-    updatedSettings[platform as keyof typeof platformSettings].apiKey = "";
+    const platformKey = platform as keyof typeof platformSettings;
+    
+    // Update all platforms to disabled state
+    updatedSettings[platformKey].enabled = false;
+    
+    // Reset the appropriate field based on platform
+    if (platform === 'teams') {
+      (updatedSettings[platformKey] as any).clientId = "";
+    } else {
+      (updatedSettings[platformKey] as any).apiKey = "";
+    }
+    
     setPlatformSettings(updatedSettings);
     
     toast({
