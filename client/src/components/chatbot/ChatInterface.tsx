@@ -52,7 +52,7 @@ export function ChatInterface() {
     getProjectStatus
   } = useProjectAssistant();
 
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('project');
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([

@@ -139,7 +139,7 @@ export const ProjectAssistantProvider = ({ children }: ProjectAssistantProviderP
     action: 'editing'
   });
   const [integrations, setIntegrations] = useState<PlatformIntegration[]>(sampleIntegrations);
-  const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(true);
 
   const toggleAssistant = () => {
     setIsAssistantOpen(prev => !prev);
