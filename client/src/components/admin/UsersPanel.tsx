@@ -296,14 +296,72 @@ const UsersPanel = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // Fetch users data
+  // Mock data for development mode
+  const mockUsers = [
+    {
+      id: 1,
+      username: "john.doe",
+      fullName: "John Doe",
+      email: "john.doe@acme-corp.com",
+      role: "admin",
+      active: true,
+      organization: { id: 1, name: "ACME Corporation" },
+      avatar: "/avatars/01.png"
+    },
+    {
+      id: 2,
+      username: "jane.smith",
+      fullName: "Jane Smith",
+      email: "jane.smith@acme-corp.com",
+      role: "manager",
+      active: true,
+      organization: { id: 1, name: "ACME Corporation" },
+      avatar: "/avatars/02.png"
+    },
+    {
+      id: 3,
+      username: "robert.johnson",
+      fullName: "Robert Johnson",
+      email: "robert.johnson@globex-ind.com",
+      role: "user",
+      active: true,
+      organization: { id: 2, name: "Globex Industries" },
+      avatar: "/avatars/03.png"
+    },
+    {
+      id: 4,
+      username: "sarah.williams",
+      fullName: "Sarah Williams",
+      email: "sarah.williams@initech.io",
+      role: "manager",
+      active: true,
+      organization: { id: 3, name: "Initech Solutions" },
+      avatar: "/avatars/04.png"
+    },
+    {
+      id: 5,
+      username: "michael.brown",
+      fullName: "Michael Brown",
+      email: "michael.brown@umbrella-corp.net",
+      role: "user",
+      active: false,
+      organization: { id: 4, name: "Umbrella Corporation" },
+      avatar: "/avatars/05.png"
+    }
+  ];
+
+  // Determine if we're in development mode
+  const isDevelopmentMode = import.meta.env.DEV === true;
+
+  // Fetch users data (or use mock data in development)
   const {
-    data: users = [],
+    data: users = isDevelopmentMode ? mockUsers : [],
     isLoading,
     isError,
     refetch,
   } = useQuery({
     queryKey: ["/admin-api/users"],
+    enabled: !isDevelopmentMode, // Don't run the query in development mode
   });
 
   // Handle adding a new user

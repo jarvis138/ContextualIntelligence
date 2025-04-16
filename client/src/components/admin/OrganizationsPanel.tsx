@@ -280,14 +280,96 @@ const OrganizationsPanel = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
 
-  // Fetch organizations data
+  // Define Organization type
+  interface Organization {
+    id: number;
+    name: string;
+    displayName?: string;
+    domain?: string;
+    status: string;
+    primaryContactEmail: string;
+    phoneNumber?: string;
+    maxUsers?: number;
+    totalUsers?: number;
+    createdAt?: string;
+  }
+
+  // Mock data for development mode
+  const mockOrganizations: Organization[] = [
+    {
+      id: 1,
+      name: "acme-corp",
+      displayName: "ACME Corporation",
+      domain: "acme-corp.com",
+      status: "active",
+      primaryContactEmail: "admin@acme-corp.com",
+      phoneNumber: "+1 (555) 123-4567",
+      maxUsers: 50,
+      totalUsers: 42,
+      createdAt: "2024-11-15T08:00:00Z"
+    },
+    {
+      id: 2,
+      name: "globex",
+      displayName: "Globex Industries",
+      domain: "globex-ind.com",
+      status: "active",
+      primaryContactEmail: "contact@globex-ind.com",
+      phoneNumber: "+1 (555) 987-6543",
+      maxUsers: 25,
+      totalUsers: 18,
+      createdAt: "2024-12-01T10:30:00Z"
+    },
+    {
+      id: 3,
+      name: "initech",
+      displayName: "Initech Solutions",
+      domain: "initech.io",
+      status: "trial",
+      primaryContactEmail: "info@initech.io",
+      phoneNumber: "+1 (555) 456-7890",
+      maxUsers: 10,
+      totalUsers: 8,
+      createdAt: "2025-01-20T14:15:00Z"
+    },
+    {
+      id: 4,
+      name: "umbrella-corp",
+      displayName: "Umbrella Corporation",
+      domain: "umbrella-corp.net",
+      status: "suspended",
+      primaryContactEmail: "support@umbrella-corp.net",
+      phoneNumber: "+1 (555) 789-0123",
+      maxUsers: 100,
+      totalUsers: 87,
+      createdAt: "2024-10-05T09:45:00Z"
+    },
+    {
+      id: 5,
+      name: "stark-industries",
+      displayName: "Stark Industries",
+      domain: "stark-ind.com",
+      status: "active",
+      primaryContactEmail: "admin@stark-ind.com",
+      phoneNumber: "+1 (555) 234-5678",
+      maxUsers: 75,
+      totalUsers: 62,
+      createdAt: "2025-02-10T11:20:00Z"
+    }
+  ];
+
+  // Determine if we're in development mode
+  const isDevelopmentMode = import.meta.env.DEV === true;
+
+  // Fetch organizations data (or use mock data in development)
   const {
-    data: organizations = [],
+    data: organizations = isDevelopmentMode ? mockOrganizations : [],
     isLoading,
     isError,
     refetch,
-  } = useQuery({
+  } = useQuery<Organization[]>({
     queryKey: ["/admin-api/organizations"],
+    enabled: !isDevelopmentMode, // Don't run the query in development mode
   });
 
   // Handle adding a new organization
@@ -333,7 +415,7 @@ const OrganizationsPanel = () => {
   };
 
   // Filter organizations based on search query
-  const filteredOrganizations = organizations.filter((org: any) => {
+  const filteredOrganizations = (organizations as Organization[]).filter((org) => {
     const searchTerms = searchQuery.toLowerCase().split(" ");
     const orgData = `${org.name} ${org.displayName || ""} ${org.domain || ""} ${
       org.primaryContactEmail
