@@ -1,79 +1,101 @@
 import { QueryClient } from "@tanstack/react-query";
 
+interface ApiRequestOptions {
+  headers?: Record<string, string>;
+  credentials?: RequestCredentials;
+  on401?: "throw" | "returnNull";
+}
+
+interface GetQueryFnOptions {
+  headers?: Record<string, string>;
+  credentials?: RequestCredentials;
+  on401?: "throw" | "returnNull";
+}
+
+// Create a query client instance - note that we also create one in App.tsx
+// This is used directly by our hooks while the one in App.tsx is used by the Provider
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: false,
+      retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 60000,
     },
-    mutations: {},
   },
 });
 
-type FetchOptions = {
-  headers?: Record<string, string>;
-  on401?: "returnNull" | "throw" | "default";
-};
-
-export function getQueryFn(options: FetchOptions = {}) {
-  return async function queryFn({ queryKey }: { queryKey: readonly unknown[] }): Promise<any> {
-    const key0 = queryKey[0];
-    let endpoint = typeof key0 === 'string' ? key0 : '/';
-    let id = queryKey.length > 1 ? queryKey[1] : null;
-
-    if (id) {
-      endpoint = `${endpoint}/${id}`;
-    }
-
-    const res = await fetch(endpoint, {
+/**
+ * Create a fetch function for use with react-query
+ * @param options Options to customize the fetch behavior
+ */
+export const getQueryFn = (options: GetQueryFnOptions = {}) => {
+  return async ({ queryKey }: { queryKey: string[] }) => {
+    const [endpoint] = queryKey;
+    
+    const response = await fetch(endpoint, {
       headers: {
         "Content-Type": "application/json",
         ...options.headers,
       },
+      credentials: options.credentials || "include",
     });
 
-    if (res.status === 401) {
+    if (response.status === 401) {
       if (options.on401 === "returnNull") {
-        return null; // Return null instead of undefined for 401s to fix TanStack Query issue
-      } else if (options.on401 === "throw") {
-        throw new Error("Unauthorized");
+        return null;
       }
-      // Default behavior is to throw and let the error boundary handle it
       throw new Error("Unauthorized");
     }
 
-    if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || response.statusText;
+      throw new Error(errorMessage);
     }
 
-    return res.json();
-  };
-}
+    if (response.status === 204) {
+      return null;
+    }
 
-export async function apiRequest(
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
+    return response.json();
+  };
+};
+
+/**
+ * Make an API request with JSON body
+ * @param method HTTP method
+ * @param endpoint API endpoint
+ * @param data Request body
+ * @param options Request options
+ */
+export const apiRequest = async (
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   endpoint: string,
   data?: any,
-  headers?: Record<string, string>
-) {
-  const res = await fetch(endpoint, {
+  options: ApiRequestOptions = {}
+) => {
+  const response = await fetch(endpoint, {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...headers,
+      ...options.headers,
     },
+    credentials: options.credentials || "include",
     body: data ? JSON.stringify(data) : undefined,
   });
 
-  if (res.status === 401) {
+  if (response.status === 401) {
+    if (options.on401 === "returnNull") {
+      return { json: () => null };
+    }
     throw new Error("Unauthorized");
   }
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || `API Error: ${res.status} ${res.statusText}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.message || errorData.error || response.statusText;
+    throw new Error(errorMessage);
   }
 
-  return res;
-}
+  return response;
+};

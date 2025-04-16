@@ -3,11 +3,24 @@ import { Toaster } from "@/components/ui/toaster";
 import Projects from "@/pages/Projects";
 import Dashboard from "@/pages/Dashboard";
 import DocumentsPage from "@/pages/documents-page";
+import ConnectorsPage from "@/pages/connectors-page";
 import PlaceholderPage from "@/pages/placeholder-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
 import MainLayout from "@/components/layout/MainLayout";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Create a query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 60000,
+    },
+  },
+});
 
 // Simplified App with direct routes and no authentication
 function App() {
@@ -54,7 +67,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <MainLayout>
         <Switch>
           <Route path="/" component={Dashboard} />
@@ -64,7 +77,8 @@ function App() {
           <Route path="/workspace" component={PlaceholderPage} />
           <Route path="/analytics" component={PlaceholderPage} />
           <Route path="/insights" component={PlaceholderPage} />
-          <Route path="/integrations" component={PlaceholderPage} />
+          <Route path="/integrations" component={ConnectorsPage} />
+          <Route path="/connectors" component={ConnectorsPage} />
           <Route path="/search" component={PlaceholderPage} />
           <Route path="/settings" component={PlaceholderPage} />
           <Route path="/admin" component={PlaceholderPage} />
@@ -74,7 +88,7 @@ function App() {
         </Switch>
       </MainLayout>
       <Toaster />
-    </>
+    </QueryClientProvider>
   );
 }
 

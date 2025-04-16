@@ -1,542 +1,449 @@
-import { Client } from '@elastic/elasticsearch';
-import { storage } from '../storage';
+/**
+ * Elasticsearch Service
+ * 
+ * This service manages the connection to Elasticsearch and provides methods
+ * for indexing and searching data.
+ */
 
-// Initialize Elasticsearch client
-// In a production environment, you would read this from environment variables
-const esClient = new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200'
+import { Client } from '@elastic/elasticsearch';
+import { logger } from './observability';
+import { metrics } from './observability/metrics-util';
+import { FetchedData } from '@shared/schema';
+
+// Create Elasticsearch client
+const client = new Client({
+  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+  auth: process.env.ELASTICSEARCH_USERNAME && process.env.ELASTICSEARCH_PASSWORD
+    ? {
+        username: process.env.ELASTICSEARCH_USERNAME,
+        password: process.env.ELASTICSEARCH_PASSWORD
+      }
+    : undefined
 });
 
 // Index names
-const INDICES = {
-  PROJECTS: 'projects',
-  DOCUMENTS: 'documents',
-  TASKS: 'tasks',
-  USERS: 'users',
-  TEAMS: 'teams',
-  CONVERSATIONS: 'conversations'
-};
+const FETCHED_DATA_INDEX = 'fetched_data';
+const RELATIONSHIP_INDEX = 'relationships';
 
 /**
- * Check if Elasticsearch is available and create indices if needed
+ * Elasticsearch Service Class
  */
-export async function initializeElasticsearch(): Promise<boolean> {
-  try {
-    // Check if the cluster is available
-    await esClient.ping();
-    console.log('Elasticsearch cluster is available');
-    
-    // Create indices if they don't exist
-    await createIndices();
-    
-    return true;
-  } catch (error: any) {
-    console.error('Elasticsearch error:', error);
-    return false;
-  }
-}
-
-/**
- * Create required indices if they don't exist
- */
-async function createIndices(): Promise<void> {
-  try {
-    // Create projects index
-    const projectsExists = await esClient.indices.exists({ index: INDICES.PROJECTS });
-    if (!projectsExists) {
-      await esClient.indices.create({
-        index: INDICES.PROJECTS,
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'integer' },
-              name: { type: 'text' },
-              description: { type: 'text' },
-              status: { type: 'keyword' },
-              progress: { type: 'integer' }
-            }
-          }
-        }
+export class ElasticsearchService {
+  /**
+   * Check if Elasticsearch is running
+   */
+  async ping(): Promise<boolean> {
+    try {
+      const startTime = Date.now();
+      const result = await client.ping();
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'ping' 
       });
-      console.log(`Created index: ${INDICES.PROJECTS}`);
-    }
-    
-    // Create documents index
-    const documentsExists = await esClient.indices.exists({ index: INDICES.DOCUMENTS });
-    if (!documentsExists) {
-      await esClient.indices.create({
-        index: INDICES.DOCUMENTS,
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'integer' },
-              title: { type: 'text' },
-              content: { type: 'text' },
-              fileType: { type: 'keyword' },
-              projectId: { type: 'integer' },
-              createdBy: { type: 'integer' },
-              updatedBy: { type: 'integer' }
-            }
-          }
-        }
-      });
-      console.log(`Created index: ${INDICES.DOCUMENTS}`);
-    }
-    
-    // Create tasks index
-    const tasksExists = await esClient.indices.exists({ index: INDICES.TASKS });
-    if (!tasksExists) {
-      await esClient.indices.create({
-        index: INDICES.TASKS,
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'integer' },
-              title: { type: 'text' },
-              description: { type: 'text' },
-              status: { type: 'keyword' },
-              projectId: { type: 'integer' },
-              assigneeId: { type: 'integer' },
-              teamId: { type: 'integer' }
-            }
-          }
-        }
-      });
-      console.log(`Created index: ${INDICES.TASKS}`);
-    }
-    
-    // Create users index
-    const usersExists = await esClient.indices.exists({ index: INDICES.USERS });
-    if (!usersExists) {
-      await esClient.indices.create({
-        index: INDICES.USERS,
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'integer' },
-              username: { type: 'keyword' },
-              fullName: { type: 'text' },
-              email: { type: 'keyword' },
-              role: { type: 'keyword' }
-            }
-          }
-        }
-      });
-      console.log(`Created index: ${INDICES.USERS}`);
-    }
-    
-    // Create teams index
-    const teamsExists = await esClient.indices.exists({ index: INDICES.TEAMS });
-    if (!teamsExists) {
-      await esClient.indices.create({
-        index: INDICES.TEAMS,
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'integer' },
-              name: { type: 'text' },
-              description: { type: 'text' },
-              progress: { type: 'integer' }
-            }
-          }
-        }
-      });
-      console.log(`Created index: ${INDICES.TEAMS}`);
-    }
-  } catch (error: any) {
-    console.error('Error creating indices:', error);
-    throw error;
-  }
-}
-
-/**
- * Index a project in Elasticsearch
- */
-export async function indexProject(project: any): Promise<boolean> {
-  try {
-    await esClient.index({
-      index: INDICES.PROJECTS,
-      id: project.id.toString(),
-      document: {
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        status: project.status,
-        progress: project.progress
-      },
-      refresh: true
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('Error indexing project:', error);
-    return false;
-  }
-}
-
-/**
- * Index a document in Elasticsearch
- */
-export async function indexDocument(document: any): Promise<boolean> {
-  try {
-    await esClient.index({
-      index: INDICES.DOCUMENTS,
-      id: document.id.toString(),
-      document: {
-        id: document.id,
-        title: document.title,
-        content: document.content || '',
-        fileType: document.fileType,
-        projectId: document.projectId,
-        createdBy: document.createdBy,
-        updatedBy: document.updatedBy
-      },
-      refresh: true
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('Error indexing document:', error);
-    return false;
-  }
-}
-
-/**
- * Index a task in Elasticsearch
- */
-export async function indexTask(task: any): Promise<boolean> {
-  try {
-    await esClient.index({
-      index: INDICES.TASKS,
-      id: task.id.toString(),
-      document: {
-        id: task.id,
-        title: task.title,
-        description: task.description || '',
-        status: task.status,
-        projectId: task.projectId,
-        assigneeId: task.assigneeId,
-        teamId: task.teamId
-      },
-      refresh: true
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('Error indexing task:', error);
-    return false;
-  }
-}
-
-/**
- * Index a user in Elasticsearch
- */
-export async function indexUser(user: any): Promise<boolean> {
-  try {
-    await esClient.index({
-      index: INDICES.USERS,
-      id: user.id.toString(),
-      document: {
-        id: user.id,
-        username: user.username,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role
-      },
-      refresh: true
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('Error indexing user:', error);
-    return false;
-  }
-}
-
-/**
- * Index a team in Elasticsearch
- */
-export async function indexTeam(team: any): Promise<boolean> {
-  try {
-    await esClient.index({
-      index: INDICES.TEAMS,
-      id: team.id.toString(),
-      document: {
-        id: team.id,
-        name: team.name,
-        description: team.description || '',
-        progress: team.progress
-      },
-      refresh: true
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('Error indexing team:', error);
-    return false;
-  }
-}
-
-/**
- * Index all data from storage
- */
-export async function indexAllData(): Promise<{
-  projects: number;
-  documents: number;
-  tasks: number;
-  users: number;
-  teams: number;
-}> {
-  try {
-    // Get all data from storage
-    const projects = await storage.getProjects();
-    const users = await storage.getUsers();
-    const teams = await storage.getTeams();
-    
-    // Index all projects
-    let indexedProjects = 0;
-    let allDocuments: any[] = [];
-    let allTasks: any[] = [];
-    
-    for (const project of projects) {
-      const success = await indexProject(project);
-      if (success) indexedProjects++;
       
-      // Index documents and tasks for this project
-      const projectDocuments = await storage.getDocuments(project.id);
-      const projectTasks = await storage.getTasks(project.id);
-      
-      allDocuments = [...allDocuments, ...projectDocuments];
-      allTasks = [...allTasks, ...projectTasks];
-      
-      for (const document of projectDocuments) {
-        await indexDocument(document);
-      }
-      
-      for (const task of projectTasks) {
-        await indexTask(task);
-      }
+      return result;
+    } catch (error) {
+      logger.error('Elasticsearch ping failed', { error });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      return false;
     }
-    
-    // Index all users
-    let indexedUsers = 0;
-    for (const user of users) {
-      const success = await indexUser(user);
-      if (success) indexedUsers++;
-    }
-    
-    // Index all teams
-    let indexedTeams = 0;
-    for (const team of teams) {
-      const success = await indexTeam(team);
-      if (success) indexedTeams++;
-    }
-    
-    return {
-      projects: indexedProjects,
-      documents: allDocuments.length,
-      tasks: allTasks.length,
-      users: indexedUsers,
-      teams: indexedTeams
-    };
-  } catch (error: any) {
-    console.error('Error indexing all data:', error);
-    return {
-      projects: 0,
-      documents: 0,
-      tasks: 0,
-      users: 0,
-      teams: 0
-    };
   }
-}
 
-/**
- * Perform global search across all indices
- */
-export async function globalSearch(query: string, filters: any = {}): Promise<{
-  projects: any[];
-  documents: any[];
-  tasks: any[];
-  users: any[];
-  teams: any[];
-}> {
-  try {
-    // Prepare the search query with filters
-    const searchQuery = {
-      query: {
-        bool: {
-          must: [
-            {
-              multi_match: {
-                query,
-                fields: ['name^2', 'title^2', 'fullName^2', 'description', 'content'],
-                fuzziness: 'AUTO'
+  /**
+   * Create indices if they don't exist
+   */
+  async createIndices(): Promise<void> {
+    try {
+      const startTime = Date.now();
+      
+      // Check if fetched data index exists
+      const fetchedDataIndexExists = await client.indices.exists({ 
+        index: FETCHED_DATA_INDEX 
+      });
+      
+      if (!fetchedDataIndexExists) {
+        // Create fetched data index
+        await client.indices.create({
+          index: FETCHED_DATA_INDEX,
+          body: {
+            mappings: {
+              properties: {
+                dataId: { type: 'keyword' },
+                userId: { type: 'integer' },
+                jobId: { type: 'keyword' },
+                connectorType: { type: 'keyword' },
+                dataType: { type: 'keyword' },
+                title: { 
+                  type: 'text',
+                  fields: {
+                    keyword: { type: 'keyword' }
+                  }
+                },
+                content: { 
+                  type: 'text',
+                  analyzer: 'standard'
+                },
+                metadata: { type: 'object', enabled: true },
+                sourceUrl: { type: 'keyword' },
+                sourceId: { type: 'keyword' },
+                fetchedAt: { type: 'date' },
+                createdAt: { type: 'date' },
+                updatedAt: { type: 'date' }
               }
             }
-          ],
-          filter: [] as any[]
-        }
-      },
-      highlight: {
-        fields: {
-          name: {},
-          title: {},
-          fullName: {},
-          description: {},
-          content: {}
-        },
-        pre_tags: ['<strong>'],
-        post_tags: ['</strong>']
+          }
+        });
+        
+        logger.info('Created fetched data index');
       }
-    };
-    
-    // Add filters if they exist
-    if (filters.projectId) {
-      searchQuery.query.bool.filter.push({
-        term: { projectId: filters.projectId }
+      
+      // Check if relationships index exists
+      const relationshipsIndexExists = await client.indices.exists({ 
+        index: RELATIONSHIP_INDEX 
       });
+      
+      if (!relationshipsIndexExists) {
+        // Create relationships index
+        await client.indices.create({
+          index: RELATIONSHIP_INDEX,
+          body: {
+            mappings: {
+              properties: {
+                relationshipId: { type: 'keyword' },
+                sourceType: { type: 'keyword' },
+                sourceId: { type: 'keyword' },
+                targetType: { type: 'keyword' },
+                targetId: { type: 'keyword' },
+                relationshipType: { type: 'keyword' },
+                confidence: { type: 'float' },
+                metadata: { type: 'object', enabled: true },
+                createdAt: { type: 'date' },
+                updatedAt: { type: 'date' }
+              }
+            }
+          }
+        });
+        
+        logger.info('Created relationships index');
+      }
+      
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'createIndices' 
+      });
+    } catch (error) {
+      logger.error('Error creating Elasticsearch indices', { error });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      throw new Error(`Failed to create Elasticsearch indices: ${error.message}`);
+    }
+  }
+
+  /**
+   * Index a batch of fetched data items
+   */
+  async indexFetchedData(dataItems: FetchedData[]): Promise<boolean> {
+    if (!dataItems.length) {
+      return true;
     }
     
-    if (filters.status) {
-      searchQuery.query.bool.filter.push({
-        term: { status: filters.status }
+    try {
+      const startTime = Date.now();
+      
+      // Create bulk operations
+      const operations = dataItems.flatMap(doc => [
+        { index: { _index: FETCHED_DATA_INDEX, _id: doc.dataId } },
+        {
+          dataId: doc.dataId,
+          userId: doc.userId,
+          jobId: doc.jobId,
+          connectorType: doc.connectorType,
+          dataType: doc.dataType,
+          title: doc.title,
+          content: doc.content,
+          metadata: doc.metadata,
+          sourceUrl: doc.sourceUrl,
+          sourceId: doc.sourceId,
+          fetchedAt: doc.fetchedAt,
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt
+        }
+      ]);
+      
+      // Send bulk request
+      const result = await client.bulk({ operations, refresh: true });
+      
+      // Check for errors
+      if (result.errors) {
+        const errors = result.items
+          .filter(item => item.index && item.index.error)
+          .map(item => item.index.error);
+        
+        logger.error('Errors in bulk indexing', { errors });
+        metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+        return false;
+      }
+      
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'indexFetchedData' 
       });
+      metrics.increment('index_operations_total', { count: dataItems.length });
+      
+      return true;
+    } catch (error) {
+      logger.error('Error indexing fetched data', { error });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      return false;
     }
-    
-    // Search each index separately
-    const [projectsResult, documentsResult, tasksResult, usersResult, teamsResult] = await Promise.all([
-      esClient.search({
-        index: INDICES.PROJECTS,
-        ...searchQuery,
-        size: 10
-      }).catch(() => ({ hits: { hits: [] } })),
+  }
+
+  /**
+   * Search the fetched data index
+   */
+  async searchFetchedData(
+    query: string,
+    filters: Record<string, any> = {},
+    page = 1,
+    size = 10
+  ) {
+    try {
+      const startTime = Date.now();
       
-      esClient.search({
-        index: INDICES.DOCUMENTS,
-        ...searchQuery,
-        size: 10
-      }).catch(() => ({ hits: { hits: [] } })),
+      // Build query
+      const mustClauses = [];
+      const filterClauses = [];
       
-      esClient.search({
-        index: INDICES.TASKS,
-        ...searchQuery,
-        size: 10
-      }).catch(() => ({ hits: { hits: [] } })),
+      // Add search query if present
+      if (query && query.trim()) {
+        mustClauses.push({
+          multi_match: {
+            query: query.trim(),
+            fields: ['title^2', 'content', 'metadata.*'],
+            type: 'best_fields',
+            fuzziness: 'AUTO'
+          }
+        });
+      }
       
-      esClient.search({
-        index: INDICES.USERS,
-        ...searchQuery,
-        size: 10
-      }).catch(() => ({ hits: { hits: [] } })),
+      // Add filters
+      if (filters.userId) {
+        filterClauses.push({ term: { userId: filters.userId } });
+      }
       
-      esClient.search({
-        index: INDICES.TEAMS,
-        ...searchQuery,
-        size: 10
-      }).catch(() => ({ hits: { hits: [] } }))
-    ]);
-    
-    // Process and format the results
-    const formatResults = (hits: any[]) => hits.map(hit => {
-      const source = hit._source;
-      const highlights = hit.highlight || {};
+      if (filters.connectorType) {
+        filterClauses.push({ term: { connectorType: filters.connectorType } });
+      }
       
-      // Format highlights
-      const getHighlight = (field: string) => {
-        return highlights[field] ? highlights[field][0] : '';
+      if (filters.dataType) {
+        filterClauses.push({ term: { dataType: filters.dataType } });
+      }
+      
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
+        const rangeFilter: any = { range: { fetchedAt: {} } };
+        
+        if (filters.dateFrom) {
+          rangeFilter.range.fetchedAt.gte = filters.dateFrom;
+        }
+        
+        if (filters.dateTo) {
+          rangeFilter.range.fetchedAt.lte = filters.dateTo;
+        }
+        
+        filterClauses.push(rangeFilter);
+      }
+      
+      // Build query object
+      const queryObject: any = {
+        bool: {}
       };
+      
+      if (mustClauses.length) {
+        queryObject.bool.must = mustClauses;
+      }
+      
+      if (filterClauses.length) {
+        queryObject.bool.filter = filterClauses;
+      }
+      
+      // If no query clauses, match all
+      if (!mustClauses.length && !filterClauses.length) {
+        queryObject.bool.must = [{ match_all: {} }];
+      }
+      
+      // Execute search
+      const response = await client.search({
+        index: FETCHED_DATA_INDEX,
+        body: {
+          query: queryObject,
+          highlight: {
+            fields: {
+              title: {},
+              content: {}
+            },
+            pre_tags: ['<strong>'],
+            post_tags: ['</strong>'],
+            fragment_size: 150,
+            number_of_fragments: 3
+          },
+          sort: [
+            { _score: { order: 'desc' } },
+            { fetchedAt: { order: 'desc' } }
+          ],
+          from: (page - 1) * size,
+          size: size
+        }
+      });
+      
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'searchFetchedData' 
+      });
+      metrics.increment('search_operations_total');
       
       return {
-        ...source,
-        highlights: {
-          title: getHighlight('title') || getHighlight('name') || getHighlight('fullName') || '',
-          description: getHighlight('description') || getHighlight('content') || ''
-        }
+        total: response.hits.total,
+        hits: response.hits.hits.map(hit => ({
+          id: hit._id,
+          score: hit._score,
+          source: hit._source,
+          highlights: hit.highlight
+        })),
+        page,
+        size,
+        pages: Math.ceil(Number(response.hits.total) / size)
       };
-    });
-    
-    return {
-      projects: formatResults(projectsResult.hits.hits || []),
-      documents: formatResults(documentsResult.hits.hits || []),
-      tasks: formatResults(tasksResult.hits.hits || []),
-      users: formatResults(usersResult.hits.hits || []),
-      teams: formatResults(teamsResult.hits.hits || [])
-    };
-  } catch (error: any) {
-    console.error('Error performing global search:', error);
-    
-    // Return empty results on error
-    return {
-      projects: [],
-      documents: [],
-      tasks: [],
-      users: [],
-      teams: []
-    };
-  }
-}
-
-/**
- * Check if Elasticsearch is available
- */
-export async function isElasticsearchAvailable(): Promise<boolean> {
-  try {
-    await esClient.ping();
-    return true;
-  } catch (error) {
-    console.warn('Elasticsearch is not available:', error);
-    return false;
-  }
-}
-
-/**
- * Perform hybrid search using both Elasticsearch and semantic search
- */
-export async function hybridSearch(query: string, projectId?: number): Promise<{
-  projects: any[];
-  documents: any[];
-  tasks: any[];
-  users: any[];
-  teams: any[];
-  semanticResults: any[];
-}> {
-  try {
-    // Create filters if projectId is provided
-    const filters = projectId ? { projectId } : {};
-    
-    // Get Elasticsearch results
-    const elasticsearchResults = await globalSearch(query, filters);
-    
-    // Get semantic search results if projectId is provided
-    let semanticResults: any[] = [];
-    
-    if (projectId) {
-      try {
-        // Import dynamically to avoid circular dependency
-        const { semanticSearch } = await import('./nlp');
-        const results = await semanticSearch(projectId, query);
-        semanticResults = results;
-      } catch (error) {
-        console.error('Error performing semantic search:', error);
-      }
+    } catch (error) {
+      logger.error('Error searching fetched data', { error, query, filters });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      throw new Error(`Failed to search fetched data: ${error.message}`);
     }
-    
-    return {
-      ...elasticsearchResults,
-      semanticResults
-    };
-  } catch (error: any) {
-    console.error('Error performing hybrid search:', error);
-    
-    // Return empty results on error
-    return {
-      projects: [],
-      documents: [],
-      tasks: [],
-      users: [],
-      teams: [],
-      semanticResults: []
-    };
+  }
+
+  /**
+   * Store a relationship between two items
+   */
+  async storeRelationship(relationship: {
+    sourceType: string;
+    sourceId: string;
+    targetType: string;
+    targetId: string;
+    relationshipType: string;
+    confidence: number;
+    metadata?: any;
+  }) {
+    try {
+      const startTime = Date.now();
+      
+      // Generate a unique ID for the relationship
+      const relationshipId = `${relationship.sourceType}_${relationship.sourceId}_${relationship.relationshipType}_${relationship.targetType}_${relationship.targetId}`;
+      
+      // Store the relationship
+      await client.index({
+        index: RELATIONSHIP_INDEX,
+        id: relationshipId,
+        body: {
+          relationshipId,
+          ...relationship,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        refresh: true
+      });
+      
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'storeRelationship' 
+      });
+      metrics.increment('relationship_operations_total');
+      
+      return relationshipId;
+    } catch (error) {
+      logger.error('Error storing relationship', { error, relationship });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      throw new Error(`Failed to store relationship: ${error.message}`);
+    }
+  }
+
+  /**
+   * Find relationships for a specific item
+   */
+  async findRelationships(
+    itemType: string,
+    itemId: string,
+    relationshipType?: string,
+    direction: 'outgoing' | 'incoming' | 'both' = 'both'
+  ) {
+    try {
+      const startTime = Date.now();
+      
+      // Build query
+      const mustClauses = [];
+      
+      if (direction === 'outgoing' || direction === 'both') {
+        const sourceClauses = [
+          { term: { sourceType: itemType } },
+          { term: { sourceId: itemId } }
+        ];
+        
+        if (relationshipType) {
+          sourceClauses.push({ term: { relationshipType } });
+        }
+        
+        mustClauses.push({
+          bool: {
+            must: sourceClauses
+          }
+        });
+      }
+      
+      if (direction === 'incoming' || direction === 'both') {
+        const targetClauses = [
+          { term: { targetType: itemType } },
+          { term: { targetId: itemId } }
+        ];
+        
+        if (relationshipType) {
+          targetClauses.push({ term: { relationshipType } });
+        }
+        
+        mustClauses.push({
+          bool: {
+            must: targetClauses
+          }
+        });
+      }
+      
+      // Execute search
+      const response = await client.search({
+        index: RELATIONSHIP_INDEX,
+        body: {
+          query: {
+            bool: {
+              should: mustClauses,
+              minimum_should_match: 1
+            }
+          },
+          sort: [
+            { confidence: { order: 'desc' } },
+            { createdAt: { order: 'desc' } }
+          ],
+          size: 100
+        }
+      });
+      
+      metrics.histogram('external_api_duration', Date.now() - startTime, { 
+        service: 'elasticsearch', 
+        endpoint: 'findRelationships' 
+      });
+      
+      return response.hits.hits.map(hit => hit._source);
+    } catch (error) {
+      logger.error('Error finding relationships', { error, itemType, itemId });
+      metrics.increment('external_api_errors_total', { service: 'elasticsearch' });
+      throw new Error(`Failed to find relationships: ${error.message}`);
+    }
   }
 }
+
+export const elasticsearchService = new ElasticsearchService();
