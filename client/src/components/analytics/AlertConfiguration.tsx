@@ -91,14 +91,58 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
   const [notificationPhone, setNotificationPhone] = useState('+1234567890');
   const [notificationSlack, setNotificationSlack] = useState('#alerts');
 
-  const handleSaveConfiguration = () => {
-    toast({
-      title: "Alert configuration saved",
-      description: "Your alert settings have been updated successfully."
-    });
+  const handleSaveConfiguration = async () => {
+    try {
+      // Save notification settings
+      const notificationSettings = {
+        email: notificationEmail,
+        phone: notificationPhone,
+        slack: notificationSlack,
+        projectId,
+        teamId
+      };
+
+      await fetch('/api/analytics/alerts/notification-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notificationSettings),
+      });
+
+      // Save all threshold alerts
+      await fetch('/api/analytics/alerts/thresholds', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ alerts: thresholdAlerts, projectId, teamId }),
+      });
+
+      // Save all anomaly alerts
+      await fetch('/api/analytics/alerts/anomalies', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ alerts: anomalyAlerts, projectId, teamId }),
+      });
+
+      toast({
+        title: "Alert configuration saved",
+        description: "Your alert settings have been updated successfully."
+      });
+    } catch (error) {
+      console.error('Error saving alert configuration:', error);
+      toast({
+        title: "Error saving configuration",
+        description: "There was an error saving your alert settings. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleAddThresholdAlert = () => {
+  const handleAddThresholdAlert = async () => {
     if (!newThresholdMetric || !newThresholdOperator || !newThresholdValue) {
       toast({
         title: "Missing information",
@@ -108,33 +152,59 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
       return;
     }
     
-    setThresholdAlerts([
-      ...thresholdAlerts,
-      {
-        id: thresholdAlerts.length + 1,
-        metric: newThresholdMetric,
-        operator: newThresholdOperator,
-        value: parseInt(newThresholdValue),
-        enabled: true,
-        severity: newThresholdSeverity || 'medium',
-        notifyEmail: true,
-        notifySms: false
+    const newAlert = {
+      id: thresholdAlerts.length + 1,
+      metric: newThresholdMetric,
+      operator: newThresholdOperator,
+      value: parseInt(newThresholdValue),
+      enabled: true,
+      severity: newThresholdSeverity || 'medium',
+      notifyEmail: true,
+      notifySms: false
+    };
+    
+    try {
+      const response = await fetch('/api/analytics/alerts/thresholds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...newAlert, projectId, teamId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to add threshold alert');
       }
-    ]);
-    
-    // Reset form
-    setNewThresholdMetric('');
-    setNewThresholdOperator('');
-    setNewThresholdValue('');
-    setNewThresholdSeverity('');
-    
-    toast({
-      title: "Threshold alert added",
-      description: "Your new threshold alert has been created."
-    });
+      
+      const result = await response.json();
+      
+      // Add with returned ID from server
+      setThresholdAlerts([
+        ...thresholdAlerts,
+        { ...newAlert, id: result.id }
+      ]);
+      
+      // Reset form
+      setNewThresholdMetric('');
+      setNewThresholdOperator('');
+      setNewThresholdValue('');
+      setNewThresholdSeverity('');
+      
+      toast({
+        title: "Threshold alert added",
+        description: "Your new threshold alert has been created."
+      });
+    } catch (error) {
+      console.error('Error adding threshold alert:', error);
+      toast({
+        title: "Error adding alert",
+        description: "There was an error creating your threshold alert. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleAddAnomalyAlert = () => {
+  const handleAddAnomalyAlert = async () => {
     if (!newAnomalyType || !newAnomalySensitivity) {
       toast({
         title: "Missing information",
@@ -144,56 +214,168 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
       return;
     }
     
-    setAnomalyAlerts([
-      ...anomalyAlerts,
-      {
-        id: anomalyAlerts.length + 1,
-        type: newAnomalyType,
-        sensitivity: newAnomalySensitivity,
-        enabled: true,
-        notifyEmail: true,
-        notifySms: false
+    const newAlert = {
+      id: anomalyAlerts.length + 1,
+      type: newAnomalyType,
+      sensitivity: newAnomalySensitivity,
+      enabled: true,
+      notifyEmail: true,
+      notifySms: false
+    };
+    
+    try {
+      const response = await fetch('/api/analytics/alerts/anomalies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...newAlert, projectId, teamId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to add anomaly alert');
       }
-    ]);
-    
-    // Reset form
-    setNewAnomalyType('');
-    setNewAnomalySensitivity('');
-    
-    toast({
-      title: "Anomaly alert added",
-      description: "Your new anomaly detection alert has been created."
-    });
+      
+      const result = await response.json();
+      
+      // Add with returned ID from server
+      setAnomalyAlerts([
+        ...anomalyAlerts,
+        { ...newAlert, id: result.id }
+      ]);
+      
+      // Reset form
+      setNewAnomalyType('');
+      setNewAnomalySensitivity('');
+      
+      toast({
+        title: "Anomaly alert added",
+        description: "Your new anomaly detection alert has been created."
+      });
+    } catch (error) {
+      console.error('Error adding anomaly alert:', error);
+      toast({
+        title: "Error adding alert",
+        description: "There was an error creating your anomaly alert. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleRemoveThresholdAlert = (id: number) => {
-    setThresholdAlerts(thresholdAlerts.filter(alert => alert.id !== id));
+  const handleRemoveThresholdAlert = async (id: number) => {
+    try {
+      const response = await fetch(`/api/analytics/alerts/thresholds/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove threshold alert');
+      }
+      
+      setThresholdAlerts(thresholdAlerts.filter(alert => alert.id !== id));
+      
+      toast({
+        title: "Alert removed",
+        description: "The threshold alert has been removed."
+      });
+    } catch (error) {
+      console.error('Error removing threshold alert:', error);
+      toast({
+        title: "Error removing alert",
+        description: "There was an error removing the threshold alert. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveAnomalyAlert = async (id: number) => {
+    try {
+      const response = await fetch(`/api/analytics/alerts/anomalies/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove anomaly alert');
+      }
+      
+      setAnomalyAlerts(anomalyAlerts.filter(alert => alert.id !== id));
+      
+      toast({
+        title: "Alert removed",
+        description: "The anomaly alert has been removed."
+      });
+    } catch (error) {
+      console.error('Error removing anomaly alert:', error);
+      toast({
+        title: "Error removing alert",
+        description: "There was an error removing the anomaly alert. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleToggleThresholdAlert = async (id: number) => {
+    const alert = thresholdAlerts.find(a => a.id === id);
+    if (!alert) return;
     
-    toast({
-      title: "Alert removed",
-      description: "The threshold alert has been removed."
-    });
-  };
-
-  const handleRemoveAnomalyAlert = (id: number) => {
-    setAnomalyAlerts(anomalyAlerts.filter(alert => alert.id !== id));
+    const updatedAlert = { ...alert, enabled: !alert.enabled };
     
-    toast({
-      title: "Alert removed",
-      description: "The anomaly alert has been removed."
-    });
+    try {
+      const response = await fetch(`/api/analytics/alerts/thresholds/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: updatedAlert.enabled }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update threshold alert');
+      }
+      
+      setThresholdAlerts(thresholdAlerts.map(a => 
+        a.id === id ? updatedAlert : a
+      ));
+    } catch (error) {
+      console.error('Error toggling threshold alert:', error);
+      toast({
+        title: "Error updating alert",
+        description: "There was an error updating the threshold alert. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleToggleThresholdAlert = (id: number) => {
-    setThresholdAlerts(thresholdAlerts.map(alert => 
-      alert.id === id ? { ...alert, enabled: !alert.enabled } : alert
-    ));
-  };
-
-  const handleToggleAnomalyAlert = (id: number) => {
-    setAnomalyAlerts(anomalyAlerts.map(alert => 
-      alert.id === id ? { ...alert, enabled: !alert.enabled } : alert
-    ));
+  const handleToggleAnomalyAlert = async (id: number) => {
+    const alert = anomalyAlerts.find(a => a.id === id);
+    if (!alert) return;
+    
+    const updatedAlert = { ...alert, enabled: !alert.enabled };
+    
+    try {
+      const response = await fetch(`/api/analytics/alerts/anomalies/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: updatedAlert.enabled }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update anomaly alert');
+      }
+      
+      setAnomalyAlerts(anomalyAlerts.map(a => 
+        a.id === id ? updatedAlert : a
+      ));
+    } catch (error) {
+      console.error('Error toggling anomaly alert:', error);
+      toast({
+        title: "Error updating alert",
+        description: "There was an error updating the anomaly alert. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Get human-readable version of metric names and operators

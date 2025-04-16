@@ -36,7 +36,8 @@ export default function AnalyticsPage() {
   // Fetch team data
   const { 
     data: teamsData, 
-    isLoading: isTeamsLoading
+    isLoading: isTeamsLoading,
+    refetch: refetchTeams
   } = useQuery({
     queryKey: ['/api/analytics/teams', { timeRange }],
   });
@@ -44,7 +45,8 @@ export default function AnalyticsPage() {
   // Fetch activities data
   const { 
     data: activitiesData, 
-    isLoading: isActivitiesLoading
+    isLoading: isActivitiesLoading,
+    refetch: refetchActivities
   } = useQuery({
     queryKey: ['/api/analytics/activities', { timeRange }],
   });
@@ -52,7 +54,8 @@ export default function AnalyticsPage() {
   // Fetch project metrics
   const {
     data: metricsData,
-    isLoading: isMetricsLoading
+    isLoading: isMetricsLoading,
+    refetch: refetchMetrics
   } = useQuery({
     queryKey: ['/api/analytics/metrics', { timeRange }],
   });
@@ -60,23 +63,105 @@ export default function AnalyticsPage() {
   // Fetch anomaly alerts
   const {
     data: anomalyAlerts,
-    isLoading: isAnomalyLoading
+    isLoading: isAnomalyLoading,
+    refetch: refetchAnomalies
   } = useQuery({
     queryKey: ['/api/analytics/anomalies', { timeRange }],
   });
+  
+  // Fetch trend data for project completion
+  const {
+    data: trendData,
+    isLoading: isTrendLoading
+  } = useQuery({
+    queryKey: ['/api/analytics/trends', { metric: 'project-completion', timeRange }],
+  });
+  
+  // Fetch predictions
+  const {
+    data: predictionsData,
+    isLoading: isPredictionsLoading
+  } = useQuery({
+    queryKey: ['/api/analytics/predict-metrics', { metrics: ['completion-rate', 'document-processing'], timeRange }],
+  });
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     toast({
       title: "Refreshing analytics data",
       description: "Fetching the latest metrics and insights...",
     });
+    
+    try {
+      // Refresh all data sources
+      await Promise.all([
+        refetchTeams(),
+        refetchActivities(),
+        refetchMetrics(),
+        refetchAnomalies()
+      ]);
+      
+      toast({
+        title: "Data refreshed",
+        description: "Analytics data has been updated with the latest information.",
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        title: "Refresh failed",
+        description: "There was an error refreshing the analytics data. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     toast({
       title: "Downloading report",
       description: "Preparing analytics report for download...",
     });
+    
+    try {
+      // Generate a comprehensive report via API
+      const response = await fetch('/api/analytics/reports/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reportType: 'comprehensive',
+          timeRange,
+          format: 'pdf',
+          options: {
+            includeCharts: true,
+            includeRawData: true
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+      
+      const result = await response.json();
+      
+      // If download URL is available, open it
+      if (result.downloadUrl) {
+        window.open(result.downloadUrl, '_blank');
+        toast({
+          title: "Report ready",
+          description: "Your analytics report has been generated and will download shortly.",
+        });
+      } else {
+        throw new Error('No download URL provided');
+      }
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
   const getSeverityBadge = (severity: string) => {

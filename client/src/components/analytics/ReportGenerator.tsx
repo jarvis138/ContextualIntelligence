@@ -40,26 +40,82 @@ export function ReportGenerator({ projectId, teamId }: ReportGeneratorProps) {
   const handleGenerateReport = async () => {
     setIsGenerating(true);
     
-    // In a real implementation, this would make an API call to generate the report
     try {
       toast({
         title: "Generating report",
         description: "Your report is being prepared...",
       });
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prepare the report configuration
+      const reportConfig = {
+        reportType,
+        timeRange,
+        format: reportFormat,
+        options: {
+          includeCharts,
+          includeRawData
+        },
+        notes
+      };
       
       if (scheduleReport) {
+        // API call to schedule a report
+        const scheduleConfig = {
+          ...reportConfig,
+          scheduleFrequency,
+          recipients: recipients.split(',').map(email => email.trim()),
+          projectId,
+          teamId
+        };
+        
+        const response = await fetch('/api/analytics/reports/schedule', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(scheduleConfig),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to schedule report');
+        }
+        
         toast({
           title: "Report scheduled",
           description: `Your ${reportType} report will be sent ${scheduleFrequency}.`,
         });
       } else {
+        // API call to generate a report immediately
+        const generateConfig = {
+          ...reportConfig,
+          projectId,
+          teamId
+        };
+        
+        const response = await fetch('/api/analytics/reports/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(generateConfig),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to generate report');
+        }
+        
+        // Get report URL or data
+        const result = await response.json();
+        
         toast({
           title: "Report generated",
           description: "Your report is ready for download.",
         });
+        
+        // If there's a download URL, open it
+        if (result.downloadUrl) {
+          window.open(result.downloadUrl, '_blank');
+        }
       }
     } catch (error) {
       toast({
@@ -67,6 +123,7 @@ export function ReportGenerator({ projectId, teamId }: ReportGeneratorProps) {
         description: "There was an error generating your report. Please try again.",
         variant: "destructive",
       });
+      console.error('Report generation error:', error);
     } finally {
       setIsGenerating(false);
     }
