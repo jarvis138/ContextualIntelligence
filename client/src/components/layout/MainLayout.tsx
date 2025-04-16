@@ -60,6 +60,17 @@ const navItems = [
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [location] = useLocation();
+  const isAdminPage = location === "/admin";
+  
+  // If this is the admin page, we want to render a different layout
+  if (isAdminPage) {
+    return (
+      <div className="min-h-screen bg-background">
+        {children}
+      </div>
+    );
+  }
+  
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<{ id: number; title: string; message: string }[]>([
     { id: 1, title: 'New comment', message: 'John commented on your document' },
