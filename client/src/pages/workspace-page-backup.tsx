@@ -631,7 +631,7 @@ export default function WorkspacePage() {
                         className="w-[200px] h-8"
                       />
                       <Button variant="outline" size="sm">
-                        <FilterX className="h-4 w-4 mr-2" />
+                        <Filter className="h-4 w-4 mr-2" />
                         Filter
                       </Button>
                     </div>
@@ -776,7 +776,7 @@ export default function WorkspacePage() {
                         className="w-[200px] h-8"
                       />
                       <Button variant="outline" size="sm">
-                        <FilterX className="h-4 w-4 mr-2" />
+                        <Filter className="h-4 w-4 mr-2" />
                         Filter
                       </Button>
                     </div>
