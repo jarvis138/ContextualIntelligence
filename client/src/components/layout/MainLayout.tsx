@@ -81,12 +81,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[240px] sm:w-[300px]">
-                <nav className="flex flex-col gap-4 pt-4">
+                <nav className="flex flex-col gap-4 pt-4" data-tour="sidebar-mobile">
                   {navItems.map((item) => (
                     <div key={item.href}>
                       <Link 
                         href={item.href}
                         onClick={() => setSidebarOpen(false)}
+                        data-tour={`${item.name.toLowerCase().replace(/\s+/g, '-')}-mobile`}
                         className={cn(
                           "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md",
                           location === item.href
@@ -214,11 +215,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Sidebar - visible on larger screens */}
         <aside className="hidden border-r bg-background md:block md:w-[240px] lg:w-[280px]">
           <div className="flex h-full flex-col">
-            <nav className="flex-1 p-4 space-y-1">
+            <nav className="flex-1 p-4 space-y-1" data-tour="sidebar">
               {navItems.map((item) => (
                 <div key={item.href}>
                   <Link 
                     href={item.href}
+                    data-tour={item.name.toLowerCase().replace(/\s+/g, '-')}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md",
                       location === item.href

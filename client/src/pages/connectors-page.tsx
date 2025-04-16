@@ -326,7 +326,7 @@ export default function ConnectorsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-6" data-tour="connectors-page">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Data Connectors</h1>
         <div className="flex gap-2">
@@ -334,7 +334,7 @@ export default function ConnectorsPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={handleAddConnector}>
+          <Button onClick={handleAddConnector} data-tour="add-connector">
             <Plus className="h-4 w-4 mr-2" />
             Add Connector
           </Button>
@@ -348,15 +348,15 @@ export default function ConnectorsPage() {
           <TabsTrigger value="data">Fetched Data</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="connectors" className="space-y-4">
+        <TabsContent value="connectors" className="space-y-4" data-tour="connector-list">
           {renderConnectorCards()}
         </TabsContent>
 
-        <TabsContent value="jobs" className="space-y-4">
+        <TabsContent value="jobs" className="space-y-4" data-tour="connector-jobs">
           {renderJobsTable()}
         </TabsContent>
 
-        <TabsContent value="data" className="space-y-4">
+        <TabsContent value="data" className="space-y-4" data-tour="data-feeds">
           <DataFeedTable data={fetchedData || []} isLoading={isLoadingData} />
         </TabsContent>
       </Tabs>
