@@ -7,6 +7,7 @@ import ConnectorsPage from "@/pages/connectors-page";
 import TeamsPage from "@/pages/teams-page";
 import WorkspacePage from "@/pages/workspace-page";
 import AnalyticsPage from "@/pages/analytics-page";
+import ReportsAlertsPage from "@/pages/reports-alerts-page";
 import InsightsPage from "@/pages/insights-page";
 import SearchPage from "@/pages/search-page";
 import SettingsPage from "@/pages/settings-page";
@@ -84,6 +85,7 @@ function App() {
           <Route path="/teams" component={TeamsPage} />
           <Route path="/workspace" component={WorkspacePage} />
           <Route path="/analytics" component={AnalyticsPage} />
+          <Route path="/reports-alerts" component={ReportsAlertsPage} />
           <Route path="/insights" component={InsightsPage} />
           <Route path="/integrations" component={ConnectorsPage} />
           <Route path="/connectors" component={ConnectorsPage} />

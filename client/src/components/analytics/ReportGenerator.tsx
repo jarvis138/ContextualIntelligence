@@ -134,7 +134,11 @@ export function ReportGenerator({ projectId, teamId }: ReportGeneratorProps) {
             <Checkbox 
               id="include-charts" 
               checked={includeCharts} 
-              onCheckedChange={(checked) => setIncludeCharts(!!checked)} 
+              onCheckedChange={(checked) => {
+                if (checked !== "indeterminate") {
+                  setIncludeCharts(checked);
+                }
+              }} 
             />
             <Label htmlFor="include-charts" className="cursor-pointer">Include charts and visualizations</Label>
           </div>
@@ -142,7 +146,11 @@ export function ReportGenerator({ projectId, teamId }: ReportGeneratorProps) {
             <Checkbox 
               id="include-raw-data" 
               checked={includeRawData} 
-              onCheckedChange={(checked) => setIncludeRawData(!!checked)} 
+              onCheckedChange={(checked) => {
+                if (checked !== "indeterminate") {
+                  setIncludeRawData(checked);
+                }
+              }} 
             />
             <Label htmlFor="include-raw-data" className="cursor-pointer">Include raw data tables</Label>
           </div>
@@ -153,7 +161,11 @@ export function ReportGenerator({ projectId, teamId }: ReportGeneratorProps) {
             <Checkbox 
               id="schedule-report" 
               checked={scheduleReport} 
-              onCheckedChange={(checked) => setScheduleReport(!!checked)} 
+              onCheckedChange={(checked) => {
+                if (checked !== "indeterminate") {
+                  setScheduleReport(checked);
+                }
+              }} 
             />
             <Label htmlFor="schedule-report" className="cursor-pointer">Schedule recurring report</Label>
           </div>

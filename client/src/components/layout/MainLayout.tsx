@@ -18,7 +18,9 @@ import {
   Shield,
   Monitor,
   LineChart,
-  Layers
+  Layers,
+  FileBarChart,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -46,6 +48,7 @@ const navItems = [
   { name: 'Teams', href: '/teams', icon: <Users className="mr-2 h-4 w-4" /> },
   { name: 'Workspace', href: '/workspace', icon: <Layers className="mr-2 h-4 w-4" /> },
   { name: 'Analytics', href: '/analytics', icon: <LineChart className="mr-2 h-4 w-4" /> },
+  { name: 'Reports & Alerts', href: '/reports-alerts', icon: <FileBarChart className="mr-2 h-4 w-4" /> },
   { name: 'Insights', href: '/insights', icon: <BarChart2 className="mr-2 h-4 w-4" /> },
   { name: 'Integrations', href: '/integrations', icon: <Zap className="mr-2 h-4 w-4" /> },
   { name: 'Search', href: '/search', icon: <Search className="mr-2 h-4 w-4" /> },
