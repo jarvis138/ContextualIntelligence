@@ -4,6 +4,24 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 
+// Define entity types for NLP processing
+export enum EntityType {
+  PERSON = "PERSON",
+  ORGANIZATION = "ORGANIZATION",
+  LOCATION = "LOCATION",
+  DATE = "DATE",
+  TIME = "TIME",
+  MONEY = "MONEY",
+  PERCENTAGE = "PERCENTAGE",
+  FACILITY = "FACILITY",
+  PRODUCT = "PRODUCT",
+  EVENT = "EVENT",
+  WORK_OF_ART = "WORK_OF_ART",
+  LAW = "LAW",
+  LANGUAGE = "LANGUAGE",
+  OTHER = "OTHER"
+}
+
 // Search filter schema for frontend to backend communication
 export const searchFilterSchema = z.object({
   field: z.string(),

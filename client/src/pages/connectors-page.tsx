@@ -1,442 +1,392 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle, Plus, RefreshCw } from "lucide-react";
-import ConnectorDialog from "@/components/integrations/ConnectorDialog";
-import ConnectorJobDialog from "@/components/integrations/ConnectorJobDialog";
-import DataFeedTable from "@/components/integrations/DataFeedTable";
+import { Plus, RefreshCw, Calendar, Trash } from "lucide-react";
+import { ConnectorDialog } from "@/components/integrations/ConnectorDialog";
+import { ConnectorJobDialog } from "@/components/integrations/ConnectorJobDialog";
+import { DataFeedTable } from "@/components/integrations/DataFeedTable";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
+import { formatDistanceToNow } from "date-fns";
+import { SiSlack, SiGoogle, SiMicrosoft } from "react-icons/si";
 
-export interface Connector {
-  id: number;
-  type: string;
+// Types for connectors, jobs, and data
+export interface ApiToken {
+  tokenId: string;
+  connectorType: string;
+  userId: number;
   name: string;
-  icon: string;
-  expiresAt?: string;
+  createdAt: string;
+  lastUsedAt: string | null;
 }
 
-export interface ConnectorJob {
+export interface FetchingJob {
   jobId: string;
-  userId: number;
   connectorType: string;
   dataType: string;
-  parameters: Record<string, any>;
   scheduleType: string;
-  scheduleValue?: string;
+  scheduleValue: string | null;
   priority: string;
   status: string;
-  lastRunAt?: string;
-  nextRunAt?: string;
-  lastResult?: Record<string, any>;
-  lastError?: string;
-  runCount: number;
   createdAt: string;
   updatedAt: string;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  parameters: Record<string, any>;
 }
 
 export interface FetchedData {
   dataId: string;
-  userId: number;
-  jobId?: string;
   connectorType: string;
   dataType: string;
-  title?: string;
-  content?: string;
-  metadata?: Record<string, any>;
-  sourceUrl?: string;
-  sourceId?: string;
-  createdAt: string;
-  updatedAt: string;
+  sourceId: string;
+  title: string | null;
+  content: string | null;
+  metadata: Record<string, any>;
   fetchedAt: string;
+  jobId: string | null;
 }
+
+// Helper function to get connector icon
+const getConnectorIcon = (type: string) => {
+  switch (type) {
+    case "slack":
+      return <SiSlack className="h-5 w-5 text-[#4A154B]" />;
+    case "google_drive":
+    case "gmail":
+      return <SiGoogle className="h-5 w-5 text-[#4285F4]" />;
+    case "microsoft_graph":
+      return <SiMicrosoft className="h-5 w-5 text-[#0078D4]" />;
+    default:
+      return null;
+  }
+};
+
+// Helper function to get connector name
+const getConnectorName = (type: string) => {
+  switch (type) {
+    case "slack":
+      return "Slack";
+    case "google_drive":
+      return "Google Drive";
+    case "gmail":
+      return "Gmail";
+    case "microsoft_graph":
+      return "Microsoft Graph";
+    default:
+      return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, " ");
+  }
+};
+
+// Helper function to get job status color
+const getJobStatusColor = (status: string) => {
+  switch (status) {
+    case "queued":
+      return "bg-blue-100 text-blue-800";
+    case "running":
+      return "bg-yellow-100 text-yellow-800";
+    case "completed":
+      return "bg-green-100 text-green-800";
+    case "failed":
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
 
 export default function ConnectorsPage() {
   const { toast } = useToast();
-  const [isConnectorDialogOpen, setIsConnectorDialogOpen] = useState(false);
-  const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
-  const [selectedConnectorType, setSelectedConnectorType] = useState("");
+  const [showConnectorDialog, setShowConnectorDialog] = useState(false);
+  const [showJobDialog, setShowJobDialog] = useState(false);
+  const [selectedConnector, setSelectedConnector] = useState<ApiToken | null>(null);
+  const [activeTab, setActiveTab] = useState("connectors");
 
-  // Get connector types
-  const { data: connectorTypes, isLoading: isLoadingTypes } = useQuery<{ types: Array<{ id: string; name: string; icon: string; description: string }> }>({
-    queryKey: ["/api/connectors/types"],
-  });
-
-  // Get user's active connectors
-  const { 
-    data: connectorsData, 
+  // Query to fetch connectors (API tokens)
+  const {
+    data: connectors,
     isLoading: isLoadingConnectors,
-    refetch: refetchConnectors 
-  } = useQuery<{ connectors: Connector[] }>({
-    queryKey: ["/api/connectors"],
+    refetch: refetchConnectors,
+  } = useQuery<ApiToken[]>({
+    queryKey: ["/api/connectors/tokens"],
   });
 
-  // Get user's jobs
-  const { 
-    data: jobsData, 
+  // Query to fetch fetching jobs
+  const {
+    data: jobs,
     isLoading: isLoadingJobs,
-    refetch: refetchJobs 
-  } = useQuery<{ jobs: ConnectorJob[] }>({
+    refetch: refetchJobs,
+  } = useQuery<FetchingJob[]>({
     queryKey: ["/api/connectors/jobs"],
   });
 
-  // Get user's fetched data
-  const { 
-    data: fetchedData, 
+  // Query to fetch data
+  const {
+    data: fetchedData,
     isLoading: isLoadingData,
-    refetch: refetchData 
-  } = useQuery<{ data: FetchedData[] }>({
+    refetch: refetchData,
+  } = useQuery<FetchedData[]>({
     queryKey: ["/api/connectors/data"],
   });
 
-  const handleConnectorDialogOpen = (connectorType: string) => {
-    setSelectedConnectorType(connectorType);
-    setIsConnectorDialogOpen(true);
+  // Handle add connector click
+  const handleAddConnector = () => {
+    setShowConnectorDialog(true);
   };
 
-  const handleJobDialogOpen = (connectorType: string) => {
-    setSelectedConnectorType(connectorType);
-    setIsJobDialogOpen(true);
+  // Handle add job click for specific connector
+  const handleAddJob = (connector: ApiToken) => {
+    setSelectedConnector(connector);
+    setShowJobDialog(true);
   };
 
-  const handleConnectorSuccess = () => {
-    toast({
-      title: "Connector configured successfully",
-      description: "Your connector has been set up and is ready to use.",
-    });
-    refetchConnectors();
-  };
-
-  const handleJobSuccess = () => {
-    toast({
-      title: "Data fetching job created",
-      description: "Your data fetching job has been set up and scheduled.",
-    });
-    refetchJobs();
-  };
-
-  const refreshAll = () => {
+  // Handle refresh data
+  const handleRefreshData = () => {
     refetchConnectors();
     refetchJobs();
     refetchData();
     toast({
       title: "Refreshed",
-      description: "All connector data has been refreshed.",
+      description: "Data has been refreshed",
+      variant: "default",
     });
   };
 
-  // Get active connector types by id
-  const activeConnectorTypes = connectorsData?.connectors.map(connector => connector.type) || [];
+  // Render connector cards
+  const renderConnectorCards = () => {
+    if (isLoadingConnectors) {
+      return (
+        <div className="flex justify-center items-center h-32">
+          <Spinner size="lg" />
+        </div>
+      );
+    }
+
+    if (!connectors || connectors.length === 0) {
+      return (
+        <div className="text-center p-6 border rounded-md">
+          <p className="text-muted-foreground">No connectors configured yet.</p>
+          <p className="text-muted-foreground mt-1">Click "Add Connector" to get started.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {connectors.map((connector) => (
+          <Card key={connector.tokenId}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {getConnectorIcon(connector.connectorType)}
+                  <CardTitle className="text-lg">{connector.name || getConnectorName(connector.connectorType)}</CardTitle>
+                </div>
+                <Badge variant="success">Connected</Badge>
+              </div>
+              <CardDescription>
+                Connected {formatDistanceToNow(new Date(connector.createdAt), { addSuffix: true })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-2">
+              <div className="text-sm">
+                <p className="text-muted-foreground">
+                  {connector.lastUsedAt 
+                    ? `Last used ${formatDistanceToNow(new Date(connector.lastUsedAt), { addSuffix: true })}` 
+                    : "Not used yet"}
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleAddJob(connector)}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Create Fetching Job
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  // Render jobs table
+  const renderJobsTable = () => {
+    if (isLoadingJobs) {
+      return (
+        <div className="flex justify-center items-center h-32">
+          <Spinner size="lg" />
+        </div>
+      );
+    }
+
+    if (!jobs || jobs.length === 0) {
+      return (
+        <div className="text-center p-6 border rounded-md">
+          <p className="text-muted-foreground">No fetching jobs created yet.</p>
+          <p className="text-muted-foreground mt-1">Create a connector first, then add fetching jobs.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="border rounded-md">
+        <table className="min-w-full divide-y divide-border">
+          <thead>
+            <tr className="bg-muted/50">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Connector
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Data Type
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Schedule
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Status
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Last Run
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Next Run
+              </th>
+              <th scope="col" className="relative px-6 py-3">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-background divide-y divide-border">
+            {jobs.map((job) => (
+              <tr key={job.jobId}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    {getConnectorIcon(job.connectorType)}
+                    <div className="ml-2">{getConnectorName(job.connectorType)}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm">{job.dataType}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm">
+                    {job.scheduleType === "once" 
+                      ? "One-time" 
+                      : job.scheduleType === "interval" 
+                        ? `Every ${job.scheduleValue} minutes` 
+                        : "Custom schedule"}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getJobStatusColor(job.status)}`}>
+                    {job.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {job.lastRunAt 
+                    ? formatDistanceToNow(new Date(job.lastRunAt), { addSuffix: true }) 
+                    : "Never"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {job.nextRunAt 
+                    ? formatDistanceToNow(new Date(job.nextRunAt), { addSuffix: true }) 
+                    : "Not scheduled"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <span className="sr-only">Open menu</span>
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>
+                        <Trash className="h-4 w-4 mr-2" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
-    <div className="container max-w-7xl mx-auto py-6">
+    <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Data Connectors</h1>
-          <p className="text-muted-foreground mt-1">
-            Connect to external data sources and manage your data integration jobs
-          </p>
+        <h1 className="text-3xl font-bold">Data Connectors</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefreshData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={handleAddConnector}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Connector
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={refreshAll}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
       </div>
 
-      <Tabs defaultValue="connectors" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="connectors">Available Connectors</TabsTrigger>
-          <TabsTrigger value="jobs">Data Fetching Jobs</TabsTrigger>
+          <TabsTrigger value="connectors">Connectors</TabsTrigger>
+          <TabsTrigger value="jobs">Fetching Jobs</TabsTrigger>
           <TabsTrigger value="data">Fetched Data</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="connectors" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isLoadingTypes ? (
-              // Loading skeletons
-              Array(4).fill(0).map((_, i) => (
-                <Card key={i} className="border shadow-sm">
-                  <CardHeader className="pb-2">
-                    <Skeleton className="h-4 w-24 mb-2" />
-                    <Skeleton className="h-4 w-full" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-4 w-full mb-2" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </CardContent>
-                  <CardFooter>
-                    <Skeleton className="h-9 w-full" />
-                  </CardFooter>
-                </Card>
-              ))
-            ) : (
-              // Actual connector cards
-              connectorTypes?.types.map((type) => {
-                const isActive = activeConnectorTypes.includes(type.id);
-                
-                return (
-                  <Card key={type.id} className="border shadow-sm">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="text-lg">{type.name}</CardTitle>
-                        {isActive && (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Connected
-                          </Badge>
-                        )}
-                      </div>
-                      <CardDescription>{type.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {isActive ? (
-                        <Alert variant="success" className="bg-green-50 text-green-700 border-green-200">
-                          <CheckCircle className="h-4 w-4" />
-                          <AlertTitle>Connected</AlertTitle>
-                          <AlertDescription>
-                            This connector is configured and active.
-                          </AlertDescription>
-                        </Alert>
-                      ) : (
-                        <Alert variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertTitle>Not Connected</AlertTitle>
-                          <AlertDescription>
-                            Click connect to set up this data source.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button 
-                        variant={isActive ? "outline" : "default"}
-                        onClick={() => handleConnectorDialogOpen(type.id)}
-                      >
-                        {isActive ? "Reconfigure" : "Connect"}
-                      </Button>
-                      
-                      {isActive && (
-                        <Button 
-                          variant="outline" 
-                          onClick={() => handleJobDialogOpen(type.id)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Create Job
-                        </Button>
-                      )}
-                    </CardFooter>
-                  </Card>
-                );
-              })
-            )}
-          </div>
+        <TabsContent value="connectors" className="space-y-4">
+          {renderConnectorCards()}
         </TabsContent>
 
-        <TabsContent value="jobs" className="space-y-6">
-          {isLoadingJobs ? (
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-48 mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Array(5).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : jobsData?.jobs && jobsData.jobs.length > 0 ? (
-            <div className="space-y-6">
-              <div className="space-y-4">
-                {/* Group jobs by connector type */}
-                {Object.entries(
-                  jobsData.jobs.reduce<Record<string, ConnectorJob[]>>((acc, job) => {
-                    if (!acc[job.connectorType]) {
-                      acc[job.connectorType] = [];
-                    }
-                    acc[job.connectorType].push(job);
-                    return acc;
-                  }, {})
-                ).map(([connectorType, jobs]) => {
-                  const connectorName = connectorTypes?.types.find(t => t.id === connectorType)?.name || connectorType;
-                  
-                  return (
-                    <Card key={connectorType}>
-                      <CardHeader>
-                        <CardTitle>{connectorName} Jobs</CardTitle>
-                        <CardDescription>
-                          Data fetching jobs for {connectorName} integration
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {jobs.map((job) => (
-                            <div key={job.jobId} className="border rounded-lg p-4 shadow-sm">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h3 className="font-medium">{job.dataType}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Schedule: {job.scheduleType === 'once' ? 'One time' : 
-                                              job.scheduleType === 'interval' ? `Every ${job.scheduleValue} minutes` : 
-                                              job.scheduleType}
-                                  </p>
-                                </div>
-                                <Badge 
-                                  variant={
-                                    job.status === 'completed' ? 'success' :
-                                    job.status === 'failed' ? 'destructive' :
-                                    job.status === 'in_progress' ? 'default' :
-                                    'outline'
-                                  }
-                                >
-                                  {job.status === 'in_progress' ? 'Running' : 
-                                   job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                                </Badge>
-                              </div>
-                              <div className="mt-3 text-sm">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <p className="text-muted-foreground">Last run:</p>
-                                    <p>{job.lastRunAt ? new Date(job.lastRunAt).toLocaleString() : 'Never'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Next run:</p>
-                                    <p>{job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'Not scheduled'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Run count:</p>
-                                    <p>{job.runCount}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Created:</p>
-                                    <p>{new Date(job.createdAt).toLocaleDateString()}</p>
-                                  </div>
-                                </div>
-                                {job.lastError && (
-                                  <Alert variant="destructive" className="mt-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>Error</AlertTitle>
-                                    <AlertDescription>{job.lastError}</AlertDescription>
-                                  </Alert>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => handleJobDialogOpen(connectorType)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Create New Job
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>No Jobs Found</CardTitle>
-                <CardDescription>
-                  You haven't created any data fetching jobs yet. Connect to a data source and create a job to start fetching data.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-8">
-                  <div className="rounded-full bg-muted p-3 mb-4">
-                    <AlertCircle className="h-6 w-6" />
-                  </div>
-                  <p className="text-center text-muted-foreground mb-6">
-                    Create a job to fetch data from your connected sources
-                  </p>
-                  {connectorTypes?.types.map((type) => {
-                    if (activeConnectorTypes.includes(type.id)) {
-                      return (
-                        <Button 
-                          key={type.id}
-                          className="mb-2"
-                          onClick={() => handleJobDialogOpen(type.id)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Create {type.name} Job
-                        </Button>
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="jobs" className="space-y-4">
+          {renderJobsTable()}
         </TabsContent>
 
-        <TabsContent value="data">
-          {isLoadingData ? (
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-48 mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Array(5).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : fetchedData?.data && fetchedData.data.length > 0 ? (
-            <DataFeedTable data={fetchedData.data} connectorTypes={connectorTypes?.types || []} />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>No Data Found</CardTitle>
-                <CardDescription>
-                  You haven't fetched any data yet. Create a data fetching job to start collecting data from your connected sources.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-8">
-                  <div className="rounded-full bg-muted p-3 mb-4">
-                    <AlertCircle className="h-6 w-6" />
-                  </div>
-                  <p className="text-center text-muted-foreground">
-                    No data has been fetched yet
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="data" className="space-y-4">
+          <DataFeedTable data={fetchedData || []} isLoading={isLoadingData} />
         </TabsContent>
       </Tabs>
 
-      {/* Dialog for connecting to a source */}
-      <ConnectorDialog 
-        open={isConnectorDialogOpen}
-        onOpenChange={setIsConnectorDialogOpen}
-        connectorType={selectedConnectorType}
-        connectorTypes={connectorTypes?.types || []}
-        onSuccess={handleConnectorSuccess}
+      {/* Connector Dialog */}
+      <ConnectorDialog
+        open={showConnectorDialog}
+        onOpenChange={setShowConnectorDialog}
+        onSuccess={() => {
+          refetchConnectors();
+          toast({ 
+            title: "Connector added",
+            description: "The connector was successfully added",
+            variant: "default",
+          });
+        }}
       />
 
-      {/* Dialog for creating a data fetching job */}
-      <ConnectorJobDialog
-        open={isJobDialogOpen}
-        onOpenChange={setIsJobDialogOpen}
-        connectorType={selectedConnectorType}
-        connectorTypes={connectorTypes?.types || []}
-        onSuccess={handleJobSuccess}
-      />
+      {/* Job Dialog */}
+      {selectedConnector && (
+        <ConnectorJobDialog
+          open={showJobDialog}
+          onOpenChange={setShowJobDialog}
+          connectorType={selectedConnector.connectorType}
+          connectorName={selectedConnector.name || getConnectorName(selectedConnector.connectorType)}
+          onSuccess={() => {
+            refetchJobs();
+            setActiveTab("jobs");
+          }}
+        />
+      )}
     </div>
   );
 }

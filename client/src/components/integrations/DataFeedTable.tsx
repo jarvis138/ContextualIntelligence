@@ -1,245 +1,237 @@
 import { useState } from "react";
-import { FetchedData } from "@/pages/connectors-page";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatDistanceToNow } from "date-fns";
+import { useMutation } from "@tanstack/react-query";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, ExternalLink, FileText, Info, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Eye, Trash } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+
+interface FetchedData {
+  dataId: string;
+  connectorType: string;
+  dataType: string;
+  title: string | null;
+  content: string | null;
+  metadata: Record<string, any>;
+  fetchedAt: string;
+}
 
 interface DataFeedTableProps {
   data: FetchedData[];
-  connectorTypes: Array<{ id: string; name: string; icon: string; description: string }>;
+  isLoading: boolean;
 }
 
-export default function DataFeedTable({ data, connectorTypes }: DataFeedTableProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [detailItem, setDetailItem] = useState<FetchedData | null>(null);
-
-  // Get connector name from type
-  const getConnectorName = (type: string) => {
-    const connector = connectorTypes.find(t => t.id === type);
-    return connector ? connector.name : type;
+export function DataFeedTable({ data, isLoading }: DataFeedTableProps) {
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [selectedData, setSelectedData] = useState<FetchedData | null>(null);
+  
+  const deleteMutation = useMutation({
+    mutationFn: async (dataId: string) => {
+      await apiRequest("DELETE", `/api/connectors/data/${dataId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/connectors/data"] });
+      toast({
+        title: "Data deleted",
+        description: "The data was successfully deleted",
+        variant: "default",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete data",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleViewData = (data: FetchedData) => {
+    setSelectedData(data);
+    setShowPreviewDialog(true);
   };
-
-  // Filter data based on search term
-  const filteredData = searchTerm 
-    ? data.filter(item => 
-        (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (item.content && item.content.toLowerCase().includes(searchTerm.toLowerCase())) || 
-        item.dataType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.connectorType.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : data;
-
-  // Format data type for display
-  const formatDataType = (dataType: string) => {
-    return dataType
-      .split("_")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+  
+  const handleDeleteData = (dataId: string) => {
+    if (confirm("Are you sure you want to delete this data?")) {
+      deleteMutation.mutate(dataId);
+    }
   };
-
-  // Get a color for the connector type
-  const getConnectorColor = (type: string) => {
+  
+  // Helper functions
+  const getConnectorLabel = (type: string) => {
     switch (type) {
       case "slack":
-        return "bg-purple-50 text-purple-700 border-purple-200";
+        return "Slack";
       case "google_drive":
-        return "bg-blue-50 text-blue-700 border-blue-200";
+        return "Google Drive";
       case "gmail":
-        return "bg-red-50 text-red-700 border-red-200";
+        return "Gmail";
       case "microsoft_graph":
-        return "bg-cyan-50 text-cyan-700 border-cyan-200";
+        return "Microsoft Graph";
       default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+  
+  const getDataTypeLabel = (type: string) => {
+    switch (type) {
+      case "message":
+        return "Message";
+      case "file":
+        return "File";
+      case "email":
+        return "Email";
+      case "document":
+        return "Document";
+      case "channel":
+        return "Channel";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, " ");
     }
   };
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+  const formatContentPreview = (content: string | null | undefined) => {
+    if (!content) return "No content";
+    return content.length > 100 ? content.substring(0, 100) + "..." : content;
   };
 
-  // Truncate text
-  const truncateText = (text: string, maxLength: number) => {
-    if (!text) return "";
-    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  const renderPreviewContent = (data: FetchedData) => {
+    // If it's JSON content, pretty print it
+    if (data.content && (data.content.startsWith("{") || data.content.startsWith("["))) {
+      try {
+        const jsonContent = JSON.parse(data.content);
+        return <pre className="whitespace-pre-wrap overflow-auto text-sm">{JSON.stringify(jsonContent, null, 2)}</pre>;
+      } catch {
+        // If parsing fails, display as regular text
+        return <p className="whitespace-pre-wrap">{data.content}</p>;
+      }
+    }
+    
+    return <p className="whitespace-pre-wrap">{data.content || "No content available"}</p>;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-32">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="text-center p-6 border rounded-md">
+        <p className="text-muted-foreground">No data has been fetched yet.</p>
+        <p className="text-muted-foreground mt-1">Create a fetching job to start collecting data.</p>
+      </div>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Fetched Data</CardTitle>
-            <CardDescription>
-              Data collected from your connected external sources
-            </CardDescription>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search data..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-56 h-8"
-            />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Fetched</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No results found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredData.map((item) => (
-                <TableRow key={item.dataId}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{truncateText(item.title || "Untitled", 40)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {truncateText(item.content || "", 60)}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{formatDataType(item.dataType)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getConnectorColor(item.connectorType)}>
-                      {getConnectorName(item.connectorType)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center text-sm">
-                      <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
-                      {formatDate(item.fetchedAt)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDetailItem(item)}
-                    >
-                      <Info className="h-4 w-4 mr-1" />
-                      Details
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Title</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Preview</TableHead>
+            <TableHead>Fetched</TableHead>
+            <TableHead className="w-[80px]">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((item) => (
+            <TableRow key={item.dataId}>
+              <TableCell className="font-medium">{item.title || "Untitled"}</TableCell>
+              <TableCell>
+                <Badge variant="outline">
+                  {getDataTypeLabel(item.dataType)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge className="bg-secondary text-secondary-foreground">
+                  {getConnectorLabel(item.connectorType)}
+                </Badge>
+              </TableCell>
+              <TableCell className="max-w-[200px] truncate">
+                {formatContentPreview(item.content)}
+              </TableCell>
+              <TableCell>
+                {formatDistanceToNow(new Date(item.fetchedAt), { addSuffix: true })}
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleViewData(item)}>
+                      <Eye className="mr-2 h-4 w-4" /> View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteData(item.dataId)}
+                      className="text-destructive"
+                    >
+                      <Trash className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
-      <Dialog open={!!detailItem} onOpenChange={(open) => !open && setDetailItem(null)}>
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>{detailItem?.title || "Untitled Item"}</DialogTitle>
+            <DialogTitle>{selectedData?.title || "Untitled"}</DialogTitle>
             <DialogDescription>
-              Item details from {detailItem && getConnectorName(detailItem.connectorType)}
+              {getConnectorLabel(selectedData?.connectorType || "")} • {getDataTypeLabel(selectedData?.dataType || "")} • Fetched {selectedData ? formatDistanceToNow(new Date(selectedData.fetchedAt), { addSuffix: true }) : ""}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-4 max-h-[500px] overflow-y-auto">
-            <div className="flex justify-between items-start border-b pb-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Data Type</p>
-                <Badge variant="outline" className="mt-1">
-                  {detailItem && formatDataType(detailItem.dataType)}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Source</p>
-                <Badge 
-                  className={`mt-1 ${detailItem && getConnectorColor(detailItem.connectorType)}`}
-                >
-                  {detailItem && getConnectorName(detailItem.connectorType)}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fetched At</p>
-                <p className="text-sm font-medium mt-1">
-                  {detailItem && formatDate(detailItem.fetchedAt)}
-                </p>
-              </div>
-            </div>
-
-            {detailItem?.sourceUrl && (
-              <div className="flex items-center space-x-2">
-                <p className="text-sm text-muted-foreground">Source URL:</p>
-                <a 
-                  href={detailItem.sourceUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline flex items-center"
-                >
-                  {truncateText(detailItem.sourceUrl, 50)}
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </a>
-              </div>
-            )}
-
-            {detailItem?.sourceId && (
-              <div className="flex items-center space-x-2">
-                <p className="text-sm text-muted-foreground">Source ID:</p>
-                <p className="text-sm font-mono">{detailItem.sourceId}</p>
-              </div>
-            )}
-
-            {detailItem?.content && (
-              <div className="pt-2">
-                <p className="text-sm font-medium mb-1 flex items-center">
-                  <FileText className="h-4 w-4 mr-1" />
-                  Content
-                </p>
-                <div className="bg-muted/50 p-4 rounded-md overflow-auto max-h-60">
-                  <pre className="text-sm whitespace-pre-wrap break-words font-mono">
-                    {detailItem.content}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {detailItem?.metadata && (
-              <div className="pt-2">
-                <p className="text-sm font-medium mb-1 flex items-center">
-                  <Info className="h-4 w-4 mr-1" />
-                  Metadata
-                </p>
-                <div className="bg-muted/50 p-4 rounded-md overflow-auto max-h-60">
-                  <pre className="text-sm whitespace-pre-wrap break-words font-mono">
-                    {JSON.stringify(detailItem.metadata, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end pt-4">
-            <Button onClick={() => setDetailItem(null)} variant="outline">
-              <X className="h-4 w-4 mr-1" />
+          
+          <ScrollArea className="max-h-[400px] mt-4 border rounded-md p-4">
+            {selectedData && renderPreviewContent(selectedData)}
+          </ScrollArea>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
               Close
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   );
 }

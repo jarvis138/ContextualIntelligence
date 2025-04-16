@@ -1,369 +1,244 @@
 import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/spinner";
-import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { SiSlack, SiGoogle, SiMicrosoft } from "react-icons/si";
 
 interface ConnectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  connectorType: string;
-  connectorTypes: Array<{ id: string; name: string; icon: string; description: string }>;
   onSuccess: () => void;
 }
 
-export default function ConnectorDialog({
-  open,
-  onOpenChange,
-  connectorType,
-  connectorTypes,
-  onSuccess,
-}: ConnectorDialogProps) {
-  const { toast } = useToast();
-  const [step, setStep] = useState<"configure" | "testing" | "success" | "error">("configure");
-  const [tokenData, setTokenData] = useState<Record<string, string>>({
-    accessToken: "",
-    refreshToken: "",
-    tokenSecret: "",
-    scope: "",
+const connectorFormSchema = z.object({
+  connectorType: z.enum(["slack", "google_drive", "gmail", "microsoft_graph"]),
+  name: z.string().min(2, {
+    message: "Name must be at least 2 characters.",
+  }).max(50, {
+    message: "Name must not be longer than 50 characters.",
+  }),
+});
+
+type ConnectorFormValues = z.infer<typeof connectorFormSchema>;
+
+export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDialogProps) {
+  const [step, setStep] = useState<"select" | "authorize">("select");
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  
+  const form = useForm<ConnectorFormValues>({
+    resolver: zodResolver(connectorFormSchema),
+    defaultValues: {
+      connectorType: "slack",
+      name: "",
+    },
   });
-  const [errorMessage, setErrorMessage] = useState("");
 
-  // Find the selected connector type
-  const selectedConnector = connectorTypes.find((t) => t.id === connectorType);
-
-  // Test connection mutation
-  const testConnectionMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/connectors/test", {
-        type: connectorType
-      });
-      return response.json();
+  const createAuthUrlMutation = useMutation({
+    mutationFn: async (values: ConnectorFormValues) => {
+      const res = await apiRequest("POST", "/api/connectors/auth-url", values);
+      return await res.json();
     },
     onSuccess: (data) => {
-      if (data.success) {
-        setStep("success");
+      if (data.authUrl) {
+        setAuthUrl(data.authUrl);
+        setStep("authorize");
       } else {
-        setErrorMessage(data.error || "Failed to connect to service");
-        setStep("error");
+        toast({
+          title: "Error",
+          description: "Failed to generate authorization URL",
+          variant: "destructive",
+        });
       }
     },
     onError: (error: Error) => {
-      setErrorMessage(error.message || "Failed to test connection");
-      setStep("error");
-    }
-  });
-
-  // Store token mutation
-  const storeTokenMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/connectors/token", {
-        ...data,
-        connectorType
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
-      return response.json();
     },
-    onSuccess: () => {
-      setStep("testing");
-      testConnectionMutation.mutate();
-    },
-    onError: (error: Error) => {
-      setErrorMessage(error.message || "Failed to store token");
-      setStep("error");
-    }
   });
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Filter out empty fields
-    const filteredTokenData = Object.entries(tokenData)
-      .filter(([_, value]) => value.trim() !== "")
-      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-    
-    storeTokenMutation.mutate(filteredTokenData);
-  };
-
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setTokenData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Handle dialog close
-  const handleClose = () => {
-    if (step === "success") {
-      onSuccess();
+  function onSubmit(values: ConnectorFormValues) {
+    createAuthUrlMutation.mutate(values);
+  }
+  
+  function handleAuthorize() {
+    if (authUrl) {
+      // Open the authorization URL in a new window
+      window.open(authUrl, "auth_window", "width=600,height=700");
+      
+      // Check for authorization callback
+      const checkAuth = setInterval(() => {
+        // Check if the API token was created by polling
+        fetch("/api/connectors/check-auth")
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              clearInterval(checkAuth);
+              onOpenChange(false);
+              onSuccess();
+              toast({
+                title: "Success",
+                description: "Connector successfully authorized",
+                variant: "default",
+              });
+            }
+          })
+          .catch(() => {
+            // Ignore errors, just keep polling
+          });
+      }, 2000);
+      
+      // Stop polling after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkAuth);
+      }, 5 * 60 * 1000);
     }
-    
-    // Reset state
-    setStep("configure");
-    setTokenData({
-      accessToken: "",
-      refreshToken: "",
-      tokenSecret: "",
-      scope: "",
-    });
-    setErrorMessage("");
-    
-    onOpenChange(false);
-  };
-
-  // Render configuration form based on connector type
-  const renderConfigForm = () => {
-    switch (connectorType) {
-      case "slack":
-        return (
-          <>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accessToken">Slack Bot Token</Label>
-                <Input
-                  id="accessToken"
-                  name="accessToken"
-                  value={tokenData.accessToken}
-                  onChange={handleInputChange}
-                  placeholder="xoxb-..."
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  This is your Slack Bot User OAuth Token that starts with 'xoxb-'
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="scope">Scope (optional)</Label>
-                <Input
-                  id="scope"
-                  name="scope"
-                  value={tokenData.scope}
-                  onChange={handleInputChange}
-                  placeholder="channels:read,chat:write,files:read"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Comma-separated list of OAuth scopes granted to your app
-                </p>
-              </div>
-            </div>
-            <Alert className="mt-4 bg-amber-50 text-amber-800 border-amber-200">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Make sure your Slack app has the necessary OAuth scopes and is installed to your workspace.
-              </AlertDescription>
-            </Alert>
-          </>
-        );
-      
-      case "google_drive":
-      case "gmail":
-        return (
-          <>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accessToken">Access Token</Label>
-                <Input
-                  id="accessToken"
-                  name="accessToken"
-                  value={tokenData.accessToken}
-                  onChange={handleInputChange}
-                  placeholder="ya29.a0AVvZVsr..."
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="refreshToken">Refresh Token</Label>
-                <Input
-                  id="refreshToken"
-                  name="refreshToken"
-                  value={tokenData.refreshToken}
-                  onChange={handleInputChange}
-                  placeholder="1//04dX..."
-                />
-                <p className="text-sm text-muted-foreground">
-                  Used to automatically refresh the access token when it expires
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="scope">Scope</Label>
-                <Input
-                  id="scope"
-                  name="scope"
-                  value={tokenData.scope}
-                  onChange={handleInputChange}
-                  placeholder="https://www.googleapis.com/auth/drive.readonly"
-                />
-              </div>
-            </div>
-            <Alert className="mt-4 bg-amber-50 text-amber-800 border-amber-200">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Make sure you've authorized the application with the correct scopes in the Google Cloud Console.
-              </AlertDescription>
-            </Alert>
-          </>
-        );
-      
-      case "microsoft_graph":
-        return (
-          <>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accessToken">Access Token</Label>
-                <Input
-                  id="accessToken"
-                  name="accessToken"
-                  value={tokenData.accessToken}
-                  onChange={handleInputChange}
-                  placeholder="eyJ0eXAiOiJKV1QiLCJub..."
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="refreshToken">Refresh Token</Label>
-                <Input
-                  id="refreshToken"
-                  name="refreshToken"
-                  value={tokenData.refreshToken}
-                  onChange={handleInputChange}
-                  placeholder="0.AR8A8lVO-..."
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="scope">Scope</Label>
-                <Input
-                  id="scope"
-                  name="scope"
-                  value={tokenData.scope}
-                  onChange={handleInputChange}
-                  placeholder="User.Read Files.Read Mail.Read"
-                />
-              </div>
-            </div>
-            <Alert className="mt-4 bg-amber-50 text-amber-800 border-amber-200">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Ensure your Microsoft application has the appropriate permissions in the Azure portal.
-              </AlertDescription>
-            </Alert>
-          </>
-        );
-      
-      default:
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="accessToken">Access Token</Label>
-              <Input
-                id="accessToken"
-                name="accessToken"
-                value={tokenData.accessToken}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="refreshToken">Refresh Token (optional)</Label>
-              <Input
-                id="refreshToken"
-                name="refreshToken"
-                value={tokenData.refreshToken}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-        );
-    }
-  };
+  }
+  
+  function handleReset() {
+    setStep("select");
+    setAuthUrl(null);
+    form.reset();
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {step === "configure" ? (
-              `Configure ${selectedConnector?.name || connectorType} Connection`
-            ) : step === "testing" ? (
-              "Testing Connection"
-            ) : step === "success" ? (
-              "Connection Successful"
-            ) : (
-              "Connection Error"
-            )}
+            {step === "select" ? "Add Data Connector" : "Authorize Connector"}
           </DialogTitle>
-          <DialogDescription>
-            {step === "configure"
-              ? `Enter your ${selectedConnector?.name || connectorType} API credentials to connect.`
-              : step === "testing"
-              ? "Please wait while we test your connection..."
-              : step === "success"
-              ? "Your connection has been successfully configured."
-              : "There was an error configuring your connection."}
-          </DialogDescription>
         </DialogHeader>
-
-        {step === "configure" ? (
-          <form onSubmit={handleSubmit}>
-            {renderConfigForm()}
-            <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={storeTokenMutation.isPending}>
-                {storeTokenMutation.isPending ? "Saving..." : "Save & Test"}
-              </Button>
-            </DialogFooter>
-          </form>
-        ) : step === "testing" ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Spinner size="lg" />
-            <p className="mt-4 text-center text-muted-foreground">
-              Testing connection to {selectedConnector?.name || connectorType}...
-            </p>
-          </div>
-        ) : step === "success" ? (
-          <div className="space-y-4">
-            <Card className="bg-green-50 border-green-200 p-4">
-              <div className="flex">
-                <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0" />
-                <div>
-                  <h4 className="text-green-800 font-medium">Connection Successful</h4>
-                  <p className="text-green-700 text-sm">
-                    Your {selectedConnector?.name || connectorType} connection has been verified and is working correctly.
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <DialogFooter>
-              <Button onClick={handleClose}>Close</Button>
-            </DialogFooter>
-          </div>
+        
+        {step === "select" ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="connectorType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Connector Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="slack" id="slack" />
+                          <label
+                            htmlFor="slack"
+                            className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                          >
+                            <SiSlack className="h-4 w-4 text-[#4A154B]" />
+                            <span>Slack</span>
+                          </label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="google_drive" id="google_drive" />
+                          <label
+                            htmlFor="google_drive"
+                            className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                          >
+                            <SiGoogle className="h-4 w-4 text-[#4285F4]" />
+                            <span>Google Drive</span>
+                          </label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="gmail" id="gmail" />
+                          <label
+                            htmlFor="gmail"
+                            className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                          >
+                            <SiGoogle className="h-4 w-4 text-[#D14836]" />
+                            <span>Gmail</span>
+                          </label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="microsoft_graph" id="microsoft_graph" />
+                          <label
+                            htmlFor="microsoft_graph"
+                            className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                          >
+                            <SiMicrosoft className="h-4 w-4 text-[#0078D4]" />
+                            <span>Microsoft Graph</span>
+                          </label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="My Workspace" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter className="pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createAuthUrlMutation.isPending}
+                >
+                  {createAuthUrlMutation.isPending ? <Spinner className="mr-2" size="sm" /> : null}
+                  Next
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         ) : (
           <div className="space-y-4">
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{errorMessage || "There was an error testing your connection."}</AlertDescription>
-            </Alert>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setStep("configure")}>
-                Try Again
+            <div className="text-center py-4">
+              <p className="mb-4">
+                Click the button below to authorize access to your{" "}
+                {form.getValues("connectorType").replace("_", " ")} account.
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                You will be redirected to the service to grant permission.
+              </p>
+              
+              <Button onClick={handleAuthorize} className="w-full">
+                Authorize Connection
               </Button>
-              <Button variant="destructive" onClick={handleClose}>
-                Close
+            </div>
+            
+            <div className="text-center py-2">
+              <Button onClick={handleReset} variant="ghost" size="sm">
+                Change connector type
               </Button>
-            </DialogFooter>
+            </div>
           </div>
         )}
       </DialogContent>
