@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import featureFlagsRouter from './feature-flags';
 import { connectorApiRouter } from './connector-api';
+import aiApiRouter from './ai-api';
 import { logger } from '../services/observability';
 
 // Create the main API router
