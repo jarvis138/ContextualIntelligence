@@ -64,6 +64,19 @@ export const documentSourceEnum = pgEnum("document_source", [
   "external_url"
 ]);
 
+export const dataSourceTypeEnum = pgEnum("data_source_type", [
+  "google_drive",
+  "google_mail",
+  "microsoft_graph",
+  "sharepoint",
+  "slack",
+  "jira", 
+  "github",
+  "trello",
+  "asana",
+  "custom_api"
+]);
+
 export const documentLifecycleStateEnum = pgEnum("document_lifecycle_state", [
   "draft",
   "active",
