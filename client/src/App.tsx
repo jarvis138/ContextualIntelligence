@@ -1,98 +1,21 @@
 import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/Dashboard";
-import CustomizableDashboard from "@/pages/CustomizableDashboard";
 import Projects from "@/pages/Projects";
-import ProjectDetail from "@/pages/ProjectDetail";
-import ProjectInsights from "@/pages/ProjectInsights";
-import Team from "@/pages/Team";
-import Documents from "@/pages/Documents";
-import DocumentManagement from "@/pages/DocumentManagement";
-import DocumentDetail from "@/pages/DocumentDetail";
-import Conversations from "@/pages/Conversations";
-import Search from "@/pages/Search";
-import Integrations from "@/pages/Integrations";
-import AuthPage from "@/pages/AuthPage";
-import UserProfile from "@/pages/UserProfile";
-import AdminDashboard from "@/pages/AdminDashboard";
-import AdminDashboardDev from "@/pages/AdminDashboardDev";
-import SystemMonitoring from "@/pages/SystemMonitoring";
-import Settings from "@/pages/Settings";
-import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
-import Workspace from "@/pages/Workspace";
-import Insights from "@/pages/Insights";
-import TokenRefreshTestPage from "@/pages/TokenRefreshTestPage";
-import WebSocketTestPage from "@/pages/WebSocketTestPage";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/hooks/use-auth";
-import { ProtectedRoute } from "@/lib/protected-route";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import Dashboard from "@/pages/Dashboard";
+import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
 import MainLayout from "@/components/layout/MainLayout";
 
-function ProtectedContent() {
-  return (
-    <MainLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard/custom" component={CustomizableDashboard} />
-        <Route path="/projects" component={Projects} />
-        <Route path="/projects/:id">
-          {params => <ProjectDetail params={params} />}
-        </Route>
-        <Route path="/projects/:projectId/insights" component={ProjectInsights} />
-        <Route path="/teams" component={Team} />
-        <Route path="/documents" component={Documents} />
-        <Route path="/documents/manage" component={DocumentManagement} />
-        <Route path="/documents/:documentId">
-          {params => <DocumentDetail documentId={params.documentId} />}
-        </Route>
-        <Route path="/conversations" component={Conversations} />
-        <Route path="/search" component={Search} />
-        <Route path="/profile" component={UserProfile} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/admin" component={AdminDashboard} />
-        <Route path="/system" component={SystemMonitoring} />
-        <Route path="/analytics" component={AdvancedAnalytics} />
-        <Route path="/workspace" component={Workspace} />
-        <Route path="/workspace/:id">
-          {params => <Workspace />}
-        </Route>
-        <Route path="/insights" component={Insights} />
-        <Route path="/integrations" component={Integrations} />
-        <Route path="/integrations/trello" component={Integrations} />
-        <Route path="/integrations/jira" component={Integrations} />
-        <Route path="/integrations/slack" component={Integrations} />
-        <Route path="/integrations/gsuite" component={Integrations} />
-        <Route path="/token-refresh-test" component={TokenRefreshTestPage} />
-        <Route path="/websocket-test" component={WebSocketTestPage} />
-        {/* Fallback to 404 */}
-        <Route component={NotFound} />
-      </Switch>
-    </MainLayout>
-  );
-}
-
-function Router() {
-  return (
-    <Switch>
-      <Route path="/auth" component={AuthPage} />
-      {/* Temporarily add direct routes for development and testing purposes */}
-      <Route path="/admin-dev" component={AdminDashboardDev} />
-      <Route path="/websocket-test" component={WebSocketTestPage} />
-      <ProtectedRoute path="/" component={ProtectedContent} />
-    </Switch>
-  );
-}
-
+// Simplified App with direct routes and no authentication
 function App() {
   useEffect(() => {
-    // Add timeline styles that we can't easily add through components
+    // Add some basic styles
     const style = document.createElement("style");
     style.innerHTML = `
+      body {
+        font-family: 'Inter', sans-serif;
+      }
       .timeline-item::before {
         content: '';
         position: absolute;
@@ -130,13 +53,13 @@ function App() {
 
   return (
     <>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Router />
-          </AuthProvider>
-        </QueryClientProvider>
-      </ErrorBoundary>
+      <MainLayout>
+        <Switch>
+          <Route path="/" component={Dashboard} />
+          <Route path="/projects" component={Projects} />
+          <Route component={NotFound} />
+        </Switch>
+      </MainLayout>
       <Toaster />
     </>
   );
