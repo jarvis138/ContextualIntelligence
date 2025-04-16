@@ -117,7 +117,7 @@ export function ProjectInsightsPanel({
       case "high":
         return <Badge variant="destructive">High Impact</Badge>;
       case "medium":
-        return <Badge variant="warning">Medium Impact</Badge>;
+        return <Badge variant="secondary">Medium Impact</Badge>;
       case "low":
         return <Badge variant="outline">Low Impact</Badge>;
       default:
