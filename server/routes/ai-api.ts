@@ -7,7 +7,7 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import * as openaiService from '../services/openai';
+import { openaiService } from '../services/openai';
 import { authenticateToken } from '../auth';
 import { logger } from '../services/observability';
 

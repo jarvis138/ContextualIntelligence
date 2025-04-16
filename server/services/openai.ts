@@ -502,37 +502,36 @@ Document: "${text.substring(0, 5000)}"`; // Truncate to avoid token limits
     try {
       const startTime = Date.now();
       
-      const contextText = `
-Project Description: ${context.projectDescription || 'N/A'}
-
-Recent Documents: ${context.recentDocuments?.join('\n') || 'N/A'}
-
-Team Members: ${context.teamMembers?.join(', ') || 'N/A'}
-
-Recent Activities: ${context.recentActivities?.join('\n') || 'N/A'}
-
-Current Issues: ${context.currentIssues?.join('\n') || 'N/A'}
-`;
+      // Format the context data
+      const contextStr = [
+        context.projectDescription ? `Project Description: ${context.projectDescription}` : '',
+        context.recentDocuments && context.recentDocuments.length > 0 
+          ? `Recent Documents: ${context.recentDocuments.join(' | ')}` : '',
+        context.teamMembers && context.teamMembers.length > 0 
+          ? `Team Members: ${context.teamMembers.join(', ')}` : '',
+        context.recentActivities && context.recentActivities.length > 0 
+          ? `Recent Activities: ${context.recentActivities.join(' | ')}` : '',
+        context.currentIssues && context.currentIssues.length > 0 
+          ? `Current Issues: ${context.currentIssues.join(' | ')}` : ''
+      ].filter(Boolean).join('\n\n');
       
-      const prompt = `Based on the following project information, generate insights that would be valuable for project management and decision-making.
-
-For each insight, provide:
+      const prompt = `Based on the following project context, generate insights that would be valuable for project management and decision making. For each insight, provide:
 1. A concise title
-2. A detailed description
-3. A confidence score (0-1)
-4. An impact score (0-1) indicating how important this insight is
-5. A category (e.g., "Risk", "Opportunity", "Efficiency", "Communication", "Resource", etc.)
-6. Related entities (if applicable)
-7. Actionable suggestions (if applicable)
+2. A detailed description of the insight
+3. A confidence score (0-1) indicating how certain you are of this insight
+4. An impact score (0-1) indicating how important this insight is to project success
+5. A category (opportunity, risk, suggestion, observation)
+6. Related entities (people, technologies, documents mentioned in the context)
+7. Actionable suggestions when applicable
 
-Return 3-5 insights as a JSON array with the format:
+Return the results as a JSON array of objects with the format:
 [
   {
-    "title": "Insight title",
-    "description": "Detailed description",
+    "title": "Brief insight title",
+    "description": "Detailed explanation of the insight",
     "confidence": 0.85,
-    "impact": 0.9,
-    "category": "Risk",
+    "impact": 0.7,
+    "category": "opportunity|risk|suggestion|observation",
     "relatedEntities": ["Entity1", "Entity2"],
     "suggestions": ["Suggestion 1", "Suggestion 2"]
   }
@@ -540,8 +539,8 @@ Return 3-5 insights as a JSON array with the format:
 
 Only return the JSON array with no additional text.
 
-Project Information:
-${contextText.substring(0, 6000)}`; // Truncate to avoid token limits
+Project Context:
+${contextStr}`;
       
       const response = await this.chatCompletion(prompt);
       

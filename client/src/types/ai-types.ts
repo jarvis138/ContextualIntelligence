@@ -1,12 +1,11 @@
 /**
- * Type definitions for AI features
+ * AI Types
  * 
- * Used in the Phase 3 implementation of AI Intelligence.
+ * This file defines TypeScript types for AI-related features in the CPI Hub.
+ * These types correspond to the data structures returned by the AI API.
  */
 
-/**
- * Entity extracted from text
- */
+// Entity represents a named entity extracted from text
 export interface Entity {
   name: string;
   type: string;
@@ -15,9 +14,7 @@ export interface Entity {
   metadata?: Record<string, any>;
 }
 
-/**
- * Relation between entities
- */
+// Relation represents a relationship between two entities
 export interface Relation {
   source: string;
   sourceType?: string;
@@ -29,9 +26,7 @@ export interface Relation {
   metadata?: Record<string, any>;
 }
 
-/**
- * Results of document analysis
- */
+// DocumentAnalysis provides comprehensive analysis of a document
 export interface DocumentAnalysis {
   summary: string;
   entities: Entity[];
@@ -45,9 +40,7 @@ export interface DocumentAnalysis {
   metadata?: Record<string, any>;
 }
 
-/**
- * Project insight generated from project data
- */
+// ProjectInsight represents an AI-generated insight about a project
 export interface ProjectInsight {
   title: string;
   description: string;
@@ -59,60 +52,39 @@ export interface ProjectInsight {
   metadata?: Record<string, any>;
 }
 
-/**
- * Graph node representation for visualization
- */
-export interface GraphNode {
-  id: string;
-  label: string;
-  type: string;
-  size?: number;
-  color?: string;
-  metadata?: Record<string, any>;
-}
-
-/**
- * Graph link representation for visualization
- */
-export interface GraphLink {
-  source: string;
-  target: string;
-  label: string;
-  value?: number;
-  color?: string;
-  metadata?: Record<string, any>;
-}
-
-/**
- * Complete graph structure for visualization
- */
-export interface Graph {
-  nodes: GraphNode[];
-  links: GraphLink[];
-}
-
-/**
- * Named entity in context, with position information
- */
-export interface NamedEntity extends Entity {
-  start: number;
-  end: number;
-  text: string;
-}
-
-/**
- * Sentiment result from analysis
- */
-export interface SentimentResult {
+// SentimentAnalysis represents the sentiment of text
+export interface SentimentAnalysis {
   sentiment: string;
   confidence: number;
-  score?: number;
 }
 
-/**
- * Project context for insight generation
- */
-export interface ProjectContext {
+// Response types for AI API endpoints
+export interface EntitiesResponse {
+  entities: Entity[];
+}
+
+export interface RelationsResponse {
+  relations: Relation[];
+}
+
+export interface DocumentAnalysisResponse {
+  analysis: DocumentAnalysis;
+}
+
+export interface ProjectInsightsResponse {
+  insights: ProjectInsight[];
+}
+
+export interface SentimentResponse {
+  sentiment: SentimentAnalysis;
+}
+
+export interface SummarizeResponse {
+  summary: string;
+}
+
+// Request types for AI API endpoints
+export interface ProjectInsightsRequest {
   projectDescription?: string;
   recentDocuments?: string[];
   teamMembers?: string[];
