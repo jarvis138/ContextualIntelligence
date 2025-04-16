@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import Projects from "@/pages/Projects";
 import Dashboard from "@/pages/Dashboard";
@@ -37,7 +37,10 @@ const queryClient = new QueryClient({
 
 // Simplified App with direct routes and no authentication
 function App() {
+  const [location] = useLocation();
+  
   useEffect(() => {
+    console.log("Current location:", location);
     // Add some basic styles
     const style = document.createElement("style");
     style.innerHTML = `
@@ -90,31 +93,34 @@ function App() {
     return () => {
       document.head.removeChild(style);
     };
-  }, []);
+  }, [location]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TourContextProvider>
         <ProjectAssistantProvider>
           <MainLayout>
-            <Switch>
-              <Route path="/projects" component={Projects} />
-              <Route path="/documents" component={DocumentsPage} />
-              <Route path="/teams" component={TeamsPage} />
-              <Route path="/workspace" component={WorkspacePage} />
-              <Route path="/analytics" component={AnalyticsPage} />
-              <Route path="/reports-alerts" component={ReportsAlertsPage} />
-              <Route path="/insights" component={InsightsPage} />
-              <Route path="/integrations" component={ConnectorsPage} />
-              <Route path="/connectors" component={ConnectorsPage} />
-              <Route path="/search" component={SearchPage} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route path="/admin" component={AdminPage} />
-              <Route path="/system" component={SystemPage} />
-              <Route path="/profile" component={PlaceholderPage} />
-              <Route path="/" component={Dashboard} />
-              <Route component={NotFound} />
-            </Switch>
+            {location === "/admin" ? (
+              <AdminPage />
+            ) : (
+              <Switch>
+                <Route path="/projects" component={Projects} />
+                <Route path="/documents" component={DocumentsPage} />
+                <Route path="/teams" component={TeamsPage} />
+                <Route path="/workspace" component={WorkspacePage} />
+                <Route path="/analytics" component={AnalyticsPage} />
+                <Route path="/reports-alerts" component={ReportsAlertsPage} />
+                <Route path="/insights" component={InsightsPage} />
+                <Route path="/integrations" component={ConnectorsPage} />
+                <Route path="/connectors" component={ConnectorsPage} />
+                <Route path="/search" component={SearchPage} />
+                <Route path="/settings" component={SettingsPage} />
+                <Route path="/system" component={SystemPage} />
+                <Route path="/profile" component={PlaceholderPage} />
+                <Route path="/" component={Dashboard} />
+                <Route component={NotFound} />
+              </Switch>
+            )}
           </MainLayout>
           <TourManager />
           <ChatInterface />
