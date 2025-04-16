@@ -35,6 +35,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
+import { HelpMenu } from '@/components/tour/HelpMenu';
 
 type MainLayoutProps = {
   children: React.ReactNode;
@@ -125,6 +126,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           {/* Right side icons */}
           <div className="flex items-center gap-2 md:gap-3">
+            {/* Help Menu */}
+            <div className="mr-1">
+              <HelpMenu />
+            </div>
+            
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -158,7 +164,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             {/* User menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
+                <Button variant="ghost" size="icon" data-tour="user-menu" className="rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="/placeholder-user.jpg" alt="User" />
                     <AvatarFallback>U</AvatarFallback>

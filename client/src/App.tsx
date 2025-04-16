@@ -19,6 +19,8 @@ import { useEffect } from "react";
 
 import MainLayout from "@/components/layout/MainLayout";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TourContextProvider } from "@/contexts/TourContext";
+import { TourManager } from "@/components/tour/TourManager";
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -67,6 +69,19 @@ function App() {
         background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
         background-size: 20px 20px;
       }
+
+      /* Tour styles */
+      .tour-helper {
+        --reactour-accent: var(--primary);
+      }
+      
+      .tour-mask {
+        color: rgba(0, 0, 0, 0.7);
+      }
+      
+      .tour-highlighted-mask {
+        border: 2px solid var(--primary);
+      }
     `;
     document.head.appendChild(style);
 
@@ -77,27 +92,30 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MainLayout>
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/projects" component={Projects} />
-          <Route path="/documents" component={DocumentsPage} />
-          <Route path="/teams" component={TeamsPage} />
-          <Route path="/workspace" component={WorkspacePage} />
-          <Route path="/analytics" component={AnalyticsPage} />
-          <Route path="/reports-alerts" component={ReportsAlertsPage} />
-          <Route path="/insights" component={InsightsPage} />
-          <Route path="/integrations" component={ConnectorsPage} />
-          <Route path="/connectors" component={ConnectorsPage} />
-          <Route path="/search" component={SearchPage} />
-          <Route path="/settings" component={SettingsPage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/system" component={SystemPage} />
-          <Route path="/profile" component={PlaceholderPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </MainLayout>
-      <Toaster />
+      <TourContextProvider>
+        <MainLayout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/projects" component={Projects} />
+            <Route path="/documents" component={DocumentsPage} />
+            <Route path="/teams" component={TeamsPage} />
+            <Route path="/workspace" component={WorkspacePage} />
+            <Route path="/analytics" component={AnalyticsPage} />
+            <Route path="/reports-alerts" component={ReportsAlertsPage} />
+            <Route path="/insights" component={InsightsPage} />
+            <Route path="/integrations" component={ConnectorsPage} />
+            <Route path="/connectors" component={ConnectorsPage} />
+            <Route path="/search" component={SearchPage} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route path="/admin" component={AdminPage} />
+            <Route path="/system" component={SystemPage} />
+            <Route path="/profile" component={PlaceholderPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </MainLayout>
+        <TourManager />
+        <Toaster />
+      </TourContextProvider>
     </QueryClientProvider>
   );
 }

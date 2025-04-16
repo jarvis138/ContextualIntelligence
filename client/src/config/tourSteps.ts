@@ -1,6 +1,6 @@
-import { StepType } from 'reactour';
+import React from 'react';
 
-interface TourStep extends StepType {
+interface TourStep {
   selector?: string;
   content: React.ReactNode;
   action?: () => void;
@@ -65,7 +65,7 @@ export const welcomeTour: TourStep[] = [
   },
   {
     selector: 'body',
-    content: 'You're all set! Explore the platform and discover how CPI Hub can help you manage your projects more effectively. You can access this tour again from the Help menu.',
+    content: "You're all set! Explore the platform and discover how CPI Hub can help you manage your projects more effectively. You can access this tour again from the Help menu.",
     position: 'center',
   },
 ];
