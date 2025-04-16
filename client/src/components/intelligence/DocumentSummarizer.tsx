@@ -1,281 +1,207 @@
-import React, { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Spinner } from "@/components/ui/spinner";
-import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, FileText, Upload } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+/**
+ * Document Summarizer Component
+ * 
+ * This component allows users to analyze documents with AI to extract summaries, topics, and key elements.
+ * It provides insights about document content and importance in a user-friendly interface.
+ */
 
-interface SummaryResult {
-  summary: string;
-  keyPoints: string[];
-  entities: {
-    name: string;
-    type: string;
-  }[];
-}
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { useDocumentAnalysis } from '@/hooks/use-ai-api';
+import { DocumentAnalysis, Entity } from '@/types/ai-types';
+import { FileText, Loader2, Tag, PenTool, AlertCircle } from 'lucide-react';
 
-interface DocumentSummarizerProps {
-  title?: string;
-  description?: string;
-  onSummaryComplete?: (result: SummaryResult) => void;
-  documentId?: string;
-  initialText?: string;
-}
-
-export function DocumentSummarizer({
-  title = "Document Summarization",
-  description = "Upload a document or enter text to generate a concise summary",
-  onSummaryComplete,
-  documentId,
-  initialText = "",
-}: DocumentSummarizerProps) {
-  const [text, setText] = useState(initialText);
-  const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<SummaryResult | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      
-      // Check file size (limit to 10MB)
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select a file smaller than 10MB",
-          variant: "destructive",
-        });
-        e.target.value = '';
-        return;
-      }
-      
-      // Check file type
-      const validTypes = ['application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!validTypes.includes(selectedFile.type)) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select a PDF, TXT, or DOCX file",
-          variant: "destructive",
-        });
-        e.target.value = '';
-        return;
-      }
-      
-      setFile(selectedFile);
-      setText('');
-    }
-  };
-
-  const summarizeMutation = useMutation({
-    mutationFn: async (payload: { text?: string; file?: File; documentId?: string }) => {
-      let formData = new FormData();
-      
-      if (payload.text) {
-        formData.append('text', payload.text);
-      }
-      
-      if (payload.file) {
-        formData.append('file', payload.file);
-      }
-      
-      if (payload.documentId) {
-        formData.append('documentId', payload.documentId);
-      }
-      
-      const res = await fetch("/api/ai/summarize", {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to summarize document");
-      }
-      
-      return await res.json() as SummaryResult;
-    },
-    onSuccess: (data) => {
-      setResult(data);
-      if (onSummaryComplete) {
-        onSummaryComplete(data);
-      }
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSummarize = () => {
-    if (!text && !file && !documentId) {
-      toast({
-        title: "No content",
-        description: "Please enter text, upload a file, or provide a document ID",
-        variant: "destructive",
-      });
-      return;
-    }
+export default function DocumentSummarizer() {
+  const [text, setText] = useState('');
+  const [activeTab, setActiveTab] = useState('input');
+  const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null);
+  
+  const documentAnalysis = useDocumentAnalysis();
+  const isLoading = documentAnalysis.isPending;
+  
+  const handleAnalyze = async () => {
+    if (!text.trim() || isLoading) return;
     
-    summarizeMutation.mutate({
-      text: text || undefined,
-      file: file || undefined,
-      documentId,
-    });
-  };
-
-  const handleUploadClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+    try {
+      const result = await documentAnalysis.mutateAsync(text);
+      setAnalysis(result);
+      setActiveTab('results');
+    } catch (error) {
+      console.error('Document analysis failed:', error);
     }
   };
-
-  const renderSummaryResult = () => {
-    if (!result) return null;
-    
-    return (
-      <div className="space-y-4">
-        <div>
-          <h4 className="text-sm font-medium mb-2">Summary</h4>
-          <p className="text-sm">{result.summary}</p>
-        </div>
-        
-        {result.keyPoints.length > 0 && (
-          <div>
-            <h4 className="text-sm font-medium mb-2">Key Points</h4>
-            <ul className="list-disc pl-5 space-y-1">
-              {result.keyPoints.map((point, i) => (
-                <li key={i} className="text-sm">{point}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {result.entities.length > 0 && (
-          <div>
-            <h4 className="text-sm font-medium mb-2">Entities Identified</h4>
-            <div className="flex flex-wrap gap-2">
-              {result.entities.map((entity, i) => (
-                <span 
-                  key={i} 
-                  className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary"
-                >
-                  {entity.name} ({entity.type})
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+  
+  const getSentimentColor = (score: number) => {
+    if (score >= 0.2) return 'bg-green-500';
+    if (score <= -0.2) return 'bg-red-500';
+    return 'bg-yellow-500';
   };
-
+  
+  const getImportanceLabel = (score: number) => {
+    if (score >= 0.75) return 'High';
+    if (score >= 0.5) return 'Medium';
+    return 'Low';
+  };
+  
+  const getEntityBadgeColor = (entityType: string) => {
+    const typeColorMap: Record<string, string> = {
+      person: 'bg-blue-500',
+      organization: 'bg-red-500',
+      location: 'bg-green-500',
+      date: 'bg-yellow-500',
+      project: 'bg-purple-500',
+      technology: 'bg-indigo-500',
+      document: 'bg-pink-500'
+    };
+    
+    return typeColorMap[entityType.toLowerCase()] || 'bg-gray-500';
+  };
+  
   return (
-    <Card className="w-full">
+    <Card className="w-full h-full">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Document Summarizer
+        </CardTitle>
+        <CardDescription>
+          Analyze documents with AI to extract summaries, topics, and key insights
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {!documentId && (
-          <>
-            <div className="space-y-2">
-              <Textarea
-                placeholder="Enter text to summarize..."
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setFile(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }}
-                className="min-h-[100px]"
-                disabled={summarizeMutation.isPending || !!file}
-              />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Or</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept=".pdf,.txt,.docx"
-                    disabled={summarizeMutation.isPending}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUploadClick}
-                    disabled={summarizeMutation.isPending}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 w-[400px] mx-auto">
+          <TabsTrigger value="input">Input</TabsTrigger>
+          <TabsTrigger value="results" disabled={!analysis}>Results</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="input" className="p-4">
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Enter your document text to analyze..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className="min-h-[250px]"
+            />
+            
+            <Button 
+              onClick={handleAnalyze} 
+              disabled={!text.trim() || isLoading}
+              className="w-full"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing Document...
+                </>
+              ) : 'Analyze Document'}
+            </Button>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="results" className="p-4">
+          {analysis && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                  <PenTool className="h-4 w-4" />
+                  Summary
+                </h3>
+                <div className="bg-muted p-3 rounded-md text-sm">
+                  {analysis.summary}
                 </div>
               </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Keywords
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.keywords.map((keyword, index) => (
+                      <Badge key={index} variant="secondary">{keyword}</Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Main Topics</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.topics.map((topic, index) => (
+                      <Badge key={index} variant="outline">{topic}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-2">Key Entities</h3>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.entities.slice(0, 10).map((entity, index) => (
+                    <Badge 
+                      key={`${entity.name}-${index}`}
+                      className={`${getEntityBadgeColor(entity.type)} text-white`}
+                      title={`Confidence: ${(entity.confidence * 100).toFixed(0)}%`}
+                    >
+                      {entity.name} ({entity.type})
+                    </Badge>
+                  ))}
+                  {analysis.entities.length > 10 && (
+                    <Badge variant="outline">+{analysis.entities.length - 10} more</Badge>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Sentiment
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      className={`${getSentimentColor(analysis.sentiment.score)} text-white`}
+                    >
+                      {analysis.sentiment.label.toUpperCase()}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      Score: {analysis.sentiment.score.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Importance</h3>
+                  <div className="space-y-2">
+                    <Progress value={analysis.importance * 100} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{getImportanceLabel(analysis.importance)} Importance</span>
+                      <span>{(analysis.importance * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <Button
+                variant="outline"
+                onClick={() => setActiveTab('input')}
+                className="w-full"
+              >
+                Analyze Another Document
+              </Button>
             </div>
-            
-            {file && (
-              <Alert>
-                <FileText className="h-4 w-4" />
-                <AlertTitle>Document selected</AlertTitle>
-                <AlertDescription>
-                  {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                </AlertDescription>
-              </Alert>
-            )}
-          </>
-        )}
-        
-        {documentId && (
-          <Alert>
-            <FileText className="h-4 w-4" />
-            <AlertTitle>Using document from system</AlertTitle>
-            <AlertDescription>
-              Document ID: {documentId}
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {summarizeMutation.isPending && (
-          <div className="flex flex-col items-center justify-center py-4">
-            <Spinner size="lg" className="mb-2" />
-            <p className="text-sm text-muted-foreground">Generating summary...</p>
-          </div>
-        )}
-        
-        {summarizeMutation.isError && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              Failed to generate summary. Please try again.
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {result && (
-          <div className="border rounded-md p-4 bg-background">
-            {renderSummaryResult()}
-          </div>
-        )}
-      </CardContent>
-      <CardFooter>
-        <Button 
-          onClick={handleSummarize} 
-          disabled={summarizeMutation.isPending || (!text && !file && !documentId)}
-          className="w-full"
-        >
-          Generate Summary
-        </Button>
+          )}
+        </TabsContent>
+      </Tabs>
+      
+      <CardFooter className="text-sm text-muted-foreground">
+        Results are generated using AI document analysis
       </CardFooter>
     </Card>
   );

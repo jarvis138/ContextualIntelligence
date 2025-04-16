@@ -18,6 +18,7 @@ const apiLogger = logger.createChildLogger({ component: 'APIRouter' });
 // Register routes
 apiRouter.use('/feature-flags', featureFlagsRouter);
 apiRouter.use('/connectors', connectorApiRouter);
+apiRouter.use('/ai', aiApiRouter);
 
 // Add version information endpoint
 apiRouter.get('/version', (req, res) => {

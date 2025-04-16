@@ -1,148 +1,171 @@
 /**
- * AI API Routes
+ * AI API Router
  * 
- * This file contains API routes for AI-powered features in the CPI Hub.
- * Phase 3 implementation for AI Intelligence.
+ * Handles AI-related API endpoints for the CPI Hub.
+ * These routes are used by the Phase 3 AI Intelligence features.
  */
 
-import { Router, Request, Response } from 'express';
-import { openaiService, Entity, Relation, DocumentAnalysis, ProjectInsight } from '../services/openai';
+import { Router } from 'express';
+import { z } from 'zod';
+import * as openaiService from '../services/openai';
 import { authenticateToken } from '../auth';
 import { logger } from '../services/observability';
-import { metrics } from '../services/observability/metrics-util';
 
 const router = Router();
+const aiLogger = logger.createChildLogger({ component: 'AIApiRouter' });
 
-/**
- * Extract entities from text
- * POST /api/ai/entities
- */
-router.post('/entities', authenticateToken, async (req: Request, res: Response) => {
+// Entity extraction endpoint
+router.post('/entities', authenticateToken, async (req, res) => {
   try {
-    const { text } = req.body;
+    const schema = z.object({
+      text: z.string().min(1, 'Text is required')
+    });
     
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text is required' });
-    }
+    const { text } = schema.parse(req.body);
     
     const entities = await openaiService.extractEntities(text);
     
-    metrics.increment('feature_usage_total', { feature: 'entity_extraction' });
-    return res.json({ entities });
-  } catch (error) {
-    logger.error('Error extracting entities', { error });
-    return res.status(500).json({ error: 'Failed to extract entities' });
+    aiLogger.info('Entity extraction performed', {
+      userId: req.user?.id,
+      entityCount: entities.length
+    });
+    
+    res.json({ entities });
+  } catch (error: any) {
+    aiLogger.error('Entity extraction failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to extract entities' });
   }
 });
 
-/**
- * Extract relationships between entities
- * POST /api/ai/relations
- */
-router.post('/relations', authenticateToken, async (req: Request, res: Response) => {
+// Relation extraction endpoint
+router.post('/relations', authenticateToken, async (req, res) => {
   try {
-    const { text, entities } = req.body;
+    const schema = z.object({
+      text: z.string().min(1, 'Text is required'),
+      entities: z.array(
+        z.object({
+          name: z.string(),
+          type: z.string(),
+          confidence: z.number()
+        })
+      ).optional()
+    });
     
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text is required' });
-    }
+    const { text, entities } = schema.parse(req.body);
     
     const relations = await openaiService.extractRelations(text, entities);
     
-    metrics.increment('feature_usage_total', { feature: 'relation_extraction' });
-    return res.json({ relations });
-  } catch (error) {
-    logger.error('Error extracting relations', { error });
-    return res.status(500).json({ error: 'Failed to extract relations' });
+    aiLogger.info('Relation extraction performed', {
+      userId: req.user?.id,
+      relationCount: relations.length
+    });
+    
+    res.json({ relations });
+  } catch (error: any) {
+    aiLogger.error('Relation extraction failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to extract relations' });
   }
 });
 
-/**
- * Analyze document
- * POST /api/ai/document-analysis
- */
-router.post('/document-analysis', authenticateToken, async (req: Request, res: Response) => {
+// Document analysis endpoint
+router.post('/document-analysis', authenticateToken, async (req, res) => {
   try {
-    const { text } = req.body;
+    const schema = z.object({
+      text: z.string().min(1, 'Document text is required')
+    });
     
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text is required' });
-    }
+    const { text } = schema.parse(req.body);
     
     const analysis = await openaiService.analyzeDocument(text);
     
-    metrics.increment('feature_usage_total', { feature: 'document_analysis' });
-    return res.json({ analysis });
-  } catch (error) {
-    logger.error('Error analyzing document', { error });
-    return res.status(500).json({ error: 'Failed to analyze document' });
+    aiLogger.info('Document analysis performed', {
+      userId: req.user?.id,
+      textLength: text.length,
+      topics: analysis.topics
+    });
+    
+    res.json({ analysis });
+  } catch (error: any) {
+    aiLogger.error('Document analysis failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to analyze document' });
   }
 });
 
-/**
- * Generate project insights
- * POST /api/ai/project-insights
- */
-router.post('/project-insights', authenticateToken, async (req: Request, res: Response) => {
+// Project insights endpoint
+router.post('/project-insights', authenticateToken, async (req, res) => {
   try {
-    const context = req.body;
+    const schema = z.object({
+      projectDescription: z.string().optional(),
+      recentDocuments: z.array(z.string()).optional(),
+      teamMembers: z.array(z.string()).optional(),
+      recentActivities: z.array(z.string()).optional(),
+      currentIssues: z.array(z.string()).optional()
+    });
     
-    if (!context || typeof context !== 'object') {
-      return res.status(400).json({ error: 'Context object is required' });
-    }
+    const context = schema.parse(req.body);
     
     const insights = await openaiService.generateProjectInsights(context);
     
-    metrics.increment('feature_usage_total', { feature: 'project_insights' });
-    return res.json({ insights });
-  } catch (error) {
-    logger.error('Error generating project insights', { error });
-    return res.status(500).json({ error: 'Failed to generate project insights' });
+    aiLogger.info('Project insights generated', {
+      userId: req.user?.id,
+      insightCount: insights.length
+    });
+    
+    res.json({ insights });
+  } catch (error: any) {
+    aiLogger.error('Project insights generation failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to generate project insights' });
   }
 });
 
-/**
- * Analyze sentiment
- * POST /api/ai/sentiment
- */
-router.post('/sentiment', authenticateToken, async (req: Request, res: Response) => {
+// Sentiment analysis endpoint
+router.post('/sentiment', authenticateToken, async (req, res) => {
   try {
-    const { text } = req.body;
+    const schema = z.object({
+      text: z.string().min(1, 'Text is required')
+    });
     
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text is required' });
-    }
+    const { text } = schema.parse(req.body);
     
     const sentiment = await openaiService.analyzeSentiment(text);
     
-    metrics.increment('feature_usage_total', { feature: 'sentiment_analysis' });
-    return res.json({ sentiment });
-  } catch (error) {
-    logger.error('Error analyzing sentiment', { error });
-    return res.status(500).json({ error: 'Failed to analyze sentiment' });
+    aiLogger.info('Sentiment analysis performed', {
+      userId: req.user?.id,
+      sentiment: sentiment.sentiment
+    });
+    
+    res.json({ sentiment });
+  } catch (error: any) {
+    aiLogger.error('Sentiment analysis failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to analyze sentiment' });
   }
 });
 
-/**
- * Summarize text
- * POST /api/ai/summarize
- */
-router.post('/summarize', authenticateToken, async (req: Request, res: Response) => {
+// Text summarization endpoint
+router.post('/summarize', authenticateToken, async (req, res) => {
   try {
-    const { text, maxLength } = req.body;
+    const schema = z.object({
+      text: z.string().min(1, 'Text is required'),
+      maxLength: z.number().optional()
+    });
     
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text is required' });
-    }
+    const { text, maxLength } = schema.parse(req.body);
     
     const summary = await openaiService.summarizeText(text, maxLength);
     
-    metrics.increment('feature_usage_total', { feature: 'text_summarization' });
-    return res.json({ summary });
-  } catch (error) {
-    logger.error('Error summarizing text', { error });
-    return res.status(500).json({ error: 'Failed to summarize text' });
+    aiLogger.info('Text summarization performed', {
+      userId: req.user?.id,
+      textLength: text.length,
+      summaryLength: summary.length
+    });
+    
+    res.json({ summary });
+  } catch (error: any) {
+    aiLogger.error('Text summarization failed', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to summarize text' });
   }
 });
+
+aiLogger.info('AI API routes initialized');
 
 export default router;
