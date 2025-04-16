@@ -1809,6 +1809,279 @@ export class DatabaseStorage implements IStorage {
     const [relationship] = await db.insert(relationships).values(insertRelationship).returning();
     return relationship;
   }
+
+  // Graph Nodes
+  async getGraphNode(id: number): Promise<GraphNode | undefined> {
+    const [node] = await db.select().from(graphNodes).where(eq(graphNodes.id, id));
+    return node;
+  }
+
+  async getGraphNodeByExternalId(externalId: string): Promise<GraphNode | undefined> {
+    const [node] = await db.select().from(graphNodes).where(eq(graphNodes.externalId, externalId));
+    return node;
+  }
+
+  async getGraphNodes(type?: string, limit?: number, offset?: number): Promise<GraphNode[]> {
+    let query = db.select().from(graphNodes);
+    
+    if (type) {
+      query = query.where(eq(graphNodes.type, type));
+    }
+    
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+    
+    if (offset !== undefined) {
+      query = query.offset(offset);
+    }
+    
+    return await query;
+  }
+
+  async createGraphNode(node: InsertGraphNode): Promise<GraphNode> {
+    const [graphNode] = await db.insert(graphNodes).values(node).returning();
+    return graphNode;
+  }
+
+  async updateGraphNode(id: number, updates: Partial<InsertGraphNode>): Promise<GraphNode | undefined> {
+    const [updatedNode] = await db.update(graphNodes)
+      .set(updates)
+      .where(eq(graphNodes.id, id))
+      .returning();
+    
+    return updatedNode;
+  }
+
+  async deleteGraphNode(id: number): Promise<boolean> {
+    // Delete all associated edges first
+    await db.delete(graphEdges)
+      .where(
+        or(
+          eq(graphEdges.sourceId, id),
+          eq(graphEdges.targetId, id)
+        )
+      );
+    
+    const result = await db.delete(graphNodes)
+      .where(eq(graphNodes.id, id));
+    
+    return result.count > 0;
+  }
+
+  // Graph Edges
+  async getGraphEdge(id: number): Promise<GraphEdge | undefined> {
+    const [edge] = await db.select().from(graphEdges).where(eq(graphEdges.id, id));
+    return edge;
+  }
+
+  async getGraphEdges(sourceId?: number, targetId?: number, type?: string): Promise<GraphEdge[]> {
+    let query = db.select().from(graphEdges);
+    
+    if (sourceId !== undefined) {
+      query = query.where(eq(graphEdges.sourceId, sourceId));
+    }
+    
+    if (targetId !== undefined) {
+      query = query.where(eq(graphEdges.targetId, targetId));
+    }
+    
+    if (type !== undefined) {
+      query = query.where(eq(graphEdges.type, type));
+    }
+    
+    return await query;
+  }
+
+  async getGraphEdgesBetween(sourceId: number, targetId: number): Promise<GraphEdge[]> {
+    return await db.select()
+      .from(graphEdges)
+      .where(
+        or(
+          and(
+            eq(graphEdges.sourceId, sourceId),
+            eq(graphEdges.targetId, targetId)
+          ),
+          and(
+            eq(graphEdges.sourceId, targetId),
+            eq(graphEdges.targetId, sourceId)
+          )
+        )
+      );
+  }
+
+  async getGraphEdgesByNode(nodeId: number, direction: 'incoming' | 'outgoing' | 'both' = 'both'): Promise<GraphEdge[]> {
+    if (direction === 'incoming') {
+      return await db.select()
+        .from(graphEdges)
+        .where(eq(graphEdges.targetId, nodeId));
+    } else if (direction === 'outgoing') {
+      return await db.select()
+        .from(graphEdges)
+        .where(eq(graphEdges.sourceId, nodeId));
+    } else {
+      return await db.select()
+        .from(graphEdges)
+        .where(
+          or(
+            eq(graphEdges.sourceId, nodeId),
+            eq(graphEdges.targetId, nodeId)
+          )
+        );
+    }
+  }
+
+  async createGraphEdge(edge: InsertGraphEdge): Promise<GraphEdge> {
+    const [graphEdge] = await db.insert(graphEdges).values(edge).returning();
+    return graphEdge;
+  }
+
+  async updateGraphEdge(id: number, updates: Partial<InsertGraphEdge>): Promise<GraphEdge | undefined> {
+    const [updatedEdge] = await db.update(graphEdges)
+      .set(updates)
+      .where(eq(graphEdges.id, id))
+      .returning();
+    
+    return updatedEdge;
+  }
+
+  async deleteGraphEdge(id: number): Promise<boolean> {
+    const result = await db.delete(graphEdges)
+      .where(eq(graphEdges.id, id));
+    
+    return result.count > 0;
+  }
+
+  // Graph Analysis
+  async getNodeConnections(nodeId: number, depth: number = 1, types?: string[]): Promise<{nodes: GraphNode[], edges: GraphEdge[]}> {
+    // This is a complex query that's better implemented in application code
+    // rather than as a single SQL query, especially with variable depth
+    
+    const result: { nodes: GraphNode[], edges: GraphEdge[] } = {
+      nodes: [],
+      edges: []
+    };
+    
+    const processedNodeIds = new Set<number>();
+    const queue: { id: number, currentDepth: number }[] = [{ id: nodeId, currentDepth: 0 }];
+    
+    while (queue.length > 0) {
+      const { id, currentDepth } = queue.shift()!;
+      
+      if (processedNodeIds.has(id)) continue;
+      processedNodeIds.add(id);
+      
+      const node = await this.getGraphNode(id);
+      if (!node) continue;
+      
+      result.nodes.push(node);
+      
+      if (currentDepth >= depth) continue;
+      
+      const edges = await this.getGraphEdgesByNode(id);
+      
+      for (const edge of edges) {
+        if (types && !types.includes(edge.type)) continue;
+        
+        result.edges.push(edge);
+        
+        const nextNodeId = edge.sourceId === id ? edge.targetId : edge.sourceId;
+        if (!processedNodeIds.has(nextNodeId)) {
+          queue.push({ id: nextNodeId, currentDepth: currentDepth + 1 });
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  async findRelatedNodes(nodeId: number, minWeight: number = 0.5, maxConnections: number = 10): Promise<GraphNode[]> {
+    const edges = await this.getGraphEdgesByNode(nodeId);
+    
+    // Filter and sort edges by weight
+    const sortedEdges = edges
+      .filter(edge => edge.weight >= minWeight)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, maxConnections);
+    
+    // Get related nodes
+    const relatedNodes: GraphNode[] = [];
+    
+    for (const edge of sortedEdges) {
+      const relatedNodeId = edge.sourceId === nodeId ? edge.targetId : edge.sourceId;
+      const relatedNode = await this.getGraphNode(relatedNodeId);
+      
+      if (relatedNode) {
+        relatedNodes.push(relatedNode);
+      }
+    }
+    
+    return relatedNodes;
+  }
+
+  async getGraphForVisualization(centralNodeId?: number, depth: number = 2, limit: number = 100): Promise<{nodes: any[], links: any[]}> {
+    let nodes: any[] = [];
+    let links: any[] = [];
+    
+    if (centralNodeId) {
+      // Get connections around a central node
+      const { nodes: connectedNodes, edges } = await this.getNodeConnections(centralNodeId, depth);
+      
+      // Format nodes for visualization
+      nodes = connectedNodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        group: node.type, // For coloring by type
+        properties: node.properties || {}
+      }));
+      
+      // Format edges for visualization
+      links = edges.map(edge => ({
+        source: edge.sourceId,
+        target: edge.targetId,
+        label: edge.type,
+        value: edge.weight, // For edge thickness
+        properties: edge.properties || {}
+      }));
+    } else {
+      // Get all nodes and edges (with limit)
+      const allNodes = await this.getGraphNodes(undefined, limit);
+      
+      // Format nodes for visualization
+      nodes = allNodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        group: node.type,
+        properties: node.properties || {}
+      }));
+      
+      // Get edges between these nodes
+      const nodeIds = allNodes.map(node => node.id);
+      
+      // This query would be more efficient in SQL, but for simplicity:
+      const allEdges = await db.select()
+        .from(graphEdges)
+        .where(
+          and(
+            inArray(graphEdges.sourceId, nodeIds),
+            inArray(graphEdges.targetId, nodeIds)
+          )
+        );
+      
+      // Format edges for visualization
+      links = allEdges.map(edge => ({
+        source: edge.sourceId,
+        target: edge.targetId,
+        label: edge.type,
+        value: edge.weight,
+        properties: edge.properties || {}
+      }));
+    }
+    
+    return { nodes, links };
+  }
   
   // Graph Nodes
   async getGraphNode(id: number): Promise<GraphNode | undefined> {
