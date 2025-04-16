@@ -20,7 +20,8 @@ import {
   Send,
   Paperclip,
   ChevronRight,
-  Link as LinkIcon
+  Link as LinkIcon,
+  FilterX
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {

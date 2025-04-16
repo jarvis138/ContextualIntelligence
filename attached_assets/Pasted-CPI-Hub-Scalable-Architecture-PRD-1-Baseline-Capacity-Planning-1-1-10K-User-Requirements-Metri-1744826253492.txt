@@ -1,0 +1,248 @@
+CPI Hub - Scalable Architecture PRD
+1. Baseline Capacity Planning
+1.1 10K User Requirements
+Metric	Target Value	Scaling Threshold
+Concurrent Users	10,000	50% CPU usage
+API Requests/sec	2,000	100ms latency
+Data Sync Operations	500/sec	5-second backlog
+AI Queries	300/sec	1-second response
+2. Multi-Repl Scalable Architecture
+mermaid
+Copy
+graph TD
+    A[Users] --> B[Replit Load Balancer]
+    B --> C[Auth Cluster]
+    B --> D[API Cluster]
+    B --> E[AI Cluster]
+    C --> F[(Auth DB)]
+    D --> G[(Main DB)]
+    E --> H[(Vector DB)]
+    
+    D --> I[Worker Pool]
+    I --> J[Platform Integrations]
+    
+    G --> K[Elasticsearch]
+    H --> L[Redis Cache]
+2.1 Component Scaling Strategy
+Component	Initial Repls	Scaling Trigger	Max Repls
+API Frontend	3	CPU >60% for 5min	15
+AI Processors	2	Queue >100 pending requests	10
+Data Sync Workers	4	Sync lag >30 seconds	20
+Redis Cache	1	Cache hit rate <85%	3
+3. Critical Performance Optimizations
+3.1 Data Layer
+Database Sharding:
+
+python
+Copy
+# User data sharding by ID range
+def get_user_shard(user_id):
+    return f"postgres-{int(user_id) % 10}"  # 10 shards
+
+# Cross-shard query pattern
+async def get_user_data(user_ids):
+    shards = {get_user_shard(id) for id in user_ids}
+    return await asyncio.gather(
+        *[db_shard[shard].query(ids) for shard in shards]
+    )
+Indexing Strategy:
+
+sql
+Copy
+-- Optimized for cross-platform search
+CREATE INDEX idx_unified_search ON documents 
+USING gin(
+    (title || ' ' || content) gin_trgm_ops,
+    jsonb_path_ops(metadata)
+);
+3.2 AI Service Load Balancing
+javascript
+Copy
+// Dynamic AI workload distribution
+class AIBalancer {
+  constructor() {
+    this.repls = [
+      'ai-engine-1.repl.co',
+      'ai-engine-2.repl.co'
+    ];
+  }
+
+  async process(prompt) {
+    const repl = this.selectLowestLoadRepl();
+    const response = await fetch(`https://${repl}/process`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt })
+    });
+    return response.json();
+  }
+}
+4. Horizontal Scaling Implementation
+4.1 Auto-Scaling Controller
+python
+Copy
+# Scaling manager in control Repl
+async def monitor_and_scale():
+    while True:
+        metrics = get_cluster_metrics()
+        
+        # Scale API Repls
+        api_load = metrics['api_cpu'] / metrics['api_repls']
+        if api_load > 0.6:
+            add_repl('api', count=1)
+        elif api_load < 0.3:
+            remove_repl('api', count=1)
+            
+        await asyncio.sleep(60)
+4.2 Stateless Service Design
+javascript
+Copy
+// API service with shared-nothing architecture
+app.use('/api', async (req, res) => {
+  // All state in external stores
+  const user = await redis.get(`user:${req.userId}`);
+  const data = await postgres.query(
+    `SELECT * FROM data WHERE org = $1`, 
+    [user.orgId]
+  );
+  
+  res.json({ data });
+});
+5. Data Pipeline at Scale
+5.1 Event-Driven Architecture
+mermaid
+Copy
+sequenceDiagram
+    User->>+API: Action
+    API->>+Kafka: Event
+    Kafka->>Worker1: Task
+    Kafka->>Worker2: Task
+    Worker1->>DB: Update
+    Worker2->>Search: Index
+Implementation:
+
+python
+Copy
+# In Replit with Kafka proxy
+from confluent_kafka import Producer
+
+producer = Producer({
+    'bootstrap.servers': 'kafka-proxy.repl.co'
+})
+
+def log_user_action(user_id, action):
+    producer.produce(
+        'user-actions',
+        key=user_id,
+        value=json.dumps(action)
+    )
+6. Caching Strategy
+6.1 Multi-Layer Cache
+Layer	Technology	Hit Rate Target	Invalidation Strategy
+Browser	Service Worker	40%	Versioned asset URLs
+Edge	Cloudflare	30%	5-minute TTL
+Application	Redis	25%	Write-through
+Database	Materialized Views	5%	Refresh on change
+Redis Implementation:
+
+javascript
+Copy
+// Cache-aside pattern
+async function getDocument(id) {
+  const cached = await redis.get(`doc:${id}`);
+  if (cached) return JSON.parse(cached);
+  
+  const doc = await db.documents.findByPk(id);
+  await redis.setEx(
+    `doc:${id}`, 
+    3600, // 1 hour TTL
+    JSON.stringify(doc)
+  );
+  return doc;
+}
+7. Failover & Reliability
+7.1 Circuit Breakers
+javascript
+Copy
+// Platform integration with fallback
+class JiraClient {
+  constructor() {
+    this.circuit = new CircuitBreaker({
+      timeout: 3000,
+      threshold: 0.2,
+      fallback: this.cachedIssues.bind(this)
+    });
+  }
+
+  async getIssues() {
+    return this.circuit.fire(() => 
+      jiraApi.searchIssues()
+    );
+  }
+}
+7.2 Data Sync Recovery
+python
+Copy
+# Checkpoint-based sync
+def sync_platform_data(platform):
+    last_checkpoint = redis.get(f"sync:{platform}")
+    new_data = platform_api.fetch(since=last_checkpoint)
+    
+    try:
+        process_data(new_data)
+        redis.set(f"sync:{platform}", datetime.now())
+    except Exception:
+        trigger_manual_review(platform, new_data)
+8. Monitoring & Scaling Triggers
+8.1 Key Metrics Dashboard
+Metric	Alert Threshold	Scaling Action
+API Latency p95	>500ms for 5min	+2 API Repls
+AI Queue Depth	>100 items	+1 AI Repl
+DB Connections	>90% of max	Add read replica
+Cache Miss Rate	>40%	Increase cache size
+8.2 Replit-Specific Scaling
+yaml
+Copy
+# .replit scaling config
+autoScale:
+  enabled: true
+  rules:
+    - metric: cpu
+      threshold: 60%
+      duration: 300s
+      action: add_repl
+    - metric: memory
+      threshold: 75%
+      duration: 180s
+      action: add_repl
+9. Progressive Scaling Roadmap
+9.1 Phase 1: 10K Users
+3 API Repls (2vCPU, 4GB each)
+
+1 AI Repl (4vCPU, 8GB)
+
+PostgreSQL (8GB RAM, 100GB storage)
+
+Redis (2GB cache)
+
+9.2 Phase 2: 50K Users
+Add read replicas for PostgreSQL
+
+Deploy dedicated Elasticsearch cluster
+
+Implement regional edge caching
+
+9.3 Phase 3: 100K+ Users
+Migrate to Replit Enterprise
+
+Deploy global load balancing
+
+Sharded Redis clusters
+
+10. Cost-Optimized Scaling Tips
+Spot Repls: Use lower-priority Repls for background workers
+
+Cold Storage: Archive old data to Replit DB with compression
+
+AI Batch Processing: Queue non-real-time AI requests
+
+Cache Warming: Pre-load cache during off-peak hours

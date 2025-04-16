@@ -1,0 +1,259 @@
+Enterprise-Grade Data Isolation PRD
+1. Strict Tenant Separation Strategy
+1.1 Physical Isolation Layers
+Isolation Level	Implementation	Enforcement Mechanism
+Database	Dedicated schema per tenant in PostgreSQL	Row-level security (RLS)
+File Storage	Separate S3/GCS buckets with tenant-specific prefixes	IAM policies
+Search Index	Tenant-specific Elasticsearch indices	Index naming convention
+Cache	Redis database partitioning (DB 0-15)	Connection string injection
+AI Models	Tenant-specific fine-tuning datasets	Model version tagging
+1.2 Tenant Context Propagation
+mermaid
+Copy
+sequenceDiagram
+    User->>+API: Request (with JWT)
+    API->>+Auth: Validate token
+    Auth-->>-API: Tenant ID + Roles
+    API->>DB: SET app.current_tenant = 'tenant123'
+    DB->>API: (All queries filtered by RLS)
+    API->>User: Tenant-specific data
+2. Implementation Details
+2.1 Database Isolation
+PostgreSQL RLS Policies:
+
+sql
+Copy
+-- Enable RLS on all tables
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+
+-- Policy for document access
+CREATE POLICY tenant_isolation_policy ON documents
+    USING (tenant_id = current_setting('app.current_tenant'));
+
+-- Even admins see only their tenant's data
+CREATE POLICY admin_tenant_restriction ON users
+    WITH CHECK (tenant_id = current_setting('app.current_tenant'));
+Connection Pooling:
+
+javascript
+Copy
+// Tenant-aware connection wrapper
+class TenantDB {
+  constructor(tenantId) {
+    this.pool = new Pool({
+      connectionString: config.db.url,
+      beforeConnect: (client) => {
+        client.query(`SET app.current_tenant = '${tenantId}'`);
+      }
+    });
+  }
+  
+  async query(sql, params) {
+    return this.pool.query(sql, params);
+  }
+}
+2.2 File Storage Isolation
+S3 Structure:
+
+Copy
+s3://cpi-hub-prod/
+   ├── tenant-123/
+   │   ├── documents/
+   │   └── attachments/
+   └── tenant-456/
+       ├── documents/
+       └── attachments/
+Pre-signed URL Generation:
+
+python
+Copy
+def generate_presigned_url(tenant_id, file_key):
+    s3 = boto3.client('s3')
+    return s3.generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': 'cpi-hub-prod',
+            'Key': f'{tenant_id}/{file_key}'
+        },
+        ExpiresIn=3600
+    )
+2.3 Search Index Isolation
+Elasticsearch Index Template:
+
+json
+Copy
+PUT _template/tenant_indices
+{
+  "index_patterns": ["tenant_*"],
+  "settings": {
+    "number_of_shards": 2,
+    "routing.allocation.require.tenant_id": "${_index.tenant_id}"
+  },
+  "aliases": {
+    "tenant_search": {}
+  }
+}
+Search Query Filter:
+
+python
+Copy
+def search_documents(tenant_id, query):
+    es = Elasticsearch()
+    return es.search(
+        index=f"tenant_{tenant_id}",
+        body={
+            "query": {
+                "bool": {
+                    "must": [{"query_string": {"query": query}}],
+                    "filter": [{"term": {"visible": True}}]
+                }
+            }
+        }
+    )
+3. Cross-Tenant Security Controls
+3.1 Hardened Authentication Flow
+mermaid
+Copy
+graph TD
+    A[User Login] --> B{Valid Credentials?}
+    B -->|Yes| C[Get Tenant ID]
+    C --> D[Generate Tenant-Scoped JWT]
+    D --> E[Set Cookie: tenant=123]
+    E --> F[All subsequent requests include tenant context]
+3.2 API Request Validation Middleware
+javascript
+Copy
+app.use((req, res, next) => {
+  const tenantId = req.user?.tenant_id || req.cookies.tenant;
+  
+  if (!tenantId) {
+    return res.status(403).json({ error: "Tenant not identified" });
+  }
+
+  // Verify tenant access to requested resource
+  if (req.params.tenantId && req.params.tenantId !== tenantId) {
+    return res.status(403).json({ error: "Cross-tenant access denied" });
+  }
+
+  req.tenant = { id: tenantId };
+  next();
+});
+4. Tenant-Specific AI Processing
+4.1 Isolated Model Training
+python
+Copy
+class TenantAIModel:
+    def __init__(self, tenant_id):
+        self.model = load_base_model()
+        self.fine_tune(tenant_id)
+    
+    def fine_tune(self, tenant_id):
+        data = TenantDataLoader(tenant_id).load()
+        self.model.train(data)
+        
+    def predict(self, input):
+        return self.model.predict(input)
+4.2 Data Residency Compliance
+yaml
+Copy
+# tenant_config.yaml
+tenant-123:
+  data_residency: eu-west-1
+  compliance:
+    gdpr: true
+    hipaa: false
+  storage:
+    db: eu-cluster
+    files: eu-bucket
+
+tenant-456:
+  data_residency: us-east-1
+  compliance:
+    gdpr: false
+    hipaa: true
+5. Audit & Compliance
+5.1 Tenant Activity Logging
+sql
+Copy
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY,
+    tenant_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id VARCHAR(36),
+    ip_address INET,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (tenant_id = current_setting('app.current_tenant'))
+);
+5.2 Data Export/Deletion Workflow
+python
+Copy
+def handle_gdpr_request(tenant_id, request_type):
+    if request_type == "export":
+        data = export_tenant_data(tenant_id)
+        encrypt_and_send(data)
+    elif request_type == "delete":
+        anonymize_tenant_data(tenant_id)
+        schedule_storage_cleanup(tenant_id)
+6. Performance Optimization
+6.1 Tenant-Specific Caching
+javascript
+Copy
+class TenantCache {
+  constructor(tenantId) {
+    this.redis = new Redis({
+      db: parseInt(tenantId.slice(-2)) % 16 // Distribute across 16 DBs
+    });
+  }
+
+  async get(key) {
+    return this.redis.get(`tenant:${key}`);
+  }
+}
+6.2 Connection Pool Partitioning
+go
+Copy
+var tenantPools = sync.Map{}
+
+func GetDB(tenantID string) *sql.DB {
+    pool, _ := tenantPools.LoadOrStore(tenantID, func() *sql.DB {
+        db := sql.Open(...)
+        db.Exec("SET app.current_tenant = ?", tenantID)
+        return db
+    }())
+    return pool.(*sql.DB)
+}
+7. Implementation Roadmap
+Phase 1 (Weeks 1-2)
+
+Tenant-aware authentication system
+
+RLS-enabled database schema
+
+Isolated file storage buckets
+
+Phase 2 (Weeks 3-4)
+
+Tenant-specific search indices
+
+Cross-tenant request validation
+
+Audit logging framework
+
+Phase 3 (Weeks 5-6)
+
+Data residency compliance
+
+Tenant AI model isolation
+
+GDPR workflows
+
+Key Guarantees
+Zero Data Bleed: Impossible to query across tenants
+
+Performance Isolation: No noisy neighbor issues
+
+Compliance Ready: Meets GDPR/HIPAA requirements
+
+Scalable Architecture: Grows with tenant count

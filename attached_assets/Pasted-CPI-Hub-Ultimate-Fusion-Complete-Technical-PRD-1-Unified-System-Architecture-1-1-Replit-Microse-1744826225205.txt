@@ -1,0 +1,318 @@
+CPI Hub Ultimate Fusion - Complete Technical PRD
+1. Unified System Architecture
+1.1 Replit Microservices Matrix
+Service Component	Replit Type	Key Technologies	Connected Platforms
+Auth Hub	Node.js Repl	OAuth 2.0, JWT, Firebase Auth	Google/MS/SSO providers
+Data Aggregator	Python Repl	BeautifulSoup, API clients	Jira, GitHub, Harvest, Figma
+AI Engine	Python+Node Repl	spaCy, TensorFlow.js, Replit AI	All integrated platforms
+Real-Time Sync	Node.js Repl	WebSockets, Server-Sent Events	Teams, Slack, Zoom
+Search Indexer	Go Repl	Elasticsearch, Bleve	Unified content from all sources
+Workflow Automator	Node.js Repl	Zapier-like rules engine	Jira↔GitHub, Calendar↔Harvest
+1.2 Cross-Platform Data Flow
+mermaid
+Copy
+graph TD
+    A[External Tools] --> B{API Gateway Repl}
+    B --> C[Data Normalizer]
+    C --> D[(Unified Graph DB)]
+    D --> E[AI Context Builder]
+    E --> F[Action Dispatcher]
+    F --> G[Destination Platforms]
+2. AI Project Manager Deep Dive
+2.1 Context-Aware Architecture
+python
+Copy
+# In AI Engine Repl
+class ProjectAssistant:
+    def __init__(self):
+        self.llm = Replit.get_ghostwriter()
+        self.context_graph = Neo4jReplContainer()
+    
+    async def respond(self, user_query):
+        # Build 360° context
+        context = {
+            'active_tools': self.get_active_windows(user_id),
+            'recent_comms': self.fetch_last_hour_comms(user_id),
+            'task_state': self.get_jira_github_state(user_id),
+            'calendar': self.get_merged_calendar(user_id)
+        }
+        
+        # Generate response
+        prompt = f"""Based on: {context}\nAnswer: {user_query}"""
+        return await self.llm.generate(prompt, temperature=0.3)
+2.2 Blocker Detection System
+javascript
+Copy
+// In Node.js Repl
+class BlockerDetector {
+  static async detect(userId) {
+    const signals = await Promise.all([
+      this._analyzeJiraIssues(userId),
+      this._parseSlackSentiment(userId),
+      this._checkCalendarConflicts(userId)
+    ]);
+
+    return {
+      technical_blockers: signals[0].filter(x => x.severity > 3),
+      communication_risks: signals[1].filter(x => x.score < -0.5),
+      scheduling_conflicts: signals[2].filter(x => x.overlap_count > 2)
+    };
+  }
+}
+3. Comprehensive Integration Guide
+3.1 Platform-Specific Adapters
+Jira Connector
+python
+Copy
+# In Python Repl
+class JiraSync:
+    @retry(wait=expo(min=1, max=60))
+    async def sync_issues(self):
+        issues = self.api.search_issues(
+            f'project = {project_key} AND updated >= "{last_sync}"'
+        )
+        await self._normalize_to_graph(issues)
+
+    def _normalize_to_graph(self, issues):
+        # Convert to unified data model
+        for issue in issues:
+            self.graph_db.merge_node(
+                f"jira:{issue.key}",
+                labels=["Task"],
+                properties={
+                    "type": issue.fields.issuetype.name,
+                    "status": issue.fields.status.name,
+                    "priority": issue.fields.priority.name
+                }
+            )
+Figma Design Tracker
+javascript
+Copy
+// In Node.js Repl
+app.post('/figma/webhook', async (req, res) => {
+  const { event_type, file_key } = req.body;
+  
+  if (event_type === 'FILE_UPDATE') {
+    const versions = await figmaApi.getFileVersions(file_key);
+    const diff = await designDiff.compare(versions[0], versions[1]);
+    
+    // Trigger actions
+    await jira.createTicketFromDesignChange(diff);
+    await slack.notifyTeam('design-update', diff);
+  }
+});
+4. Unified Search & Knowledge Graph
+4.1 Cross-Platform Query Engine
+python
+Copy
+# In Python Repl
+def unified_search(query, user_id):
+    # Search across all sources with ACLs
+    results = []
+    
+    sources = [
+        ('jira', JiraSearch(query)),
+        ('github', GitHubSearch(query)),
+        ('drive', GoogleDriveSearch(query)),
+        ('slack', SlackSearch(query))
+    ]
+    
+    for source_name, searcher in sources:
+        if user_has_access(user_id, source_name):
+            results.extend(searcher.execute())
+    
+    # Rerank with AI
+    return self.llm.rerank(
+        query=query,
+        items=results,
+        context=get_user_context(user_id)
+    )
+4.2 Real-Time Knowledge Graph
+mermaid
+Copy
+classDiagram
+    class Document{
+        +String id
+        +String source
+        +String content
+        +List~Entity~ entities
+    }
+    
+    class Entity{
+        +String type
+        +String value
+        +List~Document~ appears_in
+    }
+    
+    class Project{
+        +String name
+        +List~Document~ documents
+        +List~Person~ members
+    }
+    
+    Document "1" -- "*" Entity
+    Project "1" -- "*" Document
+5. Automated Workflow Engine
+5.1 Rule Configuration Schema
+yaml
+Copy
+# Sample workflow in Replit DB
+- name: "PR Merged → Jira Transition"
+  trigger:
+    platform: "github"
+    event_type: "pull_request.closed"
+    conditions:
+      - "merged == true"
+  actions:
+    - platform: "jira"
+      action: "transition_issue"
+      params:
+        issue_key: "{{event.pull_request.description | extract_jira_key}}"
+        transition_id: "31"
+    - platform: "slack"
+      action: "send_message"
+      channel: "team-updates"
+      text: "PR #{{event.number}} merged by {{event.sender.login}}"
+5.2 Workflow Execution
+javascript
+Copy
+// In Node.js Repl
+class WorkflowEngine {
+  async execute(triggerEvent) {
+    const matchingRules = await this.findMatchingRules(triggerEvent);
+    
+    for (const rule of matchingRules) {
+      try {
+        await this.executeActions(rule.actions, triggerEvent);
+      } catch (error) {
+        this.logFailedExecution(rule, error);
+        
+        // Fallback to human review
+        await this.createFallbackTask(rule, triggerEvent, error);
+      }
+    }
+  }
+}
+6. Deployment & Monitoring
+6.1 Replit Cluster Configuration
+yaml
+Copy
+# repls.yaml
+services:
+  auth:
+    language: nodejs
+    ports: [8080]
+    always_on: true
+    
+  ai_engine:
+    language: python
+    nix_packages: [spacy, nltk]
+    env:
+      TF_CPP_MIN_LOG_LEVEL: "2"
+
+monitoring:
+  uptime_checks:
+    - url: https://auth.repl.co/health
+      timeout: 5s
+  alerts:
+    slack_channel: "#infra-alerts"
+6.2 Performance Optimization
+python
+Copy
+# In Python Repl
+@lru_cache(maxsize=1024)
+def get_user_context(user_id):
+    """Cache user context for 5 minutes"""
+    return build_full_context(user_id)
+
+@asyncio.coroutine
+async def handle_search(request):
+    # Parallelize platform queries
+    github, jira, slack = await asyncio.gather(
+        search_github(request),
+        search_jira(request),
+        search_slack(request)
+    )
+    return merge_results(github, jira, slack)
+7. Security & Compliance
+7.1 Data Protection Matrix
+Data Type	Encryption	Access Control	Retention Policy
+Authentication	AES-256+GCM	RBAC + ABAC	30 days
+Document Content	Per-field	Document ACLs	Configurable per project
+API Credentials	HSM-backed	Vault with rotation	Until revoked
+Search Indices	TLS 1.3+encrypt	Row-level security	Sync with source
+7.2 Audit Trail Implementation
+javascript
+Copy
+// In Node.js Repl
+class AuditLogger {
+  static log(action, metadata) {
+    const record = {
+      timestamp: new Date().toISOString(),
+      user: currentUser(),
+      action,
+      metadata,
+      signature: this._createSignature()
+    };
+    
+    // Append to immutable log
+    replit.db['audit_log'].push(record);
+    
+    // Real-time alerting
+    if (action.severity > 7) {
+      slack.sendSecurityAlert(record);
+    }
+  }
+}
+8. Development Roadmap
+8.1 Phase Implementation
+Core Foundation (Week 1-2)
+
+Authentication Hub Repl
+
+Data Model Standardization
+
+Replit Cluster Networking
+
+Essential Integrations (Week 3-4)
+
+Jira + GitHub Sync
+
+Unified Calendar
+
+Basic AI Context Builder
+
+Advanced Features (Week 5-6)
+
+NLP Pipeline Repl
+
+Real-Time Collaboration
+
+Workflow Automator
+
+Optimization (Week 7+)
+
+Performance Tuning
+
+Advanced Caching
+
+Security Hardening
+
+8.2 Sample Replit Configuration
+bash
+Copy
+# AI Engine Repl setup
+replit init --template python-ai
+nix-env -iA spacy nltk
+pip install -r requirements.txt
+This merged PRD provides:
+
+Complete platform integration for all requested services
+
+AI Project Manager with contextual awareness
+
+Replit-optimized architecture with microservices
+
+End-to-end security and compliance controls
+
+Real-time collaboration capabilities
