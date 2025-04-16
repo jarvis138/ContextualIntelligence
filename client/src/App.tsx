@@ -14,6 +14,7 @@ import SettingsPage from "@/pages/settings-page";
 import AdminPage from "@/pages/admin-page";
 import AdminLoginPage from "@/pages/admin-login";
 import SystemPage from "@/pages/system-page";
+import GraphPage from "@/pages/graph-page";
 import PlaceholderPage from "@/pages/placeholder-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
@@ -136,6 +137,7 @@ function App() {
                   <Route path="/insights" component={InsightsPage} />
                   <Route path="/integrations" component={ConnectorsPage} />
                   <Route path="/connectors" component={ConnectorsPage} />
+                  <Route path="/graph" component={GraphPage} />
                   <Route path="/search" component={SearchPage} />
                   <Route path="/settings" component={SettingsPage} />
                   <Route path="/system" component={SystemPage} />
