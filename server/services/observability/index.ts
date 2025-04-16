@@ -13,6 +13,7 @@
 import { logger, requestLoggerMiddleware, getComponentLogger } from './logger';
 import { metricsService, measureExecutionTime } from './metrics';
 import { tracingService, Trace } from './tracing';
+import { initializeMetrics } from './init-metrics';
 import { Express, Request, Response, NextFunction } from 'express';
 
 // Re-export individual components
@@ -23,13 +24,17 @@ export {
   metricsService,
   measureExecutionTime,
   tracingService,
-  Trace
+  Trace,
+  initializeMetrics
 };
 
 /**
  * Setup observability middleware for Express
  */
 export function setupObservability(app: Express): void {
+  // Initialize metrics
+  initializeMetrics();
+  
   // Add request logging middleware
   app.use(requestLoggerMiddleware);
   
