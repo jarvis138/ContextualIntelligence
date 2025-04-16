@@ -1,281 +1,234 @@
 /**
  * Analytics API Router
  * 
- * Router for advanced analytics endpoints that provide data visualization and insights.
- * These endpoints support the Phase 4 analytics dashboard features.
+ * This router handles analytics-related API endpoints
  */
 
 import { Router } from 'express';
-import { logger } from '../services/observability';
-import { authenticateToken } from '../auth';
-import { db } from '../db';
+import { z } from 'zod';
 import { 
-  activities, 
-  teams, 
-  projects, 
-  documents, 
-  users, 
-  systemEvents 
-} from '@shared/schema';
-import { eq, and, sql, gte, desc } from 'drizzle-orm';
+  analyzeTrend,
+  TrendParams,
+  getTopMetrics,
+  predictProjectCompletion,
+  analyzeProjectRisks,
+  predictFutureMetrics,
+  detectAnomalies,
+  detectAccessPatternAnomalies,
+  detectDataQualityAnomalies,
+  generateReport,
+  scheduleReport,
+  cancelScheduledReport,
+  ReportConfig
+} from '../services/analytics';
+import { authenticateToken, authorizeRoles } from '../auth';
+import { logger } from '../services/observability';
 
-export const analyticsApiRouter = Router();
-const analyticsLogger = logger.createChildLogger({ component: 'AnalyticsAPI' });
+const router = Router();
 
-// Apply authentication middleware for all analytics routes
-analyticsApiRouter.use(authenticateToken);
+// Middleware to authenticate all analytics routes
+router.use(authenticateToken);
 
-// Helper function to parse time range
-function parseTimeRange(timeRange: string): Date {
-  const now = new Date();
-  
-  switch(timeRange) {
-    case '7d':
-      return new Date(now.setDate(now.getDate() - 7));
-    case '30d':
-      return new Date(now.setDate(now.getDate() - 30));
-    case '90d':
-      return new Date(now.setDate(now.getDate() - 90));
-    case 'year':
-      return new Date(now.setFullYear(now.getFullYear() - 1));
-    default:
-      return new Date(now.setDate(now.getDate() - 30)); // Default to 30 days
-  }
-}
+// Trend Analysis Endpoint
+const trendParamsSchema = z.object({
+  entityType: z.enum(['project', 'task', 'user', 'document', 'activity']),
+  metricType: z.enum(['count', 'completion_rate', 'activity_rate', 'processing_time']),
+  startDate: z.string().transform(val => new Date(val)),
+  endDate: z.string().transform(val => new Date(val)),
+  interval: z.enum(['day', 'week', 'month']),
+  entityId: z.number().optional(),
+  includeForecasting: z.boolean().optional().default(false)
+});
 
-// Get overall metrics for the dashboard
-analyticsApiRouter.get('/metrics', async (req, res) => {
+router.post('/trends', async (req, res) => {
   try {
-    const timeRange = req.query.timeRange as string || '30d';
-    const fromDate = parseTimeRange(timeRange);
+    const params = trendParamsSchema.parse(req.body);
     
-    // Get project metrics
-    const [projectsCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(projects);
-    
-    const [activeProjectsCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(projects)
-      .where(
-        and(
-          eq(projects.status, 'active'),
-          eq(projects.isArchived, false)
-        )
-      );
-    
-    // Get document metrics
-    const [documentsCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(documents);
-    
-    const [recentDocumentsCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(documents)
-      .where(gte(documents.createdAt, fromDate));
-    
-    // Get user metrics
-    const [usersCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users);
-    
-    const [activeUsersCount] = await db
-      .select({ count: sql<number>`count(distinct("userId"))` })
-      .from(activities)
-      .where(gte(activities.timestamp, fromDate));
-    
-    const [newUsersCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users)
-      .where(gte(users.createdAt, fromDate));
-    
-    // Get completion rate
-    // Calculate as percentage of completed tasks compared to total tasks
-    const [completionMetrics] = await db
-      .select({
-        total: sql<number>`count(*)`,
-        completed: sql<number>`sum(case when "status" = 'completed' then 1 else 0 end)`
-      })
-      .from(projects);
-    
-    const completionRate = Math.round(
-      (completionMetrics.completed / completionMetrics.total) * 100
-    ) || 0;
-    
-    // Calculate growth rates (simplified for demo)
-    const projectsGrowth = Math.round((activeProjectsCount.count / projectsCount.count) * 100) - 80;
-    const documentsGrowth = Math.round((recentDocumentsCount.count / documentsCount.count) * 100) - 90;
-    const usersGrowth = Math.round((newUsersCount.count / usersCount.count) * 100) - 95;
-    
-    res.json({
-      totalProjects: projectsCount.count,
-      activeProjects: activeProjectsCount.count,
-      projectsGrowth,
-      
-      totalDocuments: documentsCount.count,
-      processedDocuments: recentDocumentsCount.count,
-      documentsGrowth,
-      
-      totalUsers: usersCount.count,
-      activeUsers: activeUsersCount.count,
-      newUsers: newUsersCount.count, 
-      usersGrowth,
-      
-      completionRate
-    });
+    const result = await analyzeTrend(params as TrendParams);
+    res.json(result);
   } catch (error) {
-    analyticsLogger.error('Error fetching metrics data', { error });
-    res.status(500).json({ error: 'Failed to fetch metrics data' });
+    logger.error('Error in trend analysis endpoint', { error });
+    res.status(400).json({ error: error.message });
   }
 });
 
-// Get team data for charts
-analyticsApiRouter.get('/teams', async (req, res) => {
+// Top Metrics Endpoint
+router.get('/top-metrics/:entityType', async (req, res) => {
   try {
-    const teamsData = await db
-      .select({
-        id: teams.id,
-        name: teams.name,
-        progress: sql<number>`coalesce((
-          select avg(case when p.status = 'completed' then 100
-                 when p.status = 'in_progress' then p."completionPercentage"
-                 else 0 end)
-          from ${projects} p
-          where p."teamId" = ${teams.id}
-        ), 0)`.as('progress'),
-        memberCount: sql<number>`(
-          select count(*) from "teamMembers" tm
-          where tm."teamId" = ${teams.id}
-        )`.as('memberCount'),
-        taskCount: sql<number>`(
-          select count(*) from ${projects} p
-          where p."teamId" = ${teams.id}
-        )`.as('taskCount')
-      })
-      .from(teams)
-      .where(eq(teams.isArchived, false));
+    const entityType = req.params.entityType as 'project' | 'user' | 'task';
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
     
-    res.json(teamsData);
+    if (!['project', 'user', 'task'].includes(entityType)) {
+      return res.status(400).json({ error: 'Invalid entity type' });
+    }
+    
+    const result = await getTopMetrics(entityType, limit);
+    res.json(result);
   } catch (error) {
-    analyticsLogger.error('Error fetching teams data', { error });
-    res.status(500).json({ error: 'Failed to fetch teams data' });
+    logger.error('Error in top metrics endpoint', { error });
+    res.status(400).json({ error: error.message });
   }
 });
 
-// Get activity data for charts
-analyticsApiRouter.get('/activities', async (req, res) => {
+// Project Prediction Endpoints
+router.get('/projects/:projectId/completion-prediction', async (req, res) => {
   try {
-    const timeRange = req.query.timeRange as string || '30d';
-    const fromDate = parseTimeRange(timeRange);
+    const projectId = parseInt(req.params.projectId);
     
-    const activitiesData = await db
-      .select({
-        id: activities.id,
-        type: activities.type,
-        projectId: activities.projectId,
-        userId: activities.userId,
-        timestamp: activities.timestamp,
-        details: activities.details
-      })
-      .from(activities)
-      .where(gte(activities.timestamp, fromDate))
-      .orderBy(desc(activities.timestamp))
-      .limit(1000);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID' });
+    }
     
-    res.json(activitiesData);
+    const result = await predictProjectCompletion(projectId);
+    res.json(result);
   } catch (error) {
-    analyticsLogger.error('Error fetching activities data', { error });
-    res.status(500).json({ error: 'Failed to fetch activities data' });
+    logger.error('Error in project completion prediction endpoint', { error });
+    res.status(400).json({ error: error.message });
   }
 });
 
-// Get anomaly alerts
-analyticsApiRouter.get('/anomalies', async (req, res) => {
+router.get('/projects/:projectId/risk-analysis', async (req, res) => {
   try {
-    const timeRange = req.query.timeRange as string || '30d';
-    const fromDate = parseTimeRange(timeRange);
+    const projectId = parseInt(req.params.projectId);
     
-    // Get system events marked as anomalies
-    const anomalies = await db
-      .select({
-        id: systemEvents.id,
-        type: systemEvents.type,
-        description: systemEvents.message,
-        severity: systemEvents.severity,
-        timeDetected: systemEvents.timestamp
-      })
-      .from(systemEvents)
-      .where(
-        and(
-          gte(systemEvents.timestamp, fromDate),
-          eq(systemEvents.category, 'anomaly')
-        )
-      )
-      .orderBy(desc(systemEvents.timestamp))
-      .limit(10);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID' });
+    }
     
-    // Transform timestamps to relative time
-    const anomaliesWithRelativeTime = anomalies.map(anomaly => {
-      const timestamp = new Date(anomaly.timeDetected);
-      const now = new Date();
-      const diffInSeconds = Math.floor((now.getTime() - timestamp.getTime()) / 1000);
-      
-      let relativeTime;
-      if (diffInSeconds < 60) {
-        relativeTime = `${diffInSeconds} seconds ago`;
-      } else if (diffInSeconds < 3600) {
-        relativeTime = `${Math.floor(diffInSeconds / 60)} minutes ago`;
-      } else if (diffInSeconds < 86400) {
-        relativeTime = `${Math.floor(diffInSeconds / 3600)} hours ago`;
-      } else {
-        relativeTime = `${Math.floor(diffInSeconds / 86400)} days ago`;
-      }
-      
-      return {
-        ...anomaly,
-        timeDetected: relativeTime
-      };
-    });
-    
-    res.json(anomaliesWithRelativeTime);
+    const result = await analyzeProjectRisks(projectId);
+    res.json(result);
   } catch (error) {
-    analyticsLogger.error('Error fetching anomalies data', { error });
-    res.status(500).json({ error: 'Failed to fetch anomalies data' });
+    logger.error('Error in project risk analysis endpoint', { error });
+    res.status(400).json({ error: error.message });
   }
 });
 
-// Get relationship data for visualization
-analyticsApiRouter.get('/relationships', async (req, res) => {
+// Future Metrics Prediction Endpoint
+const futureMetricsSchema = z.object({
+  entityType: z.enum(['project', 'task', 'user', 'document', 'activity']),
+  metricType: z.enum(['count', 'completion_rate', 'activity_rate']),
+  timeframe: z.enum(['week', 'month', 'quarter'])
+});
+
+router.post('/predict-metrics', async (req, res) => {
   try {
-    const { focusId, sourceType, maxNodes = 50, minScore = 0.1 } = req.query;
-    const filter = req.query.filter as string;
-    const strengthFilter = parseFloat(req.query.strengthFilter as string) || 0.1;
+    const params = futureMetricsSchema.parse(req.body);
     
-    // For now, return placeholder data for the relationship graph
-    // In a real implementation, this would fetch data from the relationship discovery service
+    const result = await predictFutureMetrics(
+      params.entityType,
+      params.metricType,
+      params.timeframe
+    );
     
-    // Get data from the relationship discovery service
-    const relationshipData = await fetch(`${process.env.API_BASE_URL}/api/relationships`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${req.headers.authorization?.split(' ')[1]}`
-      },
-      body: JSON.stringify({
-        focusId,
-        sourceType,
-        maxNodes: parseInt(maxNodes as string),
-        minScore,
-        filter: filter !== 'all' ? filter : undefined,
-        strengthFilter
-      })
-    }).then(res => res.json());
-    
-    res.json(relationshipData);
+    res.json(result);
   } catch (error) {
-    analyticsLogger.error('Error fetching relationship data', { error });
-    res.status(500).json({ error: 'Failed to fetch relationship data' });
+    logger.error('Error in predict metrics endpoint', { error });
+    res.status(400).json({ error: error.message });
   }
 });
 
-analyticsLogger.info('Analytics API router initialized');
+// Anomaly Detection Endpoints
+const anomalyDetectionSchema = z.object({
+  entityType: z.enum(['project', 'task', 'user', 'document', 'activity', 'system']),
+  metricType: z.enum([
+    'count', 'completion_rate', 'activity_rate', 'processing_time', 
+    'response_time', 'error_rate'
+  ]),
+  sensitivity: z.enum(['low', 'medium', 'high']),
+  lookbackPeriod: z.number().min(1).max(365),
+  entityId: z.number().optional()
+});
+
+router.post('/anomalies', async (req, res) => {
+  try {
+    const config = anomalyDetectionSchema.parse(req.body);
+    
+    const result = await detectAnomalies(config);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error in anomaly detection endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/access-pattern-anomalies', async (req, res) => {
+  try {
+    const { sensitivity, lookbackPeriod } = req.body;
+    
+    if (!['low', 'medium', 'high'].includes(sensitivity)) {
+      return res.status(400).json({ error: 'Invalid sensitivity' });
+    }
+    
+    const result = await detectAccessPatternAnomalies(
+      sensitivity,
+      lookbackPeriod || 30
+    );
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Error in access pattern anomaly detection endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/data-quality-anomalies', async (req, res) => {
+  try {
+    const { lookbackPeriod } = req.body;
+    
+    const result = await detectDataQualityAnomalies(lookbackPeriod || 30);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error in data quality anomaly detection endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Reports Endpoints
+const reportConfigSchema = z.object({
+  reportType: z.enum(['project', 'team', 'system']),
+  frequency: z.enum(['daily', 'weekly', 'monthly']),
+  entityId: z.number().optional(),
+  metrics: z.array(z.string()),
+  includeAnomalies: z.boolean().optional().default(false),
+  includePredictions: z.boolean().optional().default(false),
+  includeRisks: z.boolean().optional().default(false),
+  recipients: z.array(z.string().email())
+});
+
+router.post('/reports/generate', authorizeRoles('admin', 'manager'), async (req, res) => {
+  try {
+    const config = reportConfigSchema.parse(req.body);
+    
+    const result = await generateReport(config as ReportConfig);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error in generate report endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/reports/schedule', authorizeRoles('admin', 'manager'), async (req, res) => {
+  try {
+    const config = reportConfigSchema.parse(req.body);
+    
+    const result = await scheduleReport(config as ReportConfig);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error in schedule report endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/reports/cancel/:scheduleId', authorizeRoles('admin', 'manager'), async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    
+    const result = await cancelScheduledReport(scheduleId);
+    res.json({ success: result });
+  } catch (error) {
+    logger.error('Error in cancel scheduled report endpoint', { error });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+export const analyticsApiRouter = router;

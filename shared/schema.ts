@@ -1142,3 +1142,59 @@ export type InsertFetchingJob = z.infer<typeof insertFetchingJobSchema>;
 
 export type FetchedData = typeof fetchedData.$inferSelect;
 export type InsertFetchedData = z.infer<typeof insertFetchedDataSchema>;
+
+// Reports and report subscriptions tables for analytics
+export const reports = pgTable("reports", {
+  id: varchar("id", { length: 100 }).primaryKey(),
+  title: varchar("title", { length: 200 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  entityId: integer("entity_id"),
+  content: jsonb("content").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    typeIdx: index("report_type_idx").on(table.type),
+    entityIdx: index("report_entity_idx").on(table.entityId),
+    createdAtIdx: index("report_created_at_idx").on(table.createdAt),
+  };
+});
+
+export const reportSubscriptions = pgTable("report_subscriptions", {
+  id: varchar("id", { length: 100 }).primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(),
+  entityId: integer("entity_id"),
+  frequency: varchar("frequency", { length: 20 }).notNull(),
+  recipients: text("recipients").notNull(),
+  metrics: text("metrics").notNull(),
+  includeAnomalies: boolean("include_anomalies").notNull().default(false),
+  includePredictions: boolean("include_predictions").notNull().default(false),
+  includeRisks: boolean("include_risks").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  nextRunAt: timestamp("next_run_at"),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    typeIdx: index("report_sub_type_idx").on(table.type),
+    entityIdx: index("report_sub_entity_idx").on(table.entityId),
+    activeIdx: index("report_sub_active_idx").on(table.active),
+    nextRunAtIdx: index("report_sub_next_run_idx").on(table.nextRunAt),
+  };
+});
+
+// Create insert schemas for reports
+export const insertReportSchema = createInsertSchema(reports)
+  .omit({ createdAt: true });
+
+export const insertReportSubscriptionSchema = createInsertSchema(reportSubscriptions)
+  .omit({ createdAt: true, updatedAt: true });
+
+// Export types for reports
+export type Report = typeof reports.$inferSelect;
+export type InsertReport = z.infer<typeof insertReportSchema>;
+
+export type ReportSubscription = typeof reportSubscriptions.$inferSelect;
+export type InsertReportSubscription = z.infer<typeof insertReportSubscriptionSchema>;
