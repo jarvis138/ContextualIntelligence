@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Projects from "@/pages/Projects";
 import Dashboard from "@/pages/Dashboard";
 import DocumentsPage from "@/pages/documents-page";
+import PlaceholderPage from "@/pages/placeholder-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -59,6 +60,16 @@ function App() {
           <Route path="/" component={Dashboard} />
           <Route path="/projects" component={Projects} />
           <Route path="/documents" component={DocumentsPage} />
+          <Route path="/teams" component={PlaceholderPage} />
+          <Route path="/workspace" component={PlaceholderPage} />
+          <Route path="/analytics" component={PlaceholderPage} />
+          <Route path="/insights" component={PlaceholderPage} />
+          <Route path="/integrations" component={PlaceholderPage} />
+          <Route path="/search" component={PlaceholderPage} />
+          <Route path="/settings" component={PlaceholderPage} />
+          <Route path="/admin" component={PlaceholderPage} />
+          <Route path="/system" component={PlaceholderPage} />
+          <Route path="/profile" component={PlaceholderPage} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
