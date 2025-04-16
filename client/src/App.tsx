@@ -99,10 +99,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TourContextProvider>
         <ProjectAssistantProvider>
-          <MainLayout>
-            {location === "/admin" ? (
-              <AdminPage />
-            ) : (
+          {location === "/admin" ? (
+            <AdminPage />
+          ) : (
+            <MainLayout>
               <Switch>
                 <Route path="/projects" component={Projects} />
                 <Route path="/documents" component={DocumentsPage} />
@@ -120,8 +120,8 @@ function App() {
                 <Route path="/" component={Dashboard} />
                 <Route component={NotFound} />
               </Switch>
-            )}
-          </MainLayout>
+            </MainLayout>
+          )}
           <TourManager />
           <ChatInterface />
           <Toaster />

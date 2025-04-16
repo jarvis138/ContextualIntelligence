@@ -65,7 +65,10 @@ export default function AdminPage() {
     );
   }
 
-  if (isError || !currentUser || currentUser.role !== "admin") {
+  // For development purposes only - allows testing the admin UI
+  const isDevelopmentMode = import.meta.env.DEV === true;
+  
+  if ((isError || !currentUser || currentUser.role !== "admin") && !isDevelopmentMode) {
     return (
       <>
         <AdminHeader />
@@ -87,10 +90,20 @@ export default function AdminPage() {
       </>
     );
   }
+  
+  // Development mode banner
+  const DevBanner = () => (
+    isDevelopmentMode && (
+      <div className="bg-yellow-500 text-black p-2 text-center text-sm">
+        Development Mode: Admin access restrictions bypassed
+      </div>
+    )
+  );
 
   return (
     <>
       <AdminHeader />
+      <DevBanner />
       <div className="container mx-auto p-4">
         <div className="flex flex-col space-y-4">
           <div>
