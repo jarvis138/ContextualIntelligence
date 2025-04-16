@@ -262,7 +262,9 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
                     <div className="flex items-center">
                       <Switch 
                         checked={alert.enabled} 
-                        onCheckedChange={() => handleToggleThresholdAlert(alert.id)} 
+                        onCheckedChange={(checked) => {
+                          handleToggleThresholdAlert(alert.id);
+                        }} 
                         className="mr-2" 
                       />
                       <h3 className="font-medium">
@@ -368,7 +370,9 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
                     <div className="flex items-center">
                       <Switch 
                         checked={alert.enabled} 
-                        onCheckedChange={() => handleToggleAnomalyAlert(alert.id)} 
+                        onCheckedChange={(checked) => {
+                          handleToggleAnomalyAlert(alert.id);
+                        }} 
                         className="mr-2" 
                       />
                       <h3 className="font-medium">
@@ -453,7 +457,13 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
                     />
                   </div>
                   <div>
-                    <Switch checked id="email-enabled" />
+                    <Switch 
+                      id="email-enabled" 
+                      checked={true}
+                      onCheckedChange={(checked) => {
+                        // Handle email notifications toggle
+                      }}
+                    />
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -473,7 +483,13 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
                     />
                   </div>
                   <div>
-                    <Switch id="sms-enabled" />
+                    <Switch 
+                      id="sms-enabled" 
+                      checked={false}
+                      onCheckedChange={(checked) => {
+                        // Handle SMS notifications toggle
+                      }}
+                    />
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -493,7 +509,13 @@ export function AlertConfiguration({ projectId, teamId }: AlertConfigurationProp
                     />
                   </div>
                   <div>
-                    <Switch checked id="slack-enabled" />
+                    <Switch 
+                      id="slack-enabled" 
+                      checked={true}
+                      onCheckedChange={(checked) => {
+                        // Handle Slack notifications toggle
+                      }}
+                    />
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
