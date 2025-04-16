@@ -180,11 +180,11 @@ export default function AnalyticsPage() {
   const isLoading = isTeamsLoading || isActivitiesLoading || isMetricsLoading || isAnomalyLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="analytics-page">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
         <div className="flex items-center space-x-2">
-          <Select defaultValue={timeRange} onValueChange={setTimeRange}>
+          <Select defaultValue={timeRange} onValueChange={setTimeRange} data-tour="time-range-selector">
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Time range" />
             </SelectTrigger>
@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
               <SelectItem value="custom">Custom range</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <Button variant="outline" size="sm" onClick={handleRefresh} data-tour="refresh-analytics">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -212,19 +212,19 @@ export default function AnalyticsPage() {
           <Spinner size="lg" />
         </div>
       ) : (
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue="overview" data-tour="analytics-tabs">
           <TabsList className="mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="relationships">Relationships</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
-            <TabsTrigger value="anomalies">Anomaly Detection</TabsTrigger>
-            <TabsTrigger value="predictions">Predictive Insights</TabsTrigger>
+            <TabsTrigger value="anomalies" data-tour="analytics-anomalies">Anomaly Detection</TabsTrigger>
+            <TabsTrigger value="predictions" data-tour="analytics-predictions">Predictive Insights</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4" data-tour="analytics-overview">
             {/* KPI Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-tour="analytics-kpi-cards">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
@@ -312,13 +312,17 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Project Activity & Teams Progress */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tour="analytics-charts">
               {activitiesData && (
-                <ProjectProgressChart activities={activitiesData} />
+                <div data-tour="project-progress-chart">
+                  <ProjectProgressChart activities={activitiesData} />
+                </div>
               )}
               
               {teamsData && (
-                <TeamProgressChart teams={teamsData} />
+                <div data-tour="team-progress-chart">
+                  <TeamProgressChart teams={teamsData} />
+                </div>
               )}
             </div>
 
@@ -385,10 +389,10 @@ export default function AnalyticsPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="anomalies" className="space-y-4">
+          <TabsContent value="anomalies" className="space-y-4" data-tour="analytics-anomalies-tab">
             {anomalyAlerts && anomalyAlerts.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
-                <Card>
+                <Card data-tour="anomalies-card">
                   <CardHeader>
                     <CardTitle>Anomaly Detection</CardTitle>
                     <CardDescription>AI-detected anomalies requiring attention</CardDescription>
@@ -396,7 +400,7 @@ export default function AnalyticsPage() {
                   <CardContent>
                     <div className="space-y-4">
                       {anomalyAlerts.map(alert => (
-                        <div key={alert.id} className="flex items-start space-x-4 p-4 border rounded-md">
+                        <div key={alert.id} className="flex items-start space-x-4 p-4 border rounded-md" data-tour="anomaly-item">
                           <div className="mt-0.5">
                             <AlertTriangle className={`h-5 w-5 ${
                               alert.severity === 'high' ? 'text-red-500' : 
@@ -435,15 +439,15 @@ export default function AnalyticsPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="predictions" className="space-y-4">
-            <Card>
+          <TabsContent value="predictions" className="space-y-4" data-tour="analytics-predictions-tab">
+            <Card data-tour="predictions-card">
               <CardHeader>
                 <CardTitle>Predictive Insights</CardTitle>
                 <CardDescription>AI-powered predictions based on project trends</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div className="border rounded-md p-4 space-y-2">
+                  <div className="border rounded-md p-4 space-y-2" data-tour="prediction-item">
                     <div className="flex items-center space-x-2">
                       <TrendingUp className="h-5 w-5 text-green-500" />
                       <h3 className="font-medium">Project Completion Forecast</h3>
