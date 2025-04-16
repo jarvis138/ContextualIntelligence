@@ -133,6 +133,29 @@ export interface IStorage {
   getOAuthProviderSettings(): Promise<OAuthProviderSetting[]>;
   getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined>;
   saveOAuthProviderSettings(provider: InsertOAuthProviderSetting): Promise<OAuthProviderSetting>;
+  
+  // Context Graph Operations
+  // Graph Nodes
+  getGraphNode(id: number): Promise<GraphNode | undefined>;
+  getGraphNodeByExternalId(externalId: string): Promise<GraphNode | undefined>;
+  getGraphNodes(type?: string, limit?: number, offset?: number): Promise<GraphNode[]>;
+  createGraphNode(node: InsertGraphNode): Promise<GraphNode>;
+  updateGraphNode(id: number, node: Partial<InsertGraphNode>): Promise<GraphNode | undefined>;
+  deleteGraphNode(id: number): Promise<boolean>;
+  
+  // Graph Edges
+  getGraphEdge(id: number): Promise<GraphEdge | undefined>;
+  getGraphEdges(sourceId?: number, targetId?: number, type?: string): Promise<GraphEdge[]>;
+  getGraphEdgesBetween(sourceId: number, targetId: number): Promise<GraphEdge[]>;
+  getGraphEdgesByNode(nodeId: number, direction?: 'incoming' | 'outgoing' | 'both'): Promise<GraphEdge[]>;
+  createGraphEdge(edge: InsertGraphEdge): Promise<GraphEdge>;
+  updateGraphEdge(id: number, edge: Partial<InsertGraphEdge>): Promise<GraphEdge | undefined>;
+  deleteGraphEdge(id: number): Promise<boolean>;
+  
+  // Graph Analysis
+  getNodeConnections(nodeId: number, depth?: number, types?: string[]): Promise<{nodes: GraphNode[], edges: GraphEdge[]}>;
+  findRelatedNodes(nodeId: number, minWeight?: number, maxConnections?: number): Promise<GraphNode[]>;
+  getGraphForVisualization(centralNodeId?: number, depth?: number, limit?: number): Promise<{nodes: any[], links: any[]}>;
 }
 
 export class MemStorage implements IStorage {
@@ -151,6 +174,8 @@ export class MemStorage implements IStorage {
   private refreshTokens: Map<number, RefreshToken>;
   private pkceCodeVerifiers: Map<number, PkceCodeVerifier>;
   private oauthProviderSettings: Map<number, OAuthProviderSetting>;
+  private graphNodes: Map<number, GraphNode>;
+  private graphEdges: Map<number, GraphEdge>;
 
   private currentIds: {
     users: number;
@@ -167,6 +192,8 @@ export class MemStorage implements IStorage {
     refreshTokens: number;
     pkceCodeVerifiers: number;
     oauthProviderSettings: number;
+    graphNodes: number;
+    graphEdges: number;
   };
 
   constructor() {
@@ -190,6 +217,8 @@ export class MemStorage implements IStorage {
     this.refreshTokens = new Map();
     this.pkceCodeVerifiers = new Map();
     this.oauthProviderSettings = new Map();
+    this.graphNodes = new Map();
+    this.graphEdges = new Map();
 
     this.currentIds = {
       users: 1,
@@ -205,7 +234,9 @@ export class MemStorage implements IStorage {
       relationships: 1,
       refreshTokens: 1,
       pkceCodeVerifiers: 1,
-      oauthProviderSettings: 1
+      oauthProviderSettings: 1,
+      graphNodes: 1,
+      graphEdges: 1
     };
 
     // Initialize with demo data
@@ -1778,7 +1809,236 @@ export class DatabaseStorage implements IStorage {
     const [relationship] = await db.insert(relationships).values(insertRelationship).returning();
     return relationship;
   }
+  
+  // Graph Nodes
+  async getGraphNode(id: number): Promise<GraphNode | undefined> {
+    return this.graphNodes.get(id);
+  }
+
+  async getGraphNodeByExternalId(externalId: string): Promise<GraphNode | undefined> {
+    return Array.from(this.graphNodes.values()).find(
+      (node) => node.externalId === externalId
+    );
+  }
+
+  async getGraphNodes(type?: string, limit?: number, offset?: number): Promise<GraphNode[]> {
+    let nodes = Array.from(this.graphNodes.values());
+    
+    if (type) {
+      nodes = nodes.filter(node => node.type === type);
+    }
+    
+    if (limit !== undefined && offset !== undefined) {
+      return nodes.slice(offset, offset + limit);
+    }
+    
+    return nodes;
+  }
+
+  async createGraphNode(node: InsertGraphNode): Promise<GraphNode> {
+    const id = this.currentIds.graphNodes++;
+    const graphNode: GraphNode = { ...node, id };
+    this.graphNodes.set(id, graphNode);
+    return graphNode;
+  }
+
+  async updateGraphNode(id: number, updates: Partial<InsertGraphNode>): Promise<GraphNode | undefined> {
+    const existingNode = this.graphNodes.get(id);
+    if (!existingNode) return undefined;
+    
+    const updatedNode = { ...existingNode, ...updates };
+    this.graphNodes.set(id, updatedNode);
+    return updatedNode;
+  }
+
+  async deleteGraphNode(id: number): Promise<boolean> {
+    // Also delete all associated edges
+    const edges = await this.getGraphEdgesByNode(id, 'both');
+    for (const edge of edges) {
+      await this.deleteGraphEdge(edge.id);
+    }
+    
+    return this.graphNodes.delete(id);
+  }
+
+  // Graph Edges
+  async getGraphEdge(id: number): Promise<GraphEdge | undefined> {
+    return this.graphEdges.get(id);
+  }
+
+  async getGraphEdges(sourceId?: number, targetId?: number, type?: string): Promise<GraphEdge[]> {
+    let edges = Array.from(this.graphEdges.values());
+    
+    if (sourceId !== undefined) {
+      edges = edges.filter(edge => edge.sourceId === sourceId);
+    }
+    
+    if (targetId !== undefined) {
+      edges = edges.filter(edge => edge.targetId === targetId);
+    }
+    
+    if (type !== undefined) {
+      edges = edges.filter(edge => edge.type === type);
+    }
+    
+    return edges;
+  }
+
+  async getGraphEdgesBetween(sourceId: number, targetId: number): Promise<GraphEdge[]> {
+    return Array.from(this.graphEdges.values()).filter(
+      edge => (edge.sourceId === sourceId && edge.targetId === targetId) || 
+              (edge.sourceId === targetId && edge.targetId === sourceId)
+    );
+  }
+
+  async getGraphEdgesByNode(nodeId: number, direction: 'incoming' | 'outgoing' | 'both' = 'both'): Promise<GraphEdge[]> {
+    return Array.from(this.graphEdges.values()).filter(edge => {
+      if (direction === 'incoming') return edge.targetId === nodeId;
+      if (direction === 'outgoing') return edge.sourceId === nodeId;
+      return edge.sourceId === nodeId || edge.targetId === nodeId;
+    });
+  }
+
+  async createGraphEdge(edge: InsertGraphEdge): Promise<GraphEdge> {
+    const id = this.currentIds.graphEdges++;
+    const graphEdge: GraphEdge = { ...edge, id };
+    this.graphEdges.set(id, graphEdge);
+    return graphEdge;
+  }
+
+  async updateGraphEdge(id: number, updates: Partial<InsertGraphEdge>): Promise<GraphEdge | undefined> {
+    const existingEdge = this.graphEdges.get(id);
+    if (!existingEdge) return undefined;
+    
+    const updatedEdge = { ...existingEdge, ...updates };
+    this.graphEdges.set(id, updatedEdge);
+    return updatedEdge;
+  }
+
+  async deleteGraphEdge(id: number): Promise<boolean> {
+    return this.graphEdges.delete(id);
+  }
+
+  // Graph Analysis
+  async getNodeConnections(nodeId: number, depth: number = 1, types?: string[]): Promise<{nodes: GraphNode[], edges: GraphEdge[]}> {
+    const result: { nodes: GraphNode[], edges: GraphEdge[] } = {
+      nodes: [],
+      edges: []
+    };
+    
+    const processedNodeIds = new Set<number>();
+    const queue: { id: number, currentDepth: number }[] = [{ id: nodeId, currentDepth: 0 }];
+    
+    while (queue.length > 0) {
+      const { id, currentDepth } = queue.shift()!;
+      
+      if (processedNodeIds.has(id)) continue;
+      processedNodeIds.add(id);
+      
+      const node = await this.getGraphNode(id);
+      if (!node) continue;
+      
+      result.nodes.push(node);
+      
+      if (currentDepth >= depth) continue;
+      
+      const edges = await this.getGraphEdgesByNode(id);
+      
+      for (const edge of edges) {
+        if (types && !types.includes(edge.type)) continue;
+        
+        result.edges.push(edge);
+        
+        const nextNodeId = edge.sourceId === id ? edge.targetId : edge.sourceId;
+        queue.push({ id: nextNodeId, currentDepth: currentDepth + 1 });
+      }
+    }
+    
+    return result;
+  }
+
+  async findRelatedNodes(nodeId: number, minWeight: number = 0.5, maxConnections: number = 10): Promise<GraphNode[]> {
+    const edges = await this.getGraphEdgesByNode(nodeId);
+    
+    // Sort edges by weight (descending)
+    const sortedEdges = edges
+      .filter(edge => edge.weight >= minWeight)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, maxConnections);
+    
+    const relatedNodes: GraphNode[] = [];
+    
+    for (const edge of sortedEdges) {
+      const relatedNodeId = edge.sourceId === nodeId ? edge.targetId : edge.sourceId;
+      const relatedNode = await this.getGraphNode(relatedNodeId);
+      
+      if (relatedNode) {
+        relatedNodes.push(relatedNode);
+      }
+    }
+    
+    return relatedNodes;
+  }
+
+  async getGraphForVisualization(centralNodeId?: number, depth: number = 2, limit: number = 100): Promise<{nodes: any[], links: any[]}> {
+    let nodes: any[] = [];
+    let links: any[] = [];
+    
+    if (centralNodeId) {
+      // Get connections around a central node
+      const { nodes: connectedNodes, edges } = await this.getNodeConnections(centralNodeId, depth);
+      
+      // Format nodes for visualization
+      nodes = connectedNodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        group: node.type, // For coloring by type
+        properties: node.properties || {}
+      }));
+      
+      // Format edges for visualization
+      links = edges.map(edge => ({
+        source: edge.sourceId,
+        target: edge.targetId,
+        label: edge.type,
+        value: edge.weight, // For edge thickness
+        properties: edge.properties || {}
+      }));
+    } else {
+      // Get all nodes and edges (with limit)
+      const allNodes = await this.getGraphNodes(undefined, limit);
+      
+      // Format nodes for visualization
+      nodes = allNodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        group: node.type,
+        properties: node.properties || {}
+      }));
+      
+      // Get edges between these nodes
+      const nodeIds = allNodes.map(node => node.id);
+      const allEdges = (await this.getGraphEdges()).filter(
+        edge => nodeIds.includes(edge.sourceId) && nodeIds.includes(edge.targetId)
+      );
+      
+      // Format edges for visualization
+      links = allEdges.map(edge => ({
+        source: edge.sourceId,
+        target: edge.targetId,
+        label: edge.type,
+        value: edge.weight,
+        properties: edge.properties || {}
+      }));
+    }
+    
+    return { nodes, links };
+  }
 }
+
+
 
 // Use DatabaseStorage instead of MemStorage
 export const storage = new DatabaseStorage();
