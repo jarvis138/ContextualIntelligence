@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import Projects from "@/pages/Projects";
 import Dashboard from "@/pages/Dashboard";
+import DocumentsPage from "@/pages/documents-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -57,6 +58,7 @@ function App() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/projects" component={Projects} />
+          <Route path="/documents" component={DocumentsPage} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
