@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import { z } from "zod";
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -22,82 +22,46 @@ interface ConnectorJobDialogProps {
 }
 
 const jobFormSchema = z.object({
-  connectorType: z.string(),
-  dataType: z.string(),
+  dataType: z.string().min(1, {
+    message: "Please select a data type.",
+  }),
   scheduleType: z.enum(["once", "interval", "cron"]),
-  scheduleValue: z.string().optional().nullable(),
+  scheduleValue: z.string().optional(),
   priority: z.enum(["low", "normal", "high"]).default("normal"),
-  parameters: z.record(z.any()).default({})
 });
 
 type JobFormValues = z.infer<typeof jobFormSchema>;
 
-export function ConnectorJobDialog({ 
-  open, 
-  onOpenChange, 
+export function ConnectorJobDialog({
+  open,
+  onOpenChange,
   connectorType,
   connectorName,
-  onSuccess 
+  onSuccess,
 }: ConnectorJobDialogProps) {
-  const [availableDataTypes, setAvailableDataTypes] = useState<string[]>([]);
-  const [isLoadingDataTypes, setIsLoadingDataTypes] = useState(false);
-  
   const form = useForm<JobFormValues>({
     resolver: zodResolver(jobFormSchema),
     defaultValues: {
-      connectorType: connectorType,
       dataType: "",
       scheduleType: "once",
-      scheduleValue: null,
+      scheduleValue: "",
       priority: "normal",
-      parameters: {}
     },
   });
-  
-  // Set the connector type whenever it changes
-  useEffect(() => {
-    form.setValue("connectorType", connectorType);
-  }, [connectorType, form]);
-  
-  // Fetch available data types for this connector
-  useEffect(() => {
-    if (open && connectorType) {
-      setIsLoadingDataTypes(true);
-      fetch(`/api/connectors/data-types?type=${connectorType}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.dataTypes && Array.isArray(data.dataTypes)) {
-            setAvailableDataTypes(data.dataTypes);
-            if (data.dataTypes.length > 0) {
-              form.setValue("dataType", data.dataTypes[0]);
-            }
-          }
-        })
-        .catch(err => {
-          console.error("Failed to fetch data types:", err);
-          toast({
-            title: "Error",
-            description: "Failed to fetch available data types",
-            variant: "destructive",
-          });
-        })
-        .finally(() => {
-          setIsLoadingDataTypes(false);
-        });
-    }
-  }, [open, connectorType, form]);
-  
+
   const createJobMutation = useMutation({
     mutationFn: async (values: JobFormValues) => {
-      const res = await apiRequest("POST", "/api/connectors/jobs", values);
+      const res = await apiRequest("POST", `/api/connectors/${connectorType}/jobs`, {
+        ...values,
+      });
       return await res.json();
     },
     onSuccess: () => {
       onOpenChange(false);
       onSuccess();
       toast({
-        title: "Job Created",
-        description: "The fetching job was successfully created",
+        title: "Job created",
+        description: "The fetching job has been created successfully",
         variant: "default",
       });
     },
@@ -111,30 +75,52 @@ export function ConnectorJobDialog({
   });
 
   function onSubmit(values: JobFormValues) {
-    // Handle schedule value based on schedule type
-    let scheduleValue = null;
-    if (values.scheduleType === "interval" && values.scheduleValue) {
-      scheduleValue = values.scheduleValue;
-    } else if (values.scheduleType === "cron" && values.scheduleValue) {
-      scheduleValue = values.scheduleValue;
-    }
-    
-    createJobMutation.mutate({
-      ...values,
-      scheduleValue,
-    });
+    createJobMutation.mutate(values);
   }
 
-  // Show selected schedule field based on schedule type
-  const scheduleType = form.watch("scheduleType");
-  
+  // Get data type options based on connector type
+  const getDataTypeOptions = () => {
+    switch (connectorType) {
+      case "slack":
+        return [
+          { value: "messages", label: "Messages" },
+          { value: "channels", label: "Channels" },
+          { value: "users", label: "Users" },
+        ];
+      case "google_drive":
+        return [
+          { value: "files", label: "Files" },
+          { value: "folders", label: "Folders" },
+          { value: "comments", label: "Comments" },
+        ];
+      case "gmail":
+        return [
+          { value: "messages", label: "Messages" },
+          { value: "threads", label: "Threads" },
+          { value: "labels", label: "Labels" },
+        ];
+      case "microsoft_graph":
+        return [
+          { value: "files", label: "Files" },
+          { value: "messages", label: "Messages" },
+          { value: "users", label: "Users" },
+          { value: "events", label: "Events" },
+        ];
+      default:
+        return [];
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create Fetching Job for {connectorName}</DialogTitle>
+          <DialogDescription>
+            Configure what data to fetch and how often.
+          </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -143,38 +129,23 @@ export function ConnectorJobDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Data Type</FormLabel>
-                  {isLoadingDataTypes ? (
-                    <div className="flex items-center gap-2 h-10">
-                      <Spinner size="sm" />
-                      <span className="text-sm text-muted-foreground">Loading data types...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Select
-                        disabled={availableDataTypes.length === 0}
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a data type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableDataTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {availableDataTypes.length === 0 && (
-                        <FormDescription className="text-destructive">
-                          No data types available for this connector
-                        </FormDescription>
-                      )}
-                    </>
-                  )}
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select what data to fetch" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {getDataTypeOptions().map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -194,20 +165,31 @@ export function ConnectorJobDialog({
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="once" id="once" />
-                        <label htmlFor="once" className="text-sm font-medium">
-                          One-time (run immediately)
+                        <label
+                          htmlFor="once"
+                          className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                        >
+                          <span>One-time run</span>
                         </label>
                       </div>
+                      
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="interval" id="interval" />
-                        <label htmlFor="interval" className="text-sm font-medium">
-                          Interval (run at regular intervals)
+                        <label
+                          htmlFor="interval"
+                          className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                        >
+                          <span>Interval</span>
                         </label>
                       </div>
+                      
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="cron" id="cron" />
-                        <label htmlFor="cron" className="text-sm font-medium">
-                          Cron (custom schedule)
+                        <label
+                          htmlFor="cron"
+                          className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                        >
+                          <span>Cron Schedule</span>
                         </label>
                       </div>
                     </RadioGroup>
@@ -216,91 +198,83 @@ export function ConnectorJobDialog({
                 </FormItem>
               )}
             />
-            
-            {scheduleType === "interval" && (
+
+            {form.watch("scheduleType") !== "once" && (
               <FormField
                 control={form.control}
                 name="scheduleValue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Interval (minutes)</FormLabel>
+                    <FormLabel>
+                      {form.watch("scheduleType") === "interval"
+                        ? "Interval (minutes)"
+                        : "Cron Expression"}
+                    </FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        min="5"
-                        placeholder="e.g. 30"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        value={field.value || ""}
+                        placeholder={form.watch("scheduleType") === "interval" ? "30" : "*/30 * * * *"}
                       />
                     </FormControl>
                     <FormDescription>
-                      Minimum interval is 5 minutes
+                      {form.watch("scheduleType") === "interval" 
+                        ? "How often to fetch data in minutes." 
+                        : "Standard cron expression format."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
-            
-            {scheduleType === "cron" && (
-              <FormField
-                control={form.control}
-                name="scheduleValue"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cron Expression</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. 0 9 * * 1-5"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Format: minute hour day-of-month month day-of-week
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            
+
             <FormField
               control={form.control}
               name="priority"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="space-y-3">
                   <FormLabel>Priority</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="low" id="low" />
+                        <label htmlFor="low" className="text-sm font-medium cursor-pointer">
+                          Low
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="normal" id="normal" />
+                        <label htmlFor="normal" className="text-sm font-medium cursor-pointer">
+                          Normal
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="high" id="high" />
+                        <label htmlFor="high" className="text-sm font-medium cursor-pointer">
+                          High
+                        </label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
+              <Button 
+                type="button" 
+                variant="outline" 
                 onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
               <Button 
-                type="submit"
-                disabled={createJobMutation.isPending || availableDataTypes.length === 0}
+                type="submit" 
+                disabled={createJobMutation.isPending}
               >
                 {createJobMutation.isPending ? <Spinner className="mr-2" size="sm" /> : null}
                 Create Job

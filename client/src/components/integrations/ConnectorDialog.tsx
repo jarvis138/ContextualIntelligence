@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { SiSlack, SiGoogle, SiMicrosoft } from "react-icons/si";
+import { SiSlack, SiGoogle } from "react-icons/si";
+import { BsMicrosoft } from "react-icons/bs";
 
 interface ConnectorDialogProps {
   open: boolean;
@@ -175,7 +176,7 @@ export function ConnectorDialog({ open, onOpenChange, onSuccess }: ConnectorDial
                             htmlFor="microsoft_graph"
                             className="flex items-center gap-2 cursor-pointer text-sm font-medium"
                           >
-                            <SiMicrosoft className="h-4 w-4 text-[#0078D4]" />
+                            <BsMicrosoft className="h-4 w-4 text-[#0078D4]" />
                             <span>Microsoft Graph</span>
                           </label>
                         </div>

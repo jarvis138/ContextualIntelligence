@@ -12,7 +12,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatDistanceToNow } from "date-fns";
-import { SiSlack, SiGoogle, SiMicrosoft } from "react-icons/si";
+import { SiSlack, SiGoogle } from "react-icons/si";
+import { BsMicrosoft } from "react-icons/bs";
 
 // Types for connectors, jobs, and data
 export interface ApiToken {
@@ -60,7 +61,7 @@ const getConnectorIcon = (type: string) => {
     case "gmail":
       return <SiGoogle className="h-5 w-5 text-[#4285F4]" />;
     case "microsoft_graph":
-      return <SiMicrosoft className="h-5 w-5 text-[#0078D4]" />;
+      return <BsMicrosoft className="h-5 w-5 text-[#0078D4]" />;
     default:
       return null;
   }

@@ -1,45 +1,18 @@
-import { useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { useMutation } from "@tanstack/react-query";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import React from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { toast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Eye, Trash } from "lucide-react";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-
-interface FetchedData {
-  dataId: string;
-  connectorType: string;
-  dataType: string;
-  title: string | null;
-  content: string | null;
-  metadata: Record<string, any>;
-  fetchedAt: string;
-}
+import { format } from "date-fns";
+import { SiSlack, SiGoogle } from "react-icons/si";
+import { BsMicrosoft } from "react-icons/bs";
+import { FetchedData } from "@/pages/connectors-page";
 
 interface DataFeedTableProps {
   data: FetchedData[];
@@ -47,43 +20,23 @@ interface DataFeedTableProps {
 }
 
 export function DataFeedTable({ data, isLoading }: DataFeedTableProps) {
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
-  const [selectedData, setSelectedData] = useState<FetchedData | null>(null);
-  
-  const deleteMutation = useMutation({
-    mutationFn: async (dataId: string) => {
-      await apiRequest("DELETE", `/api/connectors/data/${dataId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/connectors/data"] });
-      toast({
-        title: "Data deleted",
-        description: "The data was successfully deleted",
-        variant: "default",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete data",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const handleViewData = (data: FetchedData) => {
-    setSelectedData(data);
-    setShowPreviewDialog(true);
-  };
-  
-  const handleDeleteData = (dataId: string) => {
-    if (confirm("Are you sure you want to delete this data?")) {
-      deleteMutation.mutate(dataId);
+  // Helper function to get connector icon
+  const getConnectorIcon = (type: string) => {
+    switch (type) {
+      case "slack":
+        return <SiSlack className="h-4 w-4 text-[#4A154B]" />;
+      case "google_drive":
+      case "gmail":
+        return <SiGoogle className="h-4 w-4 text-[#4285F4]" />;
+      case "microsoft_graph":
+        return <BsMicrosoft className="h-4 w-4 text-[#0078D4]" />;
+      default:
+        return null;
     }
   };
-  
-  // Helper functions
-  const getConnectorLabel = (type: string) => {
+
+  // Helper function to get connector name
+  const getConnectorName = (type: string) => {
     switch (type) {
       case "slack":
         return "Slack";
@@ -94,45 +47,16 @@ export function DataFeedTable({ data, isLoading }: DataFeedTableProps) {
       case "microsoft_graph":
         return "Microsoft Graph";
       default:
-        return type.charAt(0).toUpperCase() + type.slice(1);
-    }
-  };
-  
-  const getDataTypeLabel = (type: string) => {
-    switch (type) {
-      case "message":
-        return "Message";
-      case "file":
-        return "File";
-      case "email":
-        return "Email";
-      case "document":
-        return "Document";
-      case "channel":
-        return "Channel";
-      default:
         return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, " ");
     }
   };
 
-  const formatContentPreview = (content: string | null | undefined) => {
-    if (!content) return "No content";
-    return content.length > 100 ? content.substring(0, 100) + "..." : content;
-  };
-
-  const renderPreviewContent = (data: FetchedData) => {
-    // If it's JSON content, pretty print it
-    if (data.content && (data.content.startsWith("{") || data.content.startsWith("["))) {
-      try {
-        const jsonContent = JSON.parse(data.content);
-        return <pre className="whitespace-pre-wrap overflow-auto text-sm">{JSON.stringify(jsonContent, null, 2)}</pre>;
-      } catch {
-        // If parsing fails, display as regular text
-        return <p className="whitespace-pre-wrap">{data.content}</p>;
-      }
-    }
-    
-    return <p className="whitespace-pre-wrap">{data.content || "No content available"}</p>;
+  // Helper function to format data type
+  const formatDataType = (type: string) => {
+    return type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   if (isLoading) {
@@ -147,91 +71,56 @@ export function DataFeedTable({ data, isLoading }: DataFeedTableProps) {
     return (
       <div className="text-center p-6 border rounded-md">
         <p className="text-muted-foreground">No data has been fetched yet.</p>
-        <p className="text-muted-foreground mt-1">Create a fetching job to start collecting data.</p>
+        <p className="text-muted-foreground mt-1">
+          Create a fetching job to start collecting data.
+        </p>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="border rounded-md overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Type</TableHead>
             <TableHead>Source</TableHead>
-            <TableHead>Preview</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Title</TableHead>
             <TableHead>Fetched</TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
+            <TableHead>Job ID</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((item) => (
             <TableRow key={item.dataId}>
-              <TableCell className="font-medium">{item.title || "Untitled"}</TableCell>
               <TableCell>
-                <Badge variant="outline">
-                  {getDataTypeLabel(item.dataType)}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {getConnectorIcon(item.connectorType)}
+                  <span>{getConnectorName(item.connectorType)}</span>
+                </div>
               </TableCell>
               <TableCell>
-                <Badge className="bg-secondary text-secondary-foreground">
-                  {getConnectorLabel(item.connectorType)}
-                </Badge>
+                <Badge variant="outline">{formatDataType(item.dataType)}</Badge>
               </TableCell>
               <TableCell className="max-w-[200px] truncate">
-                {formatContentPreview(item.content)}
+                {item.title || item.sourceId}
               </TableCell>
               <TableCell>
-                {formatDistanceToNow(new Date(item.fetchedAt), { addSuffix: true })}
+                {format(new Date(item.fetchedAt), "MMM d, yyyy HH:mm")}
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewData(item)}>
-                      <Eye className="mr-2 h-4 w-4" /> View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDeleteData(item.dataId)}
-                      className="text-destructive"
-                    >
-                      <Trash className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {item.jobId ? (
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {item.jobId.substring(0, 8)}...
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Manual</span>
+                )}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-
-      {/* Preview Dialog */}
-      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader>
-            <DialogTitle>{selectedData?.title || "Untitled"}</DialogTitle>
-            <DialogDescription>
-              {getConnectorLabel(selectedData?.connectorType || "")} • {getDataTypeLabel(selectedData?.dataType || "")} • Fetched {selectedData ? formatDistanceToNow(new Date(selectedData.fetchedAt), { addSuffix: true }) : ""}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <ScrollArea className="max-h-[400px] mt-4 border rounded-md p-4">
-            {selectedData && renderPreviewContent(selectedData)}
-          </ScrollArea>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }
