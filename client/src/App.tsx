@@ -99,29 +99,35 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TourContextProvider>
         <ProjectAssistantProvider>
-          {location === "/admin" ? (
-            <AdminPage />
-          ) : (
-            <MainLayout>
-              <Switch>
-                <Route path="/projects" component={Projects} />
-                <Route path="/documents" component={DocumentsPage} />
-                <Route path="/teams" component={TeamsPage} />
-                <Route path="/workspace" component={WorkspacePage} />
-                <Route path="/analytics" component={AnalyticsPage} />
-                <Route path="/reports-alerts" component={ReportsAlertsPage} />
-                <Route path="/insights" component={InsightsPage} />
-                <Route path="/integrations" component={ConnectorsPage} />
-                <Route path="/connectors" component={ConnectorsPage} />
-                <Route path="/search" component={SearchPage} />
-                <Route path="/settings" component={SettingsPage} />
-                <Route path="/system" component={SystemPage} />
-                <Route path="/profile" component={PlaceholderPage} />
-                <Route path="/" component={Dashboard} />
-                <Route component={NotFound} />
-              </Switch>
-            </MainLayout>
-          )}
+          <Switch>
+            {/* Admin route outside of MainLayout */}
+            <Route path="/admin">
+              <AdminPage />
+            </Route>
+            
+            {/* All other routes with MainLayout */}
+            <Route>
+              <MainLayout>
+                <Switch>
+                  <Route path="/projects" component={Projects} />
+                  <Route path="/documents" component={DocumentsPage} />
+                  <Route path="/teams" component={TeamsPage} />
+                  <Route path="/workspace" component={WorkspacePage} />
+                  <Route path="/analytics" component={AnalyticsPage} />
+                  <Route path="/reports-alerts" component={ReportsAlertsPage} />
+                  <Route path="/insights" component={InsightsPage} />
+                  <Route path="/integrations" component={ConnectorsPage} />
+                  <Route path="/connectors" component={ConnectorsPage} />
+                  <Route path="/search" component={SearchPage} />
+                  <Route path="/settings" component={SettingsPage} />
+                  <Route path="/system" component={SystemPage} />
+                  <Route path="/profile" component={PlaceholderPage} />
+                  <Route path="/" component={Dashboard} />
+                  <Route component={NotFound} />
+                </Switch>
+              </MainLayout>
+            </Route>
+          </Switch>
           <TourManager />
           <ChatInterface />
           <Toaster />
