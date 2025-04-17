@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Search, Filter, DownloadCloud, Code, Settings, Pin, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 const GraphPage: React.FC = () => {
   const [location, setLocation] = useLocation();
@@ -26,6 +28,13 @@ const GraphPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('graph');
+  
+  // State for dialogs
+  const [apiDialogOpen, setApiDialogOpen] = useState<boolean>(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState<boolean>(false);
+  
+  // Toast notifications
+  const { toast } = useToast();
   
   // Parse node ID from URL if present
   useEffect(() => {
@@ -91,21 +100,70 @@ const GraphPage: React.FC = () => {
     setCurrentTab(value);
   };
   
+  // Handle export button click
+  const handleExport = () => {
+    toast({
+      title: "Exporting graph data",
+      description: "Your graph data is being prepared for download.",
+    });
+    
+    // In a real implementation, we would fetch the data and create a download
+    setTimeout(() => {
+      // Create sample data for demonstration
+      const graphData = {
+        nodes: getMockGraphData(selectedNodeId || 1, depth).nodes,
+        links: getMockGraphData(selectedNodeId || 1, depth).links,
+        metadata: {
+          exportedAt: new Date().toISOString(),
+          depth: depth,
+          nodeLimit: nodeLimit,
+          filter: activeFilter,
+        }
+      };
+      
+      // Create and download the file
+      const dataStr = JSON.stringify(graphData, null, 2);
+      const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+      
+      const exportFileDefaultName = `graph-export-${new Date().toISOString().slice(0, 10)}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      toast({
+        title: "Export complete",
+        description: "Graph data has been downloaded successfully.",
+      });
+    }, 1000);
+  };
+  
+  // Handle API dialog open/close
+  const handleApiDialogToggle = () => {
+    setApiDialogOpen(!apiDialogOpen);
+  };
+  
+  // Handle settings dialog open/close
+  const handleSettingsDialogToggle = () => {
+    setSettingsDialogOpen(!settingsDialogOpen);
+  };
+  
   return (
     <div className="container mx-auto py-6 max-w-full">
       <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Context Graph</h1>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <DownloadCloud className="mr-2 h-4 w-4" />
               Export
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleApiDialogToggle}>
               <Code className="mr-2 h-4 w-4" />
               API
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleSettingsDialogToggle}>
               <Settings className="h-4 w-4" />
             </Button>
           </div>
@@ -345,6 +403,164 @@ const GraphPage: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* API Dialog */}
+      <Dialog open={apiDialogOpen} onOpenChange={setApiDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Graph API Documentation</DialogTitle>
+            <DialogDescription>
+              Access the graph data programmatically using the following API endpoints.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="rounded-md bg-muted p-4">
+              <h3 className="text-sm font-medium mb-2">Get Graph Visualization</h3>
+              <p className="text-xs mb-2">Retrieve a graph visualization data with specified parameters.</p>
+              <div className="bg-background rounded-md p-2 overflow-x-auto">
+                <code className="text-xs">
+                  GET /api/graph/visualization?depth=2&nodeId=12&nodeLimit=100&filter=DOCUMENT
+                </code>
+              </div>
+              <p className="text-xs mt-2 text-muted-foreground">
+                Parameters:
+                <br />• depth (optional): Depth of connections from central node (1-5)
+                <br />• nodeId (optional): ID of the central node
+                <br />• nodeLimit (optional): Maximum number of nodes to return
+                <br />• filter (optional): Filter by node type
+              </p>
+            </div>
+            
+            <div className="rounded-md bg-muted p-4">
+              <h3 className="text-sm font-medium mb-2">Search Nodes</h3>
+              <p className="text-xs mb-2">Search for nodes in the graph by keyword.</p>
+              <div className="bg-background rounded-md p-2 overflow-x-auto">
+                <code className="text-xs">
+                  GET /api/graph/search?query=project&limit=10
+                </code>
+              </div>
+              <p className="text-xs mt-2 text-muted-foreground">
+                Parameters:
+                <br />• query (required): Search term
+                <br />• limit (optional): Maximum number of results to return
+              </p>
+            </div>
+            
+            <div className="rounded-md bg-muted p-4">
+              <h3 className="text-sm font-medium mb-2">Get Node Details</h3>
+              <p className="text-xs mb-2">Get detailed information about a specific node.</p>
+              <div className="bg-background rounded-md p-2 overflow-x-auto">
+                <code className="text-xs">
+                  GET /api/graph/node/:id
+                </code>
+              </div>
+              <p className="text-xs mt-2 text-muted-foreground">
+                Parameters:
+                <br />• id (required): Node ID
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApiDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Settings Dialog */}
+      <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Graph Visualization Settings</DialogTitle>
+            <DialogDescription>
+              Customize the appearance and behavior of the graph visualization.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Performance</h3>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="webgl-renderer">WebGL Renderer</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Use WebGL for better performance with large graphs
+                  </p>
+                </div>
+                <Switch id="webgl-renderer" defaultChecked />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Appearance</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="node-size">Node Size</Label>
+                  <Select defaultValue="medium">
+                    <SelectTrigger id="node-size">
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="large">Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="link-width">Link Width</Label>
+                  <Select defaultValue="default">
+                    <SelectTrigger id="link-width">
+                      <SelectValue placeholder="Select width" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="thin">Thin</SelectItem>
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="thick">Thick</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Interaction</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="zoom-to-fit">Auto Zoom to Fit</Label>
+                  <Switch id="zoom-to-fit" defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="show-labels">Always Show Labels</Label>
+                  <Switch id="show-labels" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="directional-links">Directional Links</Label>
+                  <Switch id="directional-links" defaultChecked />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettingsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              toast({
+                title: "Settings Saved",
+                description: "Your graph visualization settings have been updated.",
+              });
+              setSettingsDialogOpen(false);
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
