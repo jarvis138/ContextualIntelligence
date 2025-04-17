@@ -10,7 +10,8 @@ import PKCEOAuthProvider from '../utils/oauth-pkce';
 import { db } from '../db';
 import { users, oauthCredentials } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { AuditService, AuditCategory, AuditSeverity } from './auditService';
+import { AuditService, AuditCategory, AuditSeverity, AuditActions } from './auditService';
+import { AuthAuditLogger, AuthAuditType } from '../utils/auth-audit-logger';
 import { generateToken } from '../auth';
 
 // Interface for OAuth provider configuration
@@ -120,7 +121,7 @@ export class OAuthService {
             name: 'displayName',
             firstName: 'givenName',
             lastName: 'surname',
-            picture: null
+            picture: undefined
           }
         });
       }
@@ -177,15 +178,30 @@ export class OAuthService {
    * @returns Express route handler
    */
   private static handleAuthorize(providerId: string) {
-    return (req: Request, res: Response) => {
+    return async (req: Request, res: Response) => {
       try {
         const config = this.providers.get(providerId);
         if (!config) {
+          // Audit failed authorization attempt
+          await AuthAuditLogger.logOAuthEvent(
+            AuthAuditType.OAUTH_START,
+            { 
+              provider: providerId,
+              userId: req.user?.id
+            },
+            `OAuth provider not found: ${providerId}`,
+            {
+              request: req,
+              success: false,
+              reason: 'Provider not configured'
+            }
+          );
+          
           return res.status(404).send('OAuth provider not found');
         }
         
         // Generate authorization URL with PKCE
-        const { url } = PKCEOAuthProvider.generateAuthorizationUrl(
+        const result = PKCEOAuthProvider.generateAuthorizationUrl(
           config.authorizationEndpoint,
           config.clientId,
           config.redirectUri,
@@ -193,10 +209,48 @@ export class OAuthService {
           config.additionalAuthParams
         );
         
+        const url = result.url;
+        const state = result.pkceData.state;
+        const codeVerifier = result.pkceData.codeVerifier;
+        
+        // Log the OAuth authorization start
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_START,
+          {
+            provider: providerId,
+            userId: req.user?.id,
+            isPkceFlow: true,
+            scopeRequested: config.scope,
+            state,
+            redirectUri: config.redirectUri
+          },
+          `Started OAuth PKCE flow with ${config.name}`,
+          {
+            request: req
+          }
+        );
+        
         // Redirect to the authorization URL
         res.redirect(url);
       } catch (error) {
         console.error(`OAuth authorize error (${providerId}):`, error);
+        
+        // Audit failed authorization attempt
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_START,
+          { 
+            provider: providerId,
+            userId: req.user?.id
+          },
+          `OAuth authorization error for ${providerId}`,
+          {
+            request: req,
+            success: false,
+            reason: error instanceof Error ? error.message : String(error),
+            severity: AuditSeverity.ERROR
+          }
+        );
+        
         res.status(500).send('Internal server error during authorization');
       }
     };
@@ -216,18 +270,81 @@ export class OAuthService {
         // Check for OAuth error
         if (error) {
           console.error(`OAuth callback error (${providerId}):`, error, error_description);
+          
+          // Log the OAuth error
+          await AuthAuditLogger.logOAuthEvent(
+            AuthAuditType.OAUTH_CALLBACK,
+            { 
+              provider: providerId,
+              userId: req.user?.id,
+              state
+            },
+            `OAuth callback error: ${error}`,
+            {
+              request: req,
+              success: false,
+              reason: error_description || error,
+              severity: AuditSeverity.WARNING
+            }
+          );
+          
           return res.redirect(`/login?error=${encodeURIComponent(error_description || error)}`);
         }
         
         // Check for required parameters
         if (!code || !state) {
+          // Log missing parameters error
+          await AuthAuditLogger.logOAuthEvent(
+            AuthAuditType.OAUTH_CALLBACK,
+            { 
+              provider: providerId,
+              userId: req.user?.id
+            },
+            `OAuth callback missing parameters`,
+            {
+              request: req,
+              success: false,
+              reason: 'Missing required parameters (code or state)',
+              severity: AuditSeverity.WARNING
+            }
+          );
+          
           return res.redirect('/login?error=Invalid%20OAuth%20callback');
         }
         
         const config = this.providers.get(providerId);
         if (!config) {
+          // Log provider not found error
+          await AuthAuditLogger.logOAuthEvent(
+            AuthAuditType.OAUTH_CALLBACK,
+            { 
+              provider: providerId,
+              userId: req.user?.id
+            },
+            `OAuth provider not found: ${providerId}`,
+            {
+              request: req,
+              success: false,
+              reason: 'Provider not configured',
+              severity: AuditSeverity.WARNING
+            }
+          );
+          
           return res.redirect('/login?error=OAuth%20provider%20not%20found');
         }
+        
+        // Log received callback before token exchange
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_CALLBACK,
+          { 
+            provider: providerId,
+            userId: req.user?.id,
+            state,
+            isPkceFlow: true
+          },
+          `Received OAuth callback for ${config.name}`,
+          { request: req }
+        );
         
         // Exchange code for token using PKCE
         const tokenResponse = await PKCEOAuthProvider.exchangeCodeForToken(
@@ -237,6 +354,20 @@ export class OAuthService {
           code,
           state,
           config.clientSecret
+        );
+        
+        // Log successful token exchange
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+          { 
+            provider: providerId,
+            userId: req.user?.id,
+            state,
+            isPkceFlow: true,
+            scopeRequested: tokenResponse.scope
+          },
+          `Successfully exchanged authorization code for tokens with ${config.name}`,
+          { request: req }
         );
         
         // Get user info
@@ -253,27 +384,59 @@ export class OAuthService {
         });
         
         // Log successful authentication
-        await AuditService.log({
-          userId: user.id,
-          tenantId: user.tenantId,
-          action: `User logged in via ${config.name}`,
-          category: AuditCategory.AUTHENTICATION,
-          severity: AuditSeverity.INFO,
-          resourceType: 'user',
-          resourceId: user.id.toString(),
-          description: `User ${user.username} logged in using ${config.name} OAuth`,
-          success: true,
-          metadata: {
-            provider: providerId,
-            providerId: userInfo[config.userInfoMapping.id],
-            ipAddress: req.ip
+        await AuthAuditLogger.logAuthEvent(
+          AuthAuditType.LOGIN,
+          user.id,
+          `User ${user.username} logged in using ${config.name}`,
+          {
+            request: req,
+            success: true,
+            metadata: {
+              provider: providerId,
+              providerUserId: userInfo[config.userInfoMapping.id],
+              authMethod: 'oauth',
+              isNewUser: !userInfo.id
+            }
           }
-        });
+        );
+        
+        // Log token creation
+        await AuthAuditLogger.logTokenEvent(
+          AuthAuditType.TOKEN_REFRESH,
+          {
+            userId: user.id,
+            tokenType: 'access',
+            source: 'oauth',
+            expiresAt: new Date(Date.now() + 3600000) // Assuming 1 hour token
+          },
+          `Created access token for user ${user.username}`,
+          {
+            request: req,
+            success: true
+          }
+        );
         
         // Redirect to frontend with token
         res.redirect(`/auth/callback?token=${token}`);
       } catch (error) {
         console.error(`OAuth callback error (${providerId}):`, error);
+        
+        // Log the error
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_CALLBACK,
+          { 
+            provider: providerId,
+            userId: req.user?.id
+          },
+          `OAuth callback processing error for ${providerId}`,
+          {
+            request: req,
+            success: false,
+            reason: error instanceof Error ? error.message : String(error),
+            severity: AuditSeverity.ERROR
+          }
+        );
+        
         res.redirect(`/login?error=${encodeURIComponent('Authentication failed')}`);
       }
     };
