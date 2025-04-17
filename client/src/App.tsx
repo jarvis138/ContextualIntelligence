@@ -13,6 +13,7 @@ import SearchPage from "@/pages/search-page";
 import SettingsPage from "@/pages/settings-page";
 import AdminPage from "@/pages/admin-page";
 import AdminLoginPage from "@/pages/admin-login";
+import TenantManagementPage from "@/pages/admin/tenant-management";
 import SystemPage from "@/pages/system-page";
 import GraphPage from "@/pages/graph-page";
 import PlaceholderPage from "@/pages/placeholder-page";

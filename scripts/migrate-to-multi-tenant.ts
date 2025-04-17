@@ -1,4 +1,3 @@
-#!/usr/bin/env ts-node
 /**
  * Migration Script for Multi-Tenant Architecture
  * 
@@ -7,18 +6,18 @@
  */
 
 import { db } from '../server/db';
-import { createMultiTenancyMigration } from '../shared/schema-updates';
+import readline from 'readline';
+import { tenants, tenantFeatureFlags, tenantAdmins } from '../shared/tenant-schema';
+import { tenantService } from '../server/tenant-service';
 import { v4 as uuidv4 } from 'uuid';
-import * as readline from 'readline';
-import { tenants } from '../shared/tenant-schema';
 
-// Create a readline interface for user input
+// Create a readline interface for CLI prompts
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-// Ask a question and get user input
+// Helper function for prompting
 function askQuestion(question: string): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
@@ -27,112 +26,252 @@ function askQuestion(question: string): Promise<string> {
   });
 }
 
+// Print a banner
+console.log("\n=======================================================");
+console.log("   CPI Hub - Migration to Multi-Tenant Architecture");
+console.log("=======================================================\n");
+
 async function migrateToMultiTenant() {
   try {
-    console.log('CPI Hub Multi-Tenant Migration Tool');
-    console.log('==================================');
-    console.log('This script will migrate your database to a multi-tenant architecture.');
-    console.log('WARNING: This is a one-way operation. Make sure you have a backup of your database.');
+    console.log("Starting migration to multi-tenant architecture...\n");
     
-    const confirm = await askQuestion('Do you want to proceed? (yes/no): ');
-    if (confirm.toLowerCase() !== 'yes') {
-      console.log('Migration aborted.');
-      process.exit(0);
-    }
+    // 1. Check if the tenants table already exists
+    console.log("Checking if migration has already been applied...");
+    const tableExists = await db.execute(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'tenants'
+      )`
+    );
     
-    // 1. Run the migration SQL
-    console.log('\nStep 1: Creating tenant tables and modifying existing tables...');
-    const migrationSql = createMultiTenancyMigration();
-    await db.execute(migrationSql);
-    console.log('✅ Database schema updated successfully.');
-    
-    // 2. Create the default tenant
-    console.log('\nStep 2: Creating default tenant...');
-    const tenantName = await askQuestion('Enter the name for your default tenant: ');
-    const subdomain = await askQuestion('Enter subdomain for the default tenant (e.g., "main"): ');
-    
-    // Insert the default tenant
-    const rlsTenantId = uuidv4();
-    const [defaultTenant] = await db.insert(tenants).values({
-      name: tenantName,
-      displayName: tenantName,
-      subdomain: subdomain,
-      status: 'active',
-      tier: 'professional',
-      schemaStrategy: 'row_level_security',
-      rlsTenantId: rlsTenantId,
-      settings: {},
-      metadata: {},
-      branding: {
-        primaryColor: '#4f46e5',
-        logo: '/logo.svg',
-        favicon: '/favicon.ico'
+    if (tableExists.rows?.[0]?.exists === true) {
+      const continueAnyway = await askQuestion(
+        "The tenants table already exists. Continue with migration anyway? (y/n): "
+      );
+      
+      if (continueAnyway.toLowerCase() !== 'y') {
+        console.log("Migration aborted by user.");
+        return;
       }
-    }).returning();
-    
-    console.log(`✅ Default tenant created with ID: ${defaultTenant.id}`);
-    
-    // 3. Update existing data to associate with the default tenant
-    console.log('\nStep 3: Associating existing data with the default tenant...');
-    
-    // Set the PostgreSQL session variable for the current tenant
-    await db.execute(`SELECT set_tenant_id(${defaultTenant.id})`);
-    
-    // Update tables with tenant_id
-    await db.execute(`UPDATE users SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    await db.execute(`UPDATE projects SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    await db.execute(`UPDATE teams SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    await db.execute(`UPDATE documents SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    await db.execute(`UPDATE tasks SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    await db.execute(`UPDATE comments SET tenant_id = ${defaultTenant.id} WHERE tenant_id IS NULL`);
-    
-    console.log('✅ Existing data migrated to the default tenant.');
-    
-    // 4. Make tenant_id not nullable (now that all existing data has a tenant_id)
-    console.log('\nStep 4: Finalizing schema...');
-    
-    await db.execute(`
-      ALTER TABLE users ALTER COLUMN tenant_id SET NOT NULL;
-      ALTER TABLE projects ALTER COLUMN tenant_id SET NOT NULL;
-      ALTER TABLE teams ALTER COLUMN tenant_id SET NOT NULL;
-      ALTER TABLE documents ALTER COLUMN tenant_id SET NOT NULL;
-      ALTER TABLE tasks ALTER COLUMN tenant_id SET NOT NULL;
-      ALTER TABLE comments ALTER COLUMN tenant_id SET NOT NULL;
-    `);
-    
-    console.log('✅ Schema finalized.');
-    
-    // 5. Create admin user for the tenant
-    console.log('\nStep 5: Creating tenant admin...');
-    const adminEmail = await askQuestion('Enter email for the tenant admin: ');
-    
-    // Find user with this email
-    const users = await db.execute(`
-      SELECT id FROM users WHERE email = '${adminEmail}' AND tenant_id = ${defaultTenant.id}
-    `);
-    
-    if (users.rows.length > 0) {
-      const userId = users.rows[0].id;
-      await db.execute(`
-        INSERT INTO tenant_admins (tenant_id, user_id, role)
-        VALUES (${defaultTenant.id}, ${userId}, 'admin')
-      `);
-      console.log(`✅ User with ID ${userId} set as tenant admin.`);
-    } else {
-      console.log('⚠️ User not found. Please manually add a tenant admin later.');
     }
     
-    console.log('\nMigration completed successfully!');
-    console.log(`Your CPI Hub is now multi-tenant with '${tenantName}' as the default tenant.`);
-    console.log(`Subdomain: ${subdomain}`);
-    console.log('\nNext steps:');
-    console.log('1. Update your application to use the tenant middleware');
-    console.log('2. Test tenant isolation by creating additional tenants');
-    console.log('3. Consider setting up custom domains for your tenants');
+    // 2. Create the tenants, tenant_feature_flags, and tenant_admins tables
+    console.log("\n(1/6) Creating tenant tables...");
+    
+    // Create PostgreSQL ENUMs first
+    await db.execute(`
+      CREATE TYPE IF NOT EXISTS tenant_status AS ENUM (
+        'active', 'suspended', 'archived', 'pending'
+      );
+      
+      CREATE TYPE IF NOT EXISTS tenant_tier AS ENUM (
+        'free', 'standard', 'professional', 'enterprise'
+      );
+      
+      CREATE TYPE IF NOT EXISTS tenant_schema_strategy AS ENUM (
+        'row_level_security', 'schema_per_tenant'
+      );
+    `);
+    
+    // Create the tables using Drizzle push
+    console.log("Running schema push...");
+    const { execSync } = require('child_process');
+    try {
+      execSync('npm run db:push', { stdio: 'inherit' });
+    } catch (error) {
+      console.error("Error running schema push:", error);
+      const continueAnyway = await askQuestion(
+        "Error occurred during schema push. Continue with migration anyway? (y/n): "
+      );
+      
+      if (continueAnyway.toLowerCase() !== 'y') {
+        console.log("Migration aborted due to schema push error.");
+        return;
+      }
+    }
+    
+    // 3. Create the PostgreSQL functions for RLS
+    console.log("\n(2/6) Creating Row-Level Security functions...");
+    await db.execute(`
+      -- Function to get the current tenant ID
+      CREATE OR REPLACE FUNCTION current_tenant_id() RETURNS INT AS $$
+      BEGIN
+        RETURN current_setting('app.current_tenant_id', true)::INT;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+      
+      -- Function to get the current tenant RLS ID (UUID)
+      CREATE OR REPLACE FUNCTION current_tenant_rls_id() RETURNS UUID AS $$
+      BEGIN
+        RETURN current_setting('app.current_tenant_rls_id', true)::UUID;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+      
+      -- Function to set the current tenant ID
+      CREATE OR REPLACE FUNCTION set_tenant_id(tenant_id INT) RETURNS VOID AS $$
+      BEGIN
+        PERFORM set_config('app.current_tenant_id', tenant_id::TEXT, false);
+      END;
+      $$ LANGUAGE plpgsql;
+      
+      -- Function to set the current tenant RLS ID
+      CREATE OR REPLACE FUNCTION set_tenant_rls_id(tenant_rls_id UUID) RETURNS VOID AS $$
+      BEGIN
+        PERFORM set_config('app.current_tenant_rls_id', tenant_rls_id::TEXT, false);
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    
+    // 4. Ask for the default tenant information
+    console.log("\n(3/6) Setting up the default tenant...");
+    const defaultTenantName = await askQuestion("Default tenant name (e.g., CPI Hub): ");
+    const defaultTenantDisplayName = await askQuestion("Default tenant display name (e.g., CPI Hub Demo): ");
+    const defaultTenantSubdomain = (await askQuestion("Default tenant subdomain (lowercase, no spaces): ")).toLowerCase();
+    
+    // 5. Create the default tenant
+    console.log("\nCreating default tenant...");
+    
+    const defaultTenant = await tenantService.createTenant({
+      name: defaultTenantName || 'CPI Hub',
+      displayName: defaultTenantDisplayName || 'CPI Hub Demo',
+      subdomain: defaultTenantSubdomain || 'demo',
+      status: 'active',
+      tier: 'enterprise',
+      schemaStrategy: 'row_level_security',
+    });
+    
+    console.log(`Default tenant created with ID: ${defaultTenant.id}`);
+    
+    // 6. Add tenant_id column to existing tables
+    console.log("\n(4/6) Adding tenant_id column to existing tables...");
+    
+    // Get a list of tables that need the tenant_id column
+    const tables = await db.execute(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_type = 'BASE TABLE'
+        AND table_name NOT IN ('tenants', 'tenant_feature_flags', 'tenant_admins', '_prisma_migrations', 'schema_migrations', 'pgmigrations', 'schema_history', 'knex_migrations', 'knex_migrations_lock')
+        AND table_name NOT LIKE 'pg_%'
+        AND table_name NOT LIKE '\\_%'
+    `);
+    
+    // Add tenant_id columns and foreign key constraints
+    for (const table of tables.rows) {
+      const tableName = table.table_name;
+      
+      console.log(`Adding tenant_id to ${tableName}...`);
+      
+      try {
+        // Check if the column already exists
+        const columnExists = await db.execute(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = '${tableName}' 
+            AND column_name = 'tenant_id'
+          )
+        `);
+        
+        if (columnExists.rows?.[0]?.exists === true) {
+          console.log(`  Column tenant_id already exists in ${tableName}`);
+          continue;
+        }
+        
+        // Add the tenant_id column
+        await db.execute(`
+          ALTER TABLE "${tableName}" 
+          ADD COLUMN tenant_id INTEGER NULL 
+          REFERENCES tenants(id) ON DELETE CASCADE;
+        `);
+        
+        // Set the default tenant ID for all existing rows
+        await db.execute(`
+          UPDATE "${tableName}" 
+          SET tenant_id = ${defaultTenant.id}
+          WHERE tenant_id IS NULL;
+        `);
+        
+        // Make tenant_id NOT NULL after populating it
+        await db.execute(`
+          ALTER TABLE "${tableName}" 
+          ALTER COLUMN tenant_id SET NOT NULL;
+        `);
+        
+        console.log(`  Successfully added tenant_id to ${tableName}`);
+      } catch (error) {
+        console.error(`  Error adding tenant_id to ${tableName}:`, error);
+      }
+    }
+    
+    // 7. Add RLS policies to tables
+    console.log("\n(5/6) Adding Row-Level Security (RLS) policies to tables...");
+    
+    for (const table of tables.rows) {
+      const tableName = table.table_name;
+      
+      console.log(`Adding RLS policy to ${tableName}...`);
+      
+      try {
+        // Enable row level security on the table
+        await db.execute(`ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY;`);
+        
+        // Create the policy for the table
+        await db.execute(`
+          CREATE POLICY tenant_isolation_policy ON "${tableName}"
+          USING (tenant_id = current_tenant_id() OR current_tenant_id() IS NULL);
+        `);
+        
+        console.log(`  Successfully added RLS policy to ${tableName}`);
+      } catch (error) {
+        console.error(`  Error adding RLS policy to ${tableName}:`, error);
+      }
+    }
+    
+    // 8. Create feature flags for the default tenant
+    console.log("\n(6/6) Creating default feature flags...");
+    const defaultFeatureFlags = [
+      { key: 'analytics_dashboard', enabled: true },
+      { key: 'ai_insights', enabled: true },
+      { key: 'slack_integration', enabled: true },
+      { key: 'context_graph', enabled: true },
+      { key: 'advanced_search', enabled: true },
+      { key: 'document_processing', enabled: true },
+      { key: 'email_notifications', enabled: true },
+    ];
+    
+    for (const flag of defaultFeatureFlags) {
+      console.log(`Creating feature flag: ${flag.key}`);
+      await tenantService.setTenantFeatureFlag(
+        defaultTenant.id,
+        flag.key,
+        flag.enabled,
+        {}
+      );
+    }
+    
+    // Final message
+    console.log("\n✅ Migration to multi-tenant architecture complete!");
+    console.log(`\nDefault tenant information:`);
+    console.log(`  ID: ${defaultTenant.id}`);
+    console.log(`  Name: ${defaultTenant.name}`);
+    console.log(`  Subdomain: ${defaultTenant.subdomain}`);
+    console.log(`  RLS Tenant ID: ${defaultTenant.rlsTenantId}`);
+    
+    console.log("\nNext steps:");
+    console.log("1. Restart your application");
+    console.log("2. Update your application to use the tenant middleware");
+    console.log("3. Use the tenant management UI to create additional tenants");
     
   } catch (error) {
-    console.error('Error during migration:', error);
-    process.exit(1);
+    console.error("Error during migration:", error);
   } finally {
     rl.close();
   }
