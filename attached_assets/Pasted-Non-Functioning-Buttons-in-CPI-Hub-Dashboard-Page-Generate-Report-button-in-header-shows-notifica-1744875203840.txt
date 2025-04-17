@@ -1,0 +1,42 @@
+Non-Functioning Buttons in CPI Hub
+Dashboard Page
+Generate Report button in header (shows notification but doesn't generate an actual report)
+View Calendar button in header (no functionality)
+View All Activity button (doesn't navigate or take any action)
+Projects Page
+All buttons are working but only show notifications, not implementing their actual functionality
+Graph Page
+✓ Share button now works with URL sharing
+✓ View Details button now works showing selected node details or graph summary
+✓ Export button now works with JSON data download
+✓ API button now opens a documentation dialog
+✓ Settings button now opens a configuration dialog
+The Pin selected node toggle in the sidebar doesn't affect graph behavior
+Analytics Page
+View All Anomalies button doesn't navigate to a details page
+Investigate buttons on anomaly cards don't perform any action
+Teams Page
+Filter buttons that don't apply actual filtering
+Add Member buttons that only show notifications
+Documents Page
+Upload Document button shows dialog but doesn't process uploads
+Batch Process button shows notification only
+Document action buttons (download, share, delete) only show notifications
+Reports & Alerts Page
+Create Alert button shows form but doesn't save alerts
+Schedule Report button shows dialog but doesn't schedule anything
+View Report History button doesn't navigate to history view
+Workspace Page
+Create Space button shows form but doesn't create spaces
+Join Space button shows notification only
+Space Settings buttons don't open settings
+Search Page
+Advanced Search toggle doesn't alter search behavior
+Save Search button only shows notification
+Settings Page
+Save Changes buttons that show success but don't persist settings
+Test Connection buttons for integrations that only show notifications
+Generate API Key buttons that only show placeholder keys
+Header/Navigation
+Logout button in user dropdown just logs a message to console
+Quick search input in header doesn't perform actual search

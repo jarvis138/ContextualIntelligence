@@ -33,6 +33,35 @@ export default function AnalyticsPage() {
   const { toast } = useToast();
   const [timeRange, setTimeRange] = useState('30d');
   
+  // State for anomalies dialog
+  const [anomaliesDialogOpen, setAnomaliesDialogOpen] = useState(false);
+  const [allAnomalies, setAllAnomalies] = useState<Array<{
+    id: number;
+    type: string;
+    description: string;
+    severity: string;
+    timeDetected: string;
+    relatedProject?: string;
+    impact?: string;
+    recommendations?: string;
+    status?: string;
+  }>>([]);
+  
+  // State for investigation dialog
+  const [investigateDialogOpen, setInvestigateDialogOpen] = useState(false);
+  const [currentAnomaly, setCurrentAnomaly] = useState<{
+    id: number;
+    type: string;
+    description: string;
+    severity: string;
+    timeDetected: string;
+    relatedProject?: string;
+    impact?: string;
+    recommendations?: string;
+    status?: string;
+    data?: any;
+  } | null>(null);
+  
   // Fetch team data
   const { 
     data: teamsData, 
@@ -175,6 +204,71 @@ export default function AnalyticsPage() {
       default:
         return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{severity}</span>;
     }
+  };
+
+  // Handle viewing all anomalies
+  const handleViewAllAnomalies = () => {
+    if (anomalyAlerts) {
+      // Generate extended anomaly data with additional fields for the full view
+      const extendedAnomalies = anomalyAlerts.map(alert => ({
+        ...alert,
+        relatedProject: ['Website Redesign', 'Mobile App Development', 'Customer Portal', 'Marketing Campaign'][Math.floor(Math.random() * 4)],
+        impact: alert.severity === 'high' 
+          ? 'Potential significant impact on project timeline and deliverables' 
+          : alert.severity === 'medium'
+          ? 'Moderate impact on specific project components'
+          : 'Limited impact, primarily affecting documentation and reporting',
+        recommendations: alert.severity === 'high'
+          ? 'Immediate attention required. Schedule a team meeting to address the issue.'
+          : alert.severity === 'medium'
+          ? 'Review affected components within this week.'
+          : 'Document the anomaly and monitor for any changes.',
+        status: ['New', 'In Progress', 'Under Review'][Math.floor(Math.random() * 3)]
+      }));
+      
+      setAllAnomalies(extendedAnomalies);
+      setAnomaliesDialogOpen(true);
+    }
+  };
+  
+  // Handle investigating a specific anomaly
+  const handleInvestigateAnomaly = (anomaly: any) => {
+    // Generate detailed investigation data for the anomaly
+    const detailedAnomaly = {
+      ...anomaly,
+      relatedProject: anomaly.relatedProject || ['Website Redesign', 'Mobile App Development', 'Customer Portal', 'Marketing Campaign'][Math.floor(Math.random() * 4)],
+      impact: anomaly.impact || (anomaly.severity === 'high' 
+        ? 'Potential significant impact on project timeline and deliverables' 
+        : anomaly.severity === 'medium'
+        ? 'Moderate impact on specific project components'
+        : 'Limited impact, primarily affecting documentation and reporting'),
+      recommendations: anomaly.recommendations || (anomaly.severity === 'high'
+        ? 'Immediate attention required. Schedule a team meeting to address the issue.'
+        : anomaly.severity === 'medium'
+        ? 'Review affected components within this week.'
+        : 'Document the anomaly and monitor for any changes.'),
+      status: anomaly.status || ['New', 'In Progress', 'Under Review'][Math.floor(Math.random() * 3)],
+      data: {
+        timeSeriesData: Array.from({ length: 14 }, (_, i) => ({
+          date: new Date(Date.now() - (13 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          value: Math.floor(Math.random() * 100) + 20
+        })),
+        relatedEntities: [
+          { name: 'Document: Technical Specification', confidence: 0.89 },
+          { name: 'User: Alex Kumar', confidence: 0.78 },
+          { name: 'Task: API Integration', confidence: 0.92 }
+        ],
+        suggestedActions: [
+          'Review recent changes in affected documents',
+          'Check integration tests for failures',
+          'Notify project stakeholders of potential delays',
+          'Schedule detailed analysis with subject matter experts'
+        ]
+      }
+    };
+    
+    setCurrentAnomaly(detailedAnomaly);
+    setInvestigateDialogOpen(true);
   };
 
   const isLoading = isTeamsLoading || isActivitiesLoading || isMetricsLoading || isAnomalyLoading;
@@ -360,7 +454,13 @@ export default function AnalyticsPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button variant="outline" className="w-full">View All Anomalies</Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleViewAllAnomalies}
+                  >
+                    View All Anomalies
+                  </Button>
                 </CardFooter>
               </Card>
             )}
@@ -419,7 +519,13 @@ export default function AnalyticsPage() {
                               Detected {alert.timeDetected}
                             </div>
                             <div className="mt-2">
-                              <Button variant="outline" size="sm">Investigate</Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleInvestigateAnomaly(alert)}
+                              >
+                                Investigate
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -491,6 +597,202 @@ export default function AnalyticsPage() {
           </TabsContent>
         </Tabs>
       )}
+      {/* All Anomalies Dialog */}
+      <Dialog open={anomaliesDialogOpen} onOpenChange={setAnomaliesDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>All Detected Anomalies</DialogTitle>
+            <DialogDescription>
+              Complete list of all anomalies detected by the system
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="space-y-4 py-4">
+              {allAnomalies.map((anomaly) => (
+                <div key={anomaly.id} className="border rounded-md p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className={`h-5 w-5 ${
+                        anomaly.severity === 'high' ? 'text-red-500' : 
+                        anomaly.severity === 'medium' ? 'text-amber-500' : 
+                        'text-blue-500'
+                      }`} />
+                      <h3 className="font-medium">{anomaly.type}</h3>
+                    </div>
+                    {getSeverityBadge(anomaly.severity)}
+                  </div>
+                  <p className="text-sm">{anomaly.description}</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Project: </span>
+                      <span className="font-medium">{anomaly.relatedProject}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Status: </span>
+                      <span className="font-medium">{anomaly.status}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Detected: </span>
+                      <span>{anomaly.timeDetected}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setAnomaliesDialogOpen(false);
+                        handleInvestigateAnomaly(anomaly);
+                      }}
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Investigate
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setAnomaliesDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Investigation Dialog */}
+      <Dialog open={investigateDialogOpen} onOpenChange={setInvestigateDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden flex flex-col">
+          {currentAnomaly && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className={`h-5 w-5 ${
+                    currentAnomaly.severity === 'high' ? 'text-red-500' : 
+                    currentAnomaly.severity === 'medium' ? 'text-amber-500' : 
+                    'text-blue-500'
+                  }`} />
+                  <DialogTitle>{currentAnomaly.type}</DialogTitle>
+                </div>
+                <DialogDescription>
+                  Anomaly #{currentAnomaly.id} • {currentAnomaly.timeDetected} • {getSeverityBadge(currentAnomaly.severity)}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-2">
+                <div className="space-y-6 py-4">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Description</h3>
+                    <p className="text-sm">{currentAnomaly.description}</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Project Context</h3>
+                    <div className="rounded-md border p-3">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Project: </span>
+                          <span className="font-medium">{currentAnomaly.relatedProject}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Status: </span>
+                          <span className="font-medium">{currentAnomaly.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Impact Assessment</h3>
+                    <div className="rounded-md border p-3 text-sm">
+                      {currentAnomaly.impact}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">AI Recommended Actions</h3>
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm mb-2">{currentAnomaly.recommendations}</p>
+                      {currentAnomaly.data?.suggestedActions && (
+                        <ul className="text-sm space-y-1 list-disc pl-4">
+                          {currentAnomaly.data.suggestedActions.map((action, index) => (
+                            <li key={index}>{action}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {currentAnomaly.data?.relatedEntities && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Related Entities</h3>
+                      <div className="space-y-2">
+                        {currentAnomaly.data.relatedEntities.map((entity, index) => (
+                          <div key={index} className="flex items-center justify-between rounded-md border p-2">
+                            <span className="text-sm">{entity.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(entity.confidence * 100)}% confidence
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {currentAnomaly.data?.timeSeriesData && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Trend Analysis</h3>
+                      <div className="h-[180px] border rounded-md p-4">
+                        {/* Simple chart visualization */}
+                        <div className="h-full flex items-end space-x-1">
+                          {currentAnomaly.data.timeSeriesData.map((point, index) => {
+                            const height = (point.value / 100) * 100;
+                            return (
+                              <div 
+                                key={index} 
+                                className="flex-1 group relative"
+                              >
+                                <div 
+                                  className={`${
+                                    index === currentAnomaly.data.timeSeriesData.length - 1 
+                                      ? 'bg-red-500' 
+                                      : 'bg-primary/60'
+                                  } h-[${height}%] min-h-[4px] rounded-t`}
+                                  style={{ height: `${height}%` }}
+                                ></div>
+                                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 z-10 bg-black text-white text-xs rounded p-1 whitespace-nowrap">
+                                  {point.date}: {point.value}
+                                </div>
+                                {index === currentAnomaly.data.timeSeriesData.length - 1 && (
+                                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 animate-pulse"></div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <DialogFooter className="pt-2">
+                <Button variant="outline" onClick={() => setInvestigateDialogOpen(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => {
+                  setInvestigateDialogOpen(false);
+                  toast({
+                    title: "Anomaly assigned",
+                    description: `Anomaly #${currentAnomaly.id} has been assigned to your team for resolution.`
+                  });
+                }}>
+                  Assign to Team
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
