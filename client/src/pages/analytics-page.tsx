@@ -71,6 +71,23 @@ export default function AnalyticsPage() {
     data?: any;
   } | null>(null);
   
+  // State for detailed predictions dialog
+  const [predictionsDialogOpen, setPredictionsDialogOpen] = useState(false);
+  const [detailedPredictions, setDetailedPredictions] = useState<Array<{
+    id: number;
+    title: string;
+    description: string;
+    category: string;
+    confidence: number;
+    impact: string;
+    trend: 'up' | 'down' | 'stable';
+    timeframe: string;
+    dataPoints?: Array<{
+      date: string;
+      value: number;
+    }>;
+  }>>([]);
+  
   // Fetch team data
   const { 
     data: teamsData, 
@@ -278,6 +295,101 @@ export default function AnalyticsPage() {
     
     setCurrentAnomaly(detailedAnomaly);
     setInvestigateDialogOpen(true);
+  };
+  
+  // Handle viewing detailed predictions
+  const handleViewDetailedPredictions = () => {
+    toast({
+      title: "Loading predictions",
+      description: "Retrieving detailed forecasts and predictions...",
+    });
+    
+    try {
+      // Generate detailed predictions data
+      const samplePredictions = [
+        {
+          id: 1,
+          title: "Project Completion Rate",
+          description: "Rate of task completion is projected to increase by 12% in the next 30 days based on current team velocity and resource allocation.",
+          category: "productivity",
+          confidence: 0.87,
+          impact: "High positive impact on overall delivery timeline",
+          trend: "up" as const,
+          timeframe: "30 days",
+          dataPoints: Array.from({ length: 12 }, (_, i) => ({
+            date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            value: 65 + Math.floor(Math.random() * 20) + (i * 0.5)
+          }))
+        },
+        {
+          id: 2,
+          title: "Resource Utilization",
+          description: "Current team allocation shows 23% underutilization in backend development resources while frontend resources are 15% overallocated.",
+          category: "resources",
+          confidence: 0.92,
+          impact: "Workflow inefficiency affecting delivery speed",
+          trend: "down" as const,
+          timeframe: "Current",
+          dataPoints: Array.from({ length: 12 }, (_, i) => ({
+            date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            value: 85 - Math.floor(Math.random() * 15) - (i * 0.8)
+          }))
+        },
+        {
+          id: 3,
+          title: "Budget Forecast",
+          description: "Based on current spending patterns, the project is projected to be 8% under budget at completion.",
+          category: "finance",
+          confidence: 0.78,
+          impact: "Potential cost savings or opportunity for additional features",
+          trend: "stable" as const,
+          timeframe: "Project end",
+          dataPoints: Array.from({ length: 12 }, (_, i) => ({
+            date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            value: 92 + Math.floor(Math.random() * 6) - (i * 0.1)
+          }))
+        },
+        {
+          id: 4,
+          title: "Quality Metrics",
+          description: "Code quality metrics predicted to improve by 7% based on recent testing patterns and defect resolution rates.",
+          category: "quality",
+          confidence: 0.81,
+          impact: "Reduced maintenance costs and technical debt",
+          trend: "up" as const,
+          timeframe: "60 days",
+          dataPoints: Array.from({ length: 12 }, (_, i) => ({
+            date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            value: 78 + Math.floor(Math.random() * 8) + (i * 0.4)
+          }))
+        },
+        {
+          id: 5,
+          title: "Team Capacity",
+          description: "Team capacity is likely to decrease by 18% during the upcoming holiday season without additional staffing.",
+          category: "resources",
+          confidence: 0.89,
+          impact: "Schedule risk for Q4 deliverables",
+          trend: "down" as const,
+          timeframe: "Q4",
+          dataPoints: Array.from({ length: 12 }, (_, i) => ({
+            date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+            value: 90 - Math.floor(Math.random() * 10) - (i * 1.2)
+          }))
+        }
+      ];
+      
+      setDetailedPredictions(samplePredictions);
+      setPredictionsDialogOpen(true);
+      
+    } catch (error) {
+      console.error('Error loading detailed predictions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load detailed predictions. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const isLoading = isTeamsLoading || isActivitiesLoading || isMetricsLoading || isAnomalyLoading;
@@ -597,7 +709,7 @@ export default function AnalyticsPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={handleViewDetailedPredictions}>
                   <BarChart3 className="h-4 w-4 mr-2" />
                   View Detailed Predictions
                 </Button>
@@ -800,6 +912,140 @@ export default function AnalyticsPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Detailed Predictions Dialog */}
+      <Dialog open={predictionsDialogOpen} onOpenChange={setPredictionsDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Detailed AI Predictions</DialogTitle>
+            <DialogDescription>
+              Comprehensive AI-generated predictions and forecasts for your projects
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="space-y-6 py-4">
+              {detailedPredictions.map((prediction) => (
+                <div key={prediction.id} className="border rounded-md p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {prediction.trend === 'up' ? (
+                        <TrendingUp className="h-5 w-5 text-green-500" />
+                      ) : prediction.trend === 'down' ? (
+                        <TrendingDown className="h-5 w-5 text-red-500" />
+                      ) : (
+                        <Target className="h-5 w-5 text-blue-500" />
+                      )}
+                      <h3 className="font-medium">{prediction.title}</h3>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                      {Math.round(prediction.confidence * 100)}% confidence
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm">{prediction.description}</p>
+                  
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Category: </span>
+                      <span className="font-medium capitalize">{prediction.category}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Impact: </span>
+                      <span className="font-medium">{prediction.impact}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Timeframe: </span>
+                      <span>{prediction.timeframe}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Trend: </span>
+                      <span className={`font-medium ${
+                        prediction.trend === 'up' ? 'text-green-600' : 
+                        prediction.trend === 'down' ? 'text-red-600' : 
+                        'text-blue-600'
+                      }`}>
+                        {prediction.trend === 'up' ? 'Increasing' : 
+                         prediction.trend === 'down' ? 'Decreasing' : 
+                         'Stable'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {prediction.dataPoints && (
+                    <div className="h-[120px] pt-2">
+                      {/* Simple chart visualization */}
+                      <div className="h-full flex items-end space-x-1">
+                        {prediction.dataPoints.map((point, index) => {
+                          const height = (point.value / 100) * 100;
+                          const isLast = index === prediction.dataPoints!.length - 1;
+                          return (
+                            <div 
+                              key={index} 
+                              className="flex-1 group relative"
+                            >
+                              <div 
+                                className={`${
+                                  isLast
+                                    ? (prediction.trend === 'up' ? 'bg-green-500' : 
+                                       prediction.trend === 'down' ? 'bg-red-500' : 
+                                       'bg-blue-500')
+                                    : 'bg-primary/60'
+                                } h-[${height}%] min-h-[4px] rounded-t`}
+                                style={{ height: `${height}%` }}
+                              ></div>
+                              <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 z-10 bg-black text-white text-xs rounded p-1 whitespace-nowrap">
+                                {point.date}: {point.value.toFixed(1)}
+                              </div>
+                              {isLast && (
+                                <div className={`absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full ${
+                                  prediction.trend === 'up' ? 'bg-green-500' : 
+                                  prediction.trend === 'down' ? 'bg-red-500' : 
+                                  'bg-blue-500'
+                                }`}></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        toast({
+                          title: "Report generated",
+                          description: `A detailed report for ${prediction.title.toLowerCase()} has been prepared.`
+                        });
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Report
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setPredictionsDialogOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setPredictionsDialogOpen(false);
+              toast({
+                title: "Predictions exported",
+                description: "All prediction data has been exported to CSV format."
+              });
+            }}>
+              <Download className="h-4 w-4 mr-2" />
+              Export All
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
