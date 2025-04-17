@@ -13,7 +13,9 @@ import {
   Zap,
   Repeat,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Loader2
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,9 +29,180 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const { toast } = useToast();
+  
+  // State for report generation
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportDownloadUrl, setReportDownloadUrl] = useState("");
+  
+  // State for calendar
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
+  
+  // State for activity view
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [allActivities, setAllActivities] = useState<Array<{
+    id: number;
+    type: string;
+    action: string;
+    subject: string;
+    project: string;
+    user: string;
+    time: string;
+    icon: JSX.Element;
+  }>>([]);
+  
+  // Handle report generation
+  const handleGenerateReport = () => {
+    setIsGeneratingReport(true);
+    toast({
+      title: "Generating report",
+      description: "Compiling data for your dashboard report...",
+    });
+    
+    // Simulate report generation
+    setTimeout(() => {
+      setIsGeneratingReport(false);
+      // Create a blob URL for the mock report
+      const reportData = {
+        date: new Date().toISOString(),
+        overview: {
+          projects: 12,
+          documents: 238,
+          teamMembers: 24,
+          integrations: 7
+        },
+        recentProjects: [
+          {
+            name: "Website Redesign",
+            status: "active",
+            progress: 68,
+            team: "Design"
+          },
+          {
+            name: "Mobile App Development",
+            status: "planning",
+            progress: 23,
+            team: "Engineering"
+          }
+        ],
+        insights: [
+          {
+            title: "Content Overlap Detected",
+            severity: "warning"
+          },
+          {
+            title: "Team Velocity Increasing",
+            severity: "positive" 
+          }
+        ]
+      };
+      
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      setReportDownloadUrl(url);
+      setReportDialogOpen(true);
+    }, 2000);
+  };
+  
+  // Handle calendar view
+  const handleViewCalendar = () => {
+    setCalendarDialogOpen(true);
+  };
+  
+  // Handle view all activities
+  const handleViewAllActivities = () => {
+    // Set up all activities (could fetch more from API in real app)
+    setAllActivities([
+      {
+        id: 1,
+        type: "document",
+        action: "uploaded",
+        subject: "Requirements.docx",
+        project: "Website Redesign",
+        user: "Sarah M.",
+        time: "15 minutes ago",
+        icon: <FileText className="h-4 w-4" />,
+      },
+      {
+        id: 2,
+        type: "comment",
+        action: "commented on",
+        subject: "API Documentation",
+        project: "Mobile App Development",
+        user: "Alex K.",
+        time: "1 hour ago",
+        icon: <Inbox className="h-4 w-4" />,
+      },
+      {
+        id: 3,
+        type: "task",
+        action: "completed",
+        subject: "User Authentication",
+        project: "Customer Portal",
+        user: "Jamal W.",
+        time: "3 hours ago",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+      },
+      {
+        id: 4,
+        type: "integration",
+        action: "connected",
+        subject: "Slack integration",
+        project: "Team Communication",
+        user: "Sophia L.",
+        time: "5 hours ago",
+        icon: <Zap className="h-4 w-4" />,
+      },
+      {
+        id: 5,
+        type: "insight",
+        action: "generated",
+        subject: "Duplicate content warning",
+        project: "Website Redesign",
+        user: "System",
+        time: "6 hours ago",
+        icon: <AlertTriangle className="h-4 w-4" />,
+      },
+      {
+        id: 6,
+        type: "document",
+        action: "updated",
+        subject: "Marketing Strategy.pptx",
+        project: "Q2 Marketing Campaign",
+        user: "Elena R.",
+        time: "1 day ago",
+        icon: <FileText className="h-4 w-4" />,
+      },
+      {
+        id: 7,
+        type: "task",
+        action: "assigned",
+        subject: "Logo Redesign",
+        project: "Website Redesign",
+        user: "Jamal W.",
+        time: "1 day ago",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+      },
+      {
+        id: 8,
+        type: "comment",
+        action: "mentioned you in",
+        subject: "Budget Discussion",
+        project: "Q2 Marketing Campaign",
+        user: "Sarah M.",
+        time: "2 days ago",
+        icon: <Inbox className="h-4 w-4" />,
+      }
+    ]);
+    
+    setActivityDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -42,11 +215,20 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button>
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Report
+          <Button onClick={handleGenerateReport} disabled={isGeneratingReport}>
+            {isGeneratingReport ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-4 w-4" />
+                Generate Report
+              </>
+            )}
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleViewCalendar}>
             <Calendar className="mr-2 h-4 w-4" />
             View Calendar
           </Button>
@@ -283,7 +465,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={handleViewAllActivities}>
                   View All Activity
                 </Button>
               </CardFooter>
@@ -742,6 +924,164 @@ export default function Dashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Report Generation Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Report Generated</DialogTitle>
+            <DialogDescription>
+              Your dashboard report has been generated successfully.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-md bg-muted p-4">
+              <div className="flex items-center gap-3 text-sm">
+                <FileText className="h-5 w-5 text-primary" />
+                <div className="font-medium">dashboard-report-{new Date().toLocaleDateString('en-US', {year: 'numeric', month: '2-digit', day: '2-digit'}).replace(/\//g, '-')}.json</div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This report includes statistics for all your projects, documents, and team activities as displayed on your dashboard.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              window.open(reportDownloadUrl);
+              setReportDialogOpen(false);
+              
+              // Release the blob URL when done
+              setTimeout(() => {
+                URL.revokeObjectURL(reportDownloadUrl);
+              }, 1000);
+            }}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Calendar Dialog */}
+      <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Project Calendar</DialogTitle>
+            <DialogDescription>
+              View and manage your upcoming project deadlines and events.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-md border p-4">
+              {/* Simplified calendar display */}
+              <div className="grid grid-cols-7 gap-2 text-center font-medium">
+                <div>Sun</div>
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-2 text-center">
+                {/* Generate dummy calendar days */}
+                {Array.from({ length: 30 }, (_, i) => (
+                  <div 
+                    key={i} 
+                    className={`p-2 rounded ${
+                      [4, 12, 18, 23].includes(i) 
+                        ? 'bg-primary/20 font-medium text-primary hover:bg-primary/30' 
+                        : 'hover:bg-muted/50'
+                    } cursor-pointer`}
+                  >
+                    {i + 1}
+                    {i === 4 && <div className="mt-1 text-xs">Website</div>}
+                    {i === 12 && <div className="mt-1 text-xs">Meeting</div>}
+                    {i === 18 && <div className="mt-1 text-xs">Deadline</div>}
+                    {i === 23 && <div className="mt-1 text-xs">Release</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Upcoming Events</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between rounded-md border p-3 text-sm">
+                  <div>
+                    <div className="font-medium">Website Redesign Milestone</div>
+                    <div className="text-xs text-muted-foreground">Design Team • High Priority</div>
+                  </div>
+                  <div className="text-muted-foreground">April 5, 2023</div>
+                </div>
+                <div className="flex justify-between rounded-md border p-3 text-sm">
+                  <div>
+                    <div className="font-medium">Stakeholder Meeting</div>
+                    <div className="text-xs text-muted-foreground">All Teams • Medium Priority</div>
+                  </div>
+                  <div className="text-muted-foreground">April 13, 2023</div>
+                </div>
+                <div className="flex justify-between rounded-md border p-3 text-sm">
+                  <div>
+                    <div className="font-medium">API Documentation Deadline</div>
+                    <div className="text-xs text-muted-foreground">Engineering Team • High Priority</div>
+                  </div>
+                  <div className="text-muted-foreground">April 19, 2023</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCalendarDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Activity Dialog */}
+      <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>All Activities</DialogTitle>
+            <DialogDescription>
+              A complete log of recent activities across all projects.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            <div className="space-y-4 py-4">
+              {allActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
+                  <div className="mt-1 rounded-full bg-primary/10 p-1 text-primary">
+                    {activity.icon}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm font-medium leading-none">
+                        {activity.user} {activity.action}{" "}
+                        <strong>{activity.subject}</strong>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.time}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {activity.project}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActivityDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
