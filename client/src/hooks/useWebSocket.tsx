@@ -39,12 +39,25 @@ export function useWebSocket(): UseWebSocketReturn {
         setConnecting(true);
         
         // In Replit, we need to be careful about the WebSocket URL construction
-        // Use wss:// for https, ws:// for http
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         
-        // Get the correct host, ensuring we use the Replit domain
-        const host = window.location.host;
-        const wsUrl = `${protocol}//${host}/ws`;
+        // Properly handle Replit domains and WebSocket protocol
+        let wsUrl: string;
+        
+        if (window.location.hostname.includes('.repl.co') || window.location.hostname.includes('.replit.app')) {
+          // This is a Replit deployment
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = window.location.host;
+          wsUrl = `${protocol}//${host}/ws`;
+        } else if (import.meta.env.DEV) {
+          // Local development
+          const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+          wsUrl = `ws://localhost:${port}/ws`;
+        } else {
+          // Production environment but not on Replit
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = window.location.host;
+          wsUrl = `${protocol}//${host}/ws`;
+        }
         
         console.log('Connecting to WebSocket server at:', wsUrl);
         
@@ -52,12 +65,33 @@ export function useWebSocket(): UseWebSocketReturn {
         let socket: WebSocket;
         try {
           socket = new WebSocket(wsUrl);
+          
+          // Add a timeout to detect connection issues
+          const connectionTimeout = setTimeout(() => {
+            if (socket.readyState !== WebSocket.OPEN) {
+              console.warn('WebSocket connection timeout, closing socket to retry');
+              socket.close();
+            }
+          }, 5000);
+          
+          // Clear timeout once connected
+          socket.addEventListener('open', () => {
+            clearTimeout(connectionTimeout);
+          });
         } catch (wsError) {
           console.error('Initial WebSocket construction failed:', wsError);
           
-          // Fallback to plain ws protocol if wss fails (for development in Replit)
-          console.log('Trying fallback WebSocket connection with ws:// protocol');
-          socket = new WebSocket(`ws://${host}/ws`);
+          // Fallback attempt with alternative protocol
+          if (wsUrl.startsWith('wss:')) {
+            console.log('Trying fallback WebSocket connection with ws:// protocol');
+            wsUrl = wsUrl.replace('wss:', 'ws:');
+          } else {
+            console.log('Trying fallback WebSocket connection with wss:// protocol');
+            wsUrl = wsUrl.replace('ws:', 'wss:');
+          }
+          
+          console.log('Fallback WebSocket URL:', wsUrl);
+          socket = new WebSocket(wsUrl);
         }
         socketRef.current = socket;
         
