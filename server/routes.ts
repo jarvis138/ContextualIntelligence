@@ -41,6 +41,7 @@ import {
   getSlackChannels,
   extractProjectDataFromSlack
 } from "./services/slack";
+import { auditMiddleware, authAuditMiddleware, destructiveOperationAuditMiddleware } from "./middleware/audit-middleware";
 import * as openaiService from "./services/openai";
 import * as oauthController from "./controllers/oauthController";
 

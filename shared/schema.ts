@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
+import { tenants } from "./tenant-schema";
 
 // Define entity types for NLP processing
 export enum EntityType {
@@ -59,7 +60,7 @@ export type SearchResult = z.infer<typeof searchResultSchema>;
 
 // Enums for consistent values across the application
 export const userRoleEnum = pgEnum("user_role", ["admin", "manager", "user", "viewer"]);
-export const authMethodEnum = pgEnum("auth_method", ["local", "google", "microsoft", "slack", "github"]);
+export const authMethodEnum = pgEnum("auth_method", ["local", "google", "microsoft", "slack", "github", "saml", "scim"]);
 export const taskStatusEnum = pgEnum("task_status", ["pending", "in_progress", "review", "completed", "blocked"]);
 export const projectStatusEnum = pgEnum("project_status", ["planning", "active", "on_hold", "completed", "archived"]);
 export const documentTypeEnum = pgEnum("document_type", ["text", "requirements", "design", "code", "meeting", "summary", "report"]);
@@ -67,6 +68,17 @@ export const entityTypeEnum = pgEnum("entity_type", ["project", "task", "documen
 export const activityTypeEnum = pgEnum("activity_type", ["create", "update", "delete", "comment", "assign", "complete", "ai", "search"]);
 export const integrationTypeEnum = pgEnum("integration_type", ["slack", "github", "jira", "google", "microsoft", "trello", "asana", "custom"]);
 export const insightTypeEnum = pgEnum("insight_type", ["warning", "info", "success", "alert"]);
+
+// Security and audit related enums
+export const auditCategoryEnum = pgEnum("audit_category", [
+  "AUTH", "DATA_ACCESS", "DATA_MODIFICATION", "ADMIN", 
+  "SYSTEM", "SECURITY", "USER_MANAGEMENT", "CONFIG", 
+  "INTEGRATION", "TENANT"
+]);
+
+export const auditSeverityEnum = pgEnum("audit_severity", [
+  "INFO", "WARNING", "ERROR", "CRITICAL"
+]);
 
 // System monitoring related enums
 export const systemMetricTypeEnum = pgEnum("system_metric_type", ["cpu", "memory", "disk", "network", "api", "database", "queue", "custom"]);
@@ -625,19 +637,31 @@ export const userSessions = pgTable("user_sessions", {
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
+  tenantId: integer("tenant_id").references(() => tenants.id),
   action: varchar("action", { length: 100 }).notNull(),
-  entityType: varchar("entity_type", { length: 50 }).notNull(),
-  entityId: integer("entity_id"),
+  category: auditCategoryEnum("category").notNull().default("DATA_MODIFICATION"),
+  severity: auditSeverityEnum("severity").notNull().default("INFO"),
+  resourceType: varchar("resource_type", { length: 100 }).notNull(),
+  resourceId: varchar("resource_id", { length: 255 }),
+  description: text("description"),
   oldValue: jsonb("old_value"),
   newValue: jsonb("new_value"),
+  metadata: jsonb("metadata"),
   ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: text("user_agent"),
+  success: boolean("success").notNull().default(true),
+  sessionId: varchar("session_id", { length: 100 }),
+  encryptedData: text("encrypted_data"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 }, (table) => {
   return {
     userIdIdx: index("audit_user_id_idx").on(table.userId),
+    tenantIdIdx: index("audit_tenant_id_idx").on(table.tenantId),
     actionIdx: index("audit_action_idx").on(table.action),
-    entityIdx: index("audit_entity_idx").on(table.entityType, table.entityId),
+    categoryIdx: index("audit_category_idx").on(table.category),
+    severityIdx: index("audit_severity_idx").on(table.severity),
+    resourceIdx: index("audit_resource_idx").on(table.resourceType, table.resourceId),
+    successIdx: index("audit_success_idx").on(table.success),
     timestampIdx: index("audit_timestamp_idx").on(table.timestamp),
   };
 });
@@ -646,6 +670,10 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, {
     fields: [auditLogs.userId],
     references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [auditLogs.tenantId],
+    references: [tenants.id],
   }),
 }));
 
