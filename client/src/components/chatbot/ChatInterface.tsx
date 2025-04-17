@@ -871,22 +871,35 @@ export function ChatInterface() {
       {!isAssistantOpen && (
         <Button
           onClick={toggleAssistant}
-          className="fixed bottom-4 right-4 rounded-full h-12 w-12 p-0 shadow-md"
+          className="fixed bottom-4 right-4 rounded-full h-14 w-14 p-0 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary text-primary-foreground flex items-center justify-center"
+          aria-label="Open Project Intelligence Assistant"
         >
-          <BrainCircuit className="h-6 w-6" />
+          <div className="relative">
+            <BrainCircuit className="h-7 w-7" />
+            <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-white">
+              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+          </div>
         </Button>
       )}
 
       {/* Chatbot interface */}
       {isAssistantOpen && (
         <Card className={cn(
-          "fixed right-4 shadow-lg transition-all duration-300 ease-in-out z-50",
+          "fixed right-4 transition-all duration-300 ease-in-out z-50 chatbot-card",
           isMinimized ? "bottom-4 h-14 w-72" : "bottom-4 h-[500px] w-[360px]"
         )}>
           {/* Chat header */}
-          <div className="flex items-center justify-between p-3 border-b bg-primary text-primary-foreground">
+          <div className="flex items-center justify-between p-3 border-b bg-primary text-primary-foreground rounded-t-lg">
             <div className="flex items-center gap-2">
-              <BrainCircuit className="h-5 w-5" />
+              <div className="relative">
+                <BrainCircuit className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2 items-center justify-center rounded-full">
+                  <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary-foreground opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1 w-1 bg-primary-foreground"></span>
+                </span>
+              </div>
               <h3 className="font-medium">Project Intelligence Assistant</h3>
             </div>
             <div className="flex items-center gap-1">
@@ -953,10 +966,13 @@ export function ChatInterface() {
                       )}
                       <div
                         className={cn(
-                          "rounded-lg p-3",
+                          "rounded-lg p-3 message-bubble",
                           message.sender === 'user'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
+                            ? "bg-primary text-primary-foreground message-bubble-user"
+                            : "bg-muted message-bubble-bot",
+                          message.type === 'alert' && "border-l-4 border-destructive",
+                          message.type === 'suggestion' && "border-l-4 border-primary/70",
+                          message.type === 'task' && "border-l-4 border-yellow-500"
                         )}
                       >
                         {getMessageComponent(message)}

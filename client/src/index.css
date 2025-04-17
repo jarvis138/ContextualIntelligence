@@ -11,3 +11,78 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* CPI Hub Custom Styles for Tour and Chatbot */
+@layer components {
+  /* Tour Styles */
+  .cpi-hub-tour {
+    --reactour-accent: var(--primary);
+    font-family: var(--font-sans);
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    background-color: #ffffff !important;
+    max-width: 400px !important;
+    padding: 16px !important;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+  }
+
+  .cpi-hub-tour button {
+    transition: all 0.2s ease;
+  }
+
+  .cpi-hub-tour button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  /* Chatbot Animation */
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.8);
+    }
+    80%, 100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pulse-dot {
+    0% {
+      transform: scale(0.8);
+    }
+    50% {
+      transform: scale(1);
+    }
+    100% {
+      transform: scale(0.8);
+    }
+  }
+
+  .chatbot-pulse-ring {
+    animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  }
+
+  .chatbot-pulse-dot {
+    animation: pulse-dot 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+  }
+
+  /* Message bubbles in chatbot */
+  .message-bubble {
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .message-bubble-user {
+    border-top-right-radius: 2px !important;
+  }
+
+  .message-bubble-bot {
+    border-top-left-radius: 2px !important;
+  }
+
+  /* Add shadow to the chatbot card */
+  .chatbot-card {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+  }
+}

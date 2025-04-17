@@ -42,6 +42,7 @@ declare module 'reactour' {
     goToStep?: number;
     disableFocusLock?: boolean;
     disableDotsNavigation?: boolean;
+    style?: React.CSSProperties;
   }
 
   const Tour: React.FC<TourProps>;
