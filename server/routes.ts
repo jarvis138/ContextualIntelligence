@@ -30,6 +30,7 @@ import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
 import { registerAdminRoutes } from "./routes/admin-api";
 import { registerTenantRoutes } from "./routes/tenant-routes";
+import adminAuditRoutes from "./routes/admin-audit-routes";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
 import { TokenRefresh } from "./services/tokenRefresh";
@@ -68,6 +69,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Add token refresh middleware
   app.use(TokenRefresh.createTokenRefreshMiddleware());
+  
+  // Add security audit middleware
+  // General audit logging for all API routes
+  app.use('/api', auditMiddleware);
+  
+  // Special audit logging for authentication routes
+  app.use('/api/v1/auth', authAuditMiddleware);
+  
+  // Special audit logging for destructive operations
+  app.use(destructiveOperationAuditMiddleware);
   
   // Create initial demo data if the database is empty
   const createInitialData = async () => {
@@ -2241,6 +2252,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register admin API routes
   registerAdminRoutes(app);
+  
+  // Register admin audit routes
+  app.use('/api/admin', adminAuditRoutes);
   
   // Register tenant management routes
   registerTenantRoutes(app);

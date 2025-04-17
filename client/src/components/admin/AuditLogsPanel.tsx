@@ -1,625 +1,536 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { 
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  AlertCircle,
   AlertTriangle,
-  Calendar, 
-  Download, 
-  Eye, 
-  FileDown, 
-  Loader2, 
-  RefreshCcw, 
-  Search, 
-  SlidersHorizontal, 
-  User 
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+  Info,
+  Search,
+  Database,
+  RefreshCw,
+  Download,
+  Calendar,
+  User,
+} from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
+import { DatePicker } from '@/components/ui/date-picker';
 
-// Action badge component
-const ActionBadge = ({ action }: { action: string }) => {
-  const getBadgeVariant = () => {
-    switch (action) {
-      case "create":
-        return "default";
-      case "update":
-        return "secondary";
-      case "delete":
-        return "destructive";
-      case "login":
-      case "logout":
-        return "outline";
-      case "export":
-      case "import":
-        return "default";
-      case "admin_action":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
+// Audit log type from server
+interface AuditLog {
+  id: number;
+  userId: number;
+  tenantId?: number;
+  action: string;
+  category: string;
+  severity: string;
+  resourceType: string;
+  resourceId?: string;
+  description?: string;
+  timestamp: string;
+  success?: boolean;
+  ipAddress?: string;
+  userAgent?: string;
+}
 
-  return (
-    <Badge variant={getBadgeVariant()} className="capitalize">
-      {action.replace('_', ' ')}
-    </Badge>
-  );
-};
+// Filter options
+interface AuditLogFilters {
+  category?: string;
+  severity?: string;
+  fromDate?: Date;
+  toDate?: Date;
+  userId?: number;
+  tenantId?: number;
+  resourceType?: string;
+  search?: string;
+  success?: boolean;
+}
 
-// Format date in a user-friendly way
-const formatDate = (dateString: string) => {
-  if (!dateString) return "—";
-  
-  const date = new Date(dateString);
-  const now = new Date();
-  
-  // For today, show time only
-  if (date.toDateString() === now.toDateString()) {
-    return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  
-  // For yesterday
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  
-  // For dates within the last week
-  if (now.getTime() - date.getTime() < 7 * 24 * 60 * 60 * 1000) {
-    return `${date.toLocaleDateString([], { weekday: 'long' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  
-  // For older dates
-  return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + 
-         ` at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-};
-
-const AuditLogsPanel = () => {
-  const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState({
-    action: "",
-    user: "",
-    startDate: null as Date | null,
-    endDate: null as Date | null,
-    entityType: "",
-  });
+export default function AuditLogsPanel() {
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
+  const [filters, setFilters] = useState<AuditLogFilters>({});
 
-  // Fetch audit logs data
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey: [
-      "/admin-api/audit-logs", 
-      page, 
-      itemsPerPage, 
-      filters.action, 
-      filters.user, 
-      filters.startDate, 
-      filters.endDate, 
-      filters.entityType
-    ],
+  // Fetch audit logs with filters
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['/api/admin/audit-logs', page, pageSize, filters],
+    queryFn: async () => {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: pageSize.toString(),
+        ...(filters.category && { category: filters.category }),
+        ...(filters.severity && { severity: filters.severity }),
+        ...(filters.fromDate && { fromDate: filters.fromDate.toISOString() }),
+        ...(filters.toDate && { toDate: filters.toDate.toISOString() }),
+        ...(filters.userId && { userId: filters.userId.toString() }),
+        ...(filters.tenantId && { tenantId: filters.tenantId.toString() }),
+        ...(filters.resourceType && { resourceType: filters.resourceType }),
+        ...(filters.search && { search: filters.search }),
+        ...(filters.success !== undefined && { success: filters.success.toString() }),
+      });
+      
+      return apiRequest(`/api/admin/audit-logs?${queryParams.toString()}`);
+    },
   });
-
-  const auditLogs = data?.logs || [];
-  const totalLogs = data?.total || 0;
-  const totalPages = Math.ceil(totalLogs / itemsPerPage);
 
   // Handle filter changes
-  const handleFilterChange = (key: string, value: any) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-    
-    // Reset to first page when filters change
+  const handleFilterChange = (key: keyof AuditLogFilters, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1); // Reset to first page when filters change
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setFilters({});
     setPage(1);
   };
 
-  // Handle exporting logs
-  const handleExportLogs = async () => {
+  // Handle export to CSV
+  const exportToCSV = async () => {
     try {
-      toast({
-        title: "Exporting logs",
-        description: "Your logs are being prepared for export.",
+      const queryParams = new URLSearchParams({
+        format: 'csv',
+        ...(filters.category && { category: filters.category }),
+        ...(filters.severity && { severity: filters.severity }),
+        ...(filters.fromDate && { fromDate: filters.fromDate.toISOString() }),
+        ...(filters.toDate && { toDate: filters.toDate.toISOString() }),
+        ...(filters.userId && { userId: filters.userId.toString() }),
+        ...(filters.tenantId && { tenantId: filters.tenantId.toString() }),
+        ...(filters.resourceType && { resourceType: filters.resourceType }),
+        ...(filters.search && { search: filters.search }),
+        ...(filters.success !== undefined && { success: filters.success.toString() }),
       });
       
-      // In a real implementation, this would download a file
-      setTimeout(() => {
-        toast({
-          title: "Logs exported",
-          description: "Audit logs have been exported successfully.",
-        });
-      }, 1500);
+      // Request CSV data
+      const response = await fetch(`/api/admin/audit-logs/export?${queryParams.toString()}`);
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
-      console.error("Error exporting logs:", error);
-      toast({
-        title: "Export failed",
-        description: "Failed to export audit logs. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Failed to export audit logs', error);
     }
   };
 
-  // Filter logs based on search query
-  const filteredLogs = auditLogs.filter((log: any) => {
-    if (!searchQuery) return true;
+  // Generate severity badge
+  const getSeverityBadge = (severity: string) => {
+    switch (severity.toUpperCase()) {
+      case 'CRITICAL':
+        return (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Critical
+          </Badge>
+        );
+      case 'ERROR':
+        return (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Error
+          </Badge>
+        );
+      case 'WARNING':
+        return (
+          <Badge variant="warning" className="flex items-center gap-1 bg-yellow-500 text-white hover:bg-yellow-600">
+            <AlertTriangle className="h-3 w-3" />
+            Warning
+          </Badge>
+        );
+      case 'INFO':
+      default:
+        return (
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            Info
+          </Badge>
+        );
+    }
+  };
+
+  // Format timestamp
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(date);
+  };
+
+  // Generate status badge
+  const getStatusBadge = (success?: boolean) => {
+    if (success === undefined) return null;
     
-    const searchTerms = searchQuery.toLowerCase().split(" ");
-    const logData = `${log.user?.username || ""} ${log.action} ${log.description} ${log.entityType || ""}`.toLowerCase();
-    
-    return searchTerms.every((term) => logData.includes(term));
-  });
+    return success ? (
+      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+        Success
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+        Failed
+      </Badge>
+    );
+  };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-          <div>
-            <CardTitle>Audit Logs</CardTitle>
-            <CardDescription>Track all system activities and user actions</CardDescription>
-          </div>
-          <div className="mt-4 sm:mt-0 flex space-x-2">
-            <Button variant="outline" size="sm" onClick={handleExportLogs}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-          </div>
-        </div>
+        <CardTitle className="text-2xl font-bold">Security Audit Logs</CardTitle>
+        <CardDescription>
+          View and analyze security events across the platform
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="relative w-full sm:w-auto">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search audit logs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 w-full sm:w-[300px]"
-              />
+        {/* Filters */}
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-wrap gap-4">
+            <div className="w-full md:w-auto">
+              <Label htmlFor="search" className="mb-1">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Search logs..."
+                  className="pl-8"
+                  value={filters.search || ''}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                />
+              </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    <SlidersHorizontal className="mr-2 h-4 w-4" />
-                    Filters
-                    {Object.values(filters).some(value => value !== "" && value !== null) && (
-                      <Badge variant="secondary" className="ml-2 px-1 py-0">
-                        {Object.values(filters).filter(value => value !== "" && value !== null).length}
-                      </Badge>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80">
-                  <div className="space-y-4">
-                    <h4 className="font-medium">Filter Logs</h4>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-action">Action Type</Label>
-                      <Select
-                        value={filters.action}
-                        onValueChange={(value) => handleFilterChange("action", value)}
-                      >
-                        <SelectTrigger id="filter-action">
-                          <SelectValue placeholder="All actions" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">All actions</SelectItem>
-                          <SelectItem value="create">Create</SelectItem>
-                          <SelectItem value="update">Update</SelectItem>
-                          <SelectItem value="delete">Delete</SelectItem>
-                          <SelectItem value="read">Read</SelectItem>
-                          <SelectItem value="login">Login</SelectItem>
-                          <SelectItem value="logout">Logout</SelectItem>
-                          <SelectItem value="export">Export</SelectItem>
-                          <SelectItem value="import">Import</SelectItem>
-                          <SelectItem value="share">Share</SelectItem>
-                          <SelectItem value="invite">Invite</SelectItem>
-                          <SelectItem value="admin_action">Admin Action</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-entity">Entity Type</Label>
-                      <Select
-                        value={filters.entityType}
-                        onValueChange={(value) => handleFilterChange("entityType", value)}
-                      >
-                        <SelectTrigger id="filter-entity">
-                          <SelectValue placeholder="All entities" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">All entities</SelectItem>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="project">Project</SelectItem>
-                          <SelectItem value="team">Team</SelectItem>
-                          <SelectItem value="document">Document</SelectItem>
-                          <SelectItem value="organization">Organization</SelectItem>
-                          <SelectItem value="subscription">Subscription</SelectItem>
-                          <SelectItem value="api_key">API Key</SelectItem>
-                          <SelectItem value="setting">Setting</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Date Range</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="justify-start text-left font-normal"
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {filters.startDate ? (
-                                filters.startDate.toLocaleDateString()
-                              ) : (
-                                <span>Start date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <CalendarComponent
-                              mode="single"
-                              selected={filters.startDate}
-                              onSelect={(date) => handleFilterChange("startDate", date)}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="justify-start text-left font-normal"
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {filters.endDate ? (
-                                filters.endDate.toLocaleDateString()
-                              ) : (
-                                <span>End date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <CalendarComponent
-                              mode="single"
-                              selected={filters.endDate}
-                              onSelect={(date) => handleFilterChange("endDate", date)}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between pt-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setFilters({
-                            action: "",
-                            user: "",
-                            startDate: null,
-                            endDate: null,
-                            entityType: "",
-                          });
-                        }}
-                      >
-                        Reset filters
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          // Apply filters and close popover
-                          document.body.click(); // Close popover
-                        }}
-                      >
-                        Apply filters
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              
+            <div className="w-full md:w-auto">
+              <Label htmlFor="category" className="mb-1">Category</Label>
               <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(value) => {
-                  setItemsPerPage(parseInt(value));
-                  setPage(1); // Reset to first page when changing items per page
-                }}
+                value={filters.category || ''}
+                onValueChange={(value) => handleFilterChange('category', value || undefined)}
               >
-                <SelectTrigger className="w-[130px] h-9">
-                  <SelectValue placeholder="Rows per page" />
+                <SelectTrigger id="category" className="w-[180px]">
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10">10 per page</SelectItem>
-                  <SelectItem value="20">20 per page</SelectItem>
-                  <SelectItem value="50">50 per page</SelectItem>
-                  <SelectItem value="100">100 per page</SelectItem>
+                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="AUTH">Authentication</SelectItem>
+                  <SelectItem value="DATA_ACCESS">Data Access</SelectItem>
+                  <SelectItem value="DATA_MODIFICATION">Data Modification</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="SYSTEM">System</SelectItem>
+                  <SelectItem value="SECURITY">Security</SelectItem>
+                  <SelectItem value="USER_MANAGEMENT">User Management</SelectItem>
+                  <SelectItem value="CONFIG">Configuration</SelectItem>
+                  <SelectItem value="INTEGRATION">Integration</SelectItem>
+                  <SelectItem value="TENANT">Tenant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="w-full md:w-auto">
+              <Label htmlFor="severity" className="mb-1">Severity</Label>
+              <Select
+                value={filters.severity || ''}
+                onValueChange={(value) => handleFilterChange('severity', value || undefined)}
+              >
+                <SelectTrigger id="severity" className="w-[180px]">
+                  <SelectValue placeholder="All Severities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Severities</SelectItem>
+                  <SelectItem value="INFO">Info</SelectItem>
+                  <SelectItem value="WARNING">Warning</SelectItem>
+                  <SelectItem value="ERROR">Error</SelectItem>
+                  <SelectItem value="CRITICAL">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <Label htmlFor="resource-type" className="mb-1">Resource Type</Label>
+              <div className="flex items-center">
+                <Database className="mr-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="resource-type"
+                  placeholder="Resource type..."
+                  value={filters.resourceType || ''}
+                  onChange={(e) => handleFilterChange('resourceType', e.target.value || undefined)}
+                  className="w-[180px]"
+                />
+              </div>
+            </div>
           </div>
           
-          {Object.values(filters).some(value => value !== "" && value !== null) && (
-            <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Filters applied</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 ml-auto"
-                onClick={() => {
-                  setFilters({
-                    action: "",
-                    user: "",
-                    startDate: null,
-                    endDate: null,
-                    entityType: "",
-                  });
+          <div className="flex flex-wrap gap-4">
+            <div className="w-full md:w-auto">
+              <Label htmlFor="from-date" className="mb-1">From Date</Label>
+              <div className="flex items-center">
+                <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                <DatePicker
+                  id="from-date"
+                  date={filters.fromDate}
+                  onSelect={(date) => handleFilterChange('fromDate', date)}
+                  className="w-[180px]"
+                />
+              </div>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <Label htmlFor="to-date" className="mb-1">To Date</Label>
+              <div className="flex items-center">
+                <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                <DatePicker
+                  id="to-date"
+                  date={filters.toDate}
+                  onSelect={(date) => handleFilterChange('toDate', date)}
+                  className="w-[180px]"
+                />
+              </div>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <Label htmlFor="user-id" className="mb-1">User ID</Label>
+              <div className="flex items-center">
+                <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="user-id"
+                  type="number"
+                  placeholder="User ID..."
+                  value={filters.userId || ''}
+                  onChange={(e) => handleFilterChange('userId', e.target.value ? parseInt(e.target.value) : undefined)}
+                  className="w-[180px]"
+                />
+              </div>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <Label htmlFor="status" className="mb-1">Status</Label>
+              <Select
+                value={filters.success !== undefined ? filters.success.toString() : ''}
+                onValueChange={(value) => {
+                  if (value === '') {
+                    handleFilterChange('success', undefined);
+                  } else {
+                    handleFilterChange('success', value === 'true');
+                  }
                 }}
               >
-                Clear all
+                <SelectTrigger id="status" className="w-[180px]">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="true">Success</SelectItem>
+                  <SelectItem value="false">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-end ml-auto">
+              <Button variant="outline" className="mr-2" onClick={resetFilters}>
+                Reset Filters
+              </Button>
+              <Button variant="default" onClick={() => refetch()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button variant="secondary" className="ml-2" onClick={exportToCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
               </Button>
             </div>
-          )}
+          </div>
+        </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : isError ? (
-            <div className="py-8 text-center text-red-500">
-              Error loading audit logs. Please try again.
-            </div>
-          ) : (
+        {/* Audit logs table */}
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        ) : isError ? (
+          <div className="text-center py-8 text-destructive">
+            <AlertCircle className="mx-auto h-8 w-8 mb-2" />
+            <p>Failed to load audit logs. Please try again.</p>
+          </div>
+        ) : (
+          <>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>User</TableHead>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User ID</TableHead>
                     <TableHead>Action</TableHead>
-                    <TableHead className="w-[40%]">Description</TableHead>
-                    <TableHead>Entity Type</TableHead>
-                    <TableHead className="text-right">Details</TableHead>
+                    <TableHead>Resource</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>IP Address</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6">
-                        {searchQuery || Object.values(filters).some(value => value !== "" && value !== null)
-                          ? "No logs match your search or filter criteria."
-                          : "No audit logs found."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredLogs.map((log: any) => (
+                  {data?.logs?.length ? (
+                    data.logs.map((log: AuditLog) => (
                       <TableRow key={log.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {formatDate(log.timestamp)}
+                        <TableCell className="font-mono text-xs">
+                          {formatTimestamp(log.timestamp)}
+                        </TableCell>
+                        <TableCell>{log.userId}</TableCell>
+                        <TableCell className="max-w-[200px] truncate" title={log.action}>
+                          {log.action}
+                          {log.description && (
+                            <div className="text-xs text-muted-foreground truncate" title={log.description}>
+                              {log.description}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span>{log.user?.username || "System"}</span>
-                          </div>
+                          {log.resourceType}
+                          {log.resourceId && <span className="text-xs text-muted-foreground ml-1">#{log.resourceId}</span>}
                         </TableCell>
-                        <TableCell>
-                          <ActionBadge action={log.action} />
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {log.description}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {log.entityType || "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[400px]">
-                              <div className="space-y-2">
-                                <h4 className="font-medium">Audit Log Details</h4>
-                                <Accordion type="single" collapsible className="w-full">
-                                  <AccordionItem value="metadata">
-                                    <AccordionTrigger>Metadata</AccordionTrigger>
-                                    <AccordionContent>
-                                      <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">ID:</span>
-                                          <span>{log.id}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Timestamp:</span>
-                                          <span>{new Date(log.timestamp).toISOString()}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">IP Address:</span>
-                                          <span>{log.ipAddress || "—"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">User Agent:</span>
-                                          <span className="truncate max-w-[250px]">{log.userAgent || "—"}</span>
-                                        </div>
-                                      </div>
-                                    </AccordionContent>
-                                  </AccordionItem>
-                                  <AccordionItem value="entity">
-                                    <AccordionTrigger>Entity Information</AccordionTrigger>
-                                    <AccordionContent>
-                                      <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Entity Type:</span>
-                                          <span className="capitalize">{log.entityType || "—"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Entity ID:</span>
-                                          <span>{log.entityId || "—"}</span>
-                                        </div>
-                                        {log.entityName && (
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Entity Name:</span>
-                                            <span>{log.entityName}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </AccordionContent>
-                                  </AccordionItem>
-                                  {log.changes && (
-                                    <AccordionItem value="changes">
-                                      <AccordionTrigger>Changes</AccordionTrigger>
-                                      <AccordionContent>
-                                        <div className="space-y-2 text-sm">
-                                          {Object.entries(log.changes).map(([key, value]: [string, any]) => (
-                                            <div key={key} className="space-y-1">
-                                              <div className="font-medium">{key}</div>
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <div className="bg-muted p-1 rounded text-xs overflow-auto">
-                                                  {JSON.stringify(value.from, null, 2) || "null"}
-                                                </div>
-                                                <div className="bg-muted p-1 rounded text-xs overflow-auto">
-                                                  {JSON.stringify(value.to, null, 2) || "null"}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                          {(!log.changes || Object.keys(log.changes).length === 0) && (
-                                            <div className="text-muted-foreground">No changes recorded</div>
-                                          )}
-                                        </div>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  )}
-                                </Accordion>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </TableCell>
+                        <TableCell>{getSeverityBadge(log.severity)}</TableCell>
+                        <TableCell>{getStatusBadge(log.success)}</TableCell>
+                        <TableCell className="font-mono text-xs">{log.ipAddress}</TableCell>
                       </TableRow>
                     ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        No audit logs found matching the current filters.
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
-          )}
-          
-          {/* Pagination */}
-          {!isLoading && !isError && totalPages > 1 && (
-            <div className="flex items-center justify-between py-2">
-              <div className="text-sm text-muted-foreground">
-                Showing {((page - 1) * itemsPerPage) + 1} to {Math.min(page * itemsPerPage, totalLogs)} of {totalLogs} entries
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(1)}
-                  disabled={page === 1}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                >
-                  Previous
-                </Button>
-                <div className="text-sm">
-                  Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+
+            {/* Pagination */}
+            {data?.pagination && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((page - 1) * pageSize) + 1}-
+                  {Math.min(page * pageSize, data.pagination.totalItems)} of {data.pagination.totalItems} logs
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page === totalPages}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(totalPages)}
-                  disabled={page === totalPages}
-                >
-                  Last
-                </Button>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                        disabled={page === 1}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: Math.min(5, data.pagination.totalPages) }, (_, i) => {
+                      // Logic to show 5 page links centered around the current page
+                      let pageNum;
+                      if (data.pagination.totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (page <= 3) {
+                        pageNum = i + 1;
+                      } else if (page >= data.pagination.totalPages - 2) {
+                        pageNum = data.pagination.totalPages - 4 + i;
+                      } else {
+                        pageNum = page - 2 + i;
+                      }
+                      
+                      return (
+                        <PaginationItem key={i}>
+                          <PaginationLink
+                            onClick={() => setPage(pageNum)}
+                            isActive={page === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    
+                    {data.pagination.totalPages > 5 && page < data.pagination.totalPages - 2 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationLink
+                            onClick={() => setPage(data.pagination.totalPages)}
+                          >
+                            {data.pagination.totalPages}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </>
+                    )}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setPage(prev => Math.min(prev + 1, data.pagination.totalPages))}
+                        disabled={page === data.pagination.totalPages}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(parseInt(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[70px]">
+                      <SelectValue placeholder={pageSize.toString()} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" size="sm" onClick={handleExportLogs}>
-          <Download className="mr-2 h-4 w-4" />
-          Export Logs
-        </Button>
-      </CardFooter>
     </Card>
   );
-};
-
-export default AuditLogsPanel;
+}

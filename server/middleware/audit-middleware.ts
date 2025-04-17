@@ -1,478 +1,282 @@
 /**
  * Audit Middleware
  * 
- * This middleware intercepts API requests and responses to automatically
- * log relevant security events for auditing purposes.
+ * Provides middleware for automatic security event logging across the application.
+ * Includes specialized middleware for authentication events and destructive operations.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import { AuditService, AuditCategory, AuditSeverity, AuditActions } from '../services/auditService';
-import { getClientInfo, getTenantId, getSanitizedRequestData } from '../utils/requestUtils';
-
-// Paths that should be audited
-const AUDITED_PATHS = [
-  // Authentication paths
-  '/auth/login',
-  '/auth/register',
-  '/auth/logout',
-  '/auth/refresh-token',
-  // User management paths
-  '/api/v1/users',
-  // Administrative paths
-  '/api/v1/admin',
-  // Tenant paths
-  '/api/v1/tenants',
-  // Integration paths
-  '/api/v1/integrations',
-  // System configuration paths
-  '/api/v1/settings',
-  // API key management
-  '/api/v1/api-keys',
-];
-
-// Sensitive operations that should always be audited
-const SENSITIVE_OPERATIONS = [
-  // Methods that modify data
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-];
+import { getSanitizedRequestData, getTenantId } from '../utils/requestUtils';
 
 /**
- * Determines if a request should be audited based on path and method
- * 
- * @param req Express request
- * @returns Whether the request should be audited
+ * General audit middleware for API routes
+ * Logs access to API endpoints and the result of operations
  */
-function shouldAuditRequest(req: Request): boolean {
-  const path = req.path;
-  const method = req.method;
-  
-  // Check if path is in audited paths or starts with any of them
-  const isAuditedPath = AUDITED_PATHS.some(auditedPath => 
-    path === auditedPath || path.startsWith(`${auditedPath}/`)
-  );
-  
-  // Check if method is considered sensitive
-  const isSensitiveOperation = SENSITIVE_OPERATIONS.includes(method);
-  
-  // Special conditions for specific paths or operations
-  const isSpecialCase = (
-    // Always audit authentication attempts
-    path.includes('/auth/') || 
-    // Always audit admin operations
-    path.includes('/admin/') ||
-    // Always audit tenant operations
-    path.includes('/tenants/') ||
-    // Always audit sensitive data access
-    path.includes('/api/v1/sensitive/')
-  );
-  
-  return isAuditedPath || (isSensitiveOperation && isSpecialCase);
-}
-
-/**
- * Determine audit category based on request path and method
- * 
- * @param req Express request
- * @returns The audit category
- */
-function determineAuditCategory(req: Request): AuditCategory {
-  const path = req.path;
-  
-  if (path.includes('/auth/')) {
-    return AuditCategory.AUTH;
-  }
-  
-  if (path.includes('/admin/')) {
-    return AuditCategory.ADMIN;
-  }
-  
-  if (path.includes('/tenants/') || path.includes('/tenant-')) {
-    return AuditCategory.TENANT;
-  }
-  
-  if (path.includes('/integrations/')) {
-    return AuditCategory.INTEGRATION;
-  }
-  
-  if (path.includes('/settings/') || path.includes('/config/')) {
-    return AuditCategory.CONFIG;
-  }
-  
-  if (path.includes('/users/')) {
-    return AuditCategory.USER_MANAGEMENT;
-  }
-  
-  // Default category based on method
-  switch (req.method) {
-    case 'GET':
-      return AuditCategory.DATA_ACCESS;
-    case 'POST':
-    case 'PUT':
-    case 'PATCH':
-    case 'DELETE':
-      return AuditCategory.DATA_MODIFICATION;
-    default:
-      return AuditCategory.SYSTEM;
-  }
-}
-
-/**
- * Determine audit action based on request path and method
- * 
- * @param req Express request
- * @returns The audit action
- */
-function determineAuditAction(req: Request): string {
-  const path = req.path;
-  const method = req.method;
-  
-  // Authentication actions
-  if (path.includes('/auth/login')) {
-    return AuditActions.AUTH.LOGIN_SUCCESS;
-  }
-  
-  if (path.includes('/auth/logout')) {
-    return AuditActions.AUTH.LOGOUT;
-  }
-  
-  if (path.includes('/auth/register')) {
-    return AuditActions.AUTH.REGISTER;
-  }
-  
-  if (path.includes('/auth/refresh-token')) {
-    return AuditActions.AUTH.TOKEN_REFRESH;
-  }
-  
-  // User management actions
-  if (path.includes('/users/') || path.includes('/user/')) {
-    switch (method) {
-      case 'POST':
-        return AuditActions.ADMIN.USER_CREATE;
-      case 'PUT':
-      case 'PATCH':
-        return AuditActions.ADMIN.USER_UPDATE;
-      case 'DELETE':
-        return AuditActions.ADMIN.USER_DELETE;
-      default:
-        return AuditActions.DATA.READ;
-    }
-  }
-  
-  // Tenant actions
-  if (path.includes('/tenants/') || path.includes('/tenant-')) {
-    switch (method) {
-      case 'POST':
-        return AuditActions.TENANT.CREATE;
-      case 'PUT':
-      case 'PATCH':
-        return AuditActions.TENANT.UPDATE;
-      case 'DELETE':
-        return AuditActions.TENANT.DELETE;
-      default:
-        return AuditActions.DATA.READ;
-    }
-  }
-  
-  // Default actions based on method
-  switch (method) {
-    case 'GET':
-      return AuditActions.DATA.READ;
-    case 'POST':
-      return AuditActions.DATA.CREATE;
-    case 'PUT':
-    case 'PATCH':
-      return AuditActions.DATA.UPDATE;
-    case 'DELETE':
-      return AuditActions.DATA.DELETE;
-    default:
-      return 'UNKNOWN';
-  }
-}
-
-/**
- * Determine audit severity based on request path, method, and response status
- * 
- * @param req Express request
- * @param res Express response
- * @returns The audit severity
- */
-function determineAuditSeverity(req: Request, res: Response): AuditSeverity {
-  const path = req.path;
-  const method = req.method;
-  const status = res.statusCode;
-  
-  // Critical actions
-  const isCriticalAction = (
-    path.includes('/auth/') ||
-    path.includes('/admin/') ||
-    path.includes('/settings/') ||
-    path.includes('/api-keys/') ||
-    path.includes('/tenants/')
-  );
-  
-  // Security-relevant paths
-  const isSecurityPath = (
-    path.includes('/permissions/') ||
-    path.includes('/roles/') ||
-    path.includes('/security/')
-  );
-  
-  // Determine severity based on status code
-  if (status >= 500) {
-    return AuditSeverity.ERROR;
-  }
-  
-  if (status === 401 || status === 403) {
-    return AuditSeverity.WARNING;
-  }
-  
-  // Critical actions with destructive methods
-  if (isCriticalAction && (method === 'DELETE' || method === 'PUT')) {
-    return AuditSeverity.WARNING;
-  }
-  
-  // Security paths are always at least WARNING level
-  if (isSecurityPath) {
-    return AuditSeverity.WARNING;
-  }
-  
-  // Default to INFO level
-  return AuditSeverity.INFO;
-}
-
-/**
- * Middleware to audit API requests and responses
- * 
- * @param req Express request
- * @param res Express response
- * @param next Express next function
- */
-export function auditMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Skip auditing for static assets and non-API requests
-  if (req.path.includes('/static/') || req.path.includes('/assets/') || req.path.includes('favicon.ico')) {
+export const auditMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  // Skip logging for static assets, CORS preflight, etc.
+  if (req.method === 'OPTIONS' || req.path.includes('/assets/') || req.path.includes('.js') || req.path.includes('.css')) {
     return next();
   }
-  
-  // Check if this request should be audited
-  if (!shouldAuditRequest(req)) {
-    return next();
-  }
-  
-  // Store original end function to intercept it
+
+  // Store original response methods
+  const originalSend = res.send;
+  const originalJson = res.json;
   const originalEnd = res.end;
-  
-  // Get original request time
-  const requestTime = Date.now();
-  
-  // Intercept the response end function
-  res.end = function(chunk?: any, encoding?: any, callback?: any) {
-    // Restore original end function
-    res.end = originalEnd;
-    
-    // Calculate response time
-    const responseTime = Date.now() - requestTime;
-    
-    // Log the audit event
+
+  // Get request start time
+  const startTime = Date.now();
+
+  // Capture response data for logging
+  let responseData: any = null;
+  let responseStatusCode = 200;
+
+  // Override methods to capture response data
+  res.send = function (body: any): Response {
+    responseData = body;
+    return originalSend.apply(res, [body] as any);
+  };
+
+  res.json = function (body: any): Response {
+    responseData = body;
+    return originalJson.apply(res, [body] as any);
+  };
+
+  res.end = function (chunk?: any, encoding?: string, cb?: () => void): Response {
+    responseStatusCode = res.statusCode;
+    return originalEnd.apply(res, [chunk, encoding, cb] as any);
+  };
+
+  // Continue with request processing
+  next();
+
+  // After response is sent
+  res.on('finish', async () => {
+    const duration = Date.now() - startTime;
+
+    // Skip audit logging for successful static asset requests
+    if (responseStatusCode === 200 && (
+      req.path.includes('/assets/') || 
+      req.path.includes('.js') || 
+      req.path.includes('.css') || 
+      req.path.includes('.ico')
+    )) {
+      return;
+    }
+
     try {
-      // Skip if no user is authenticated (unless it's an auth endpoint)
-      const isAuthEndpoint = req.path.includes('/auth/');
-      
-      if (!req.user && !isAuthEndpoint) {
-        // Just log anonymous access attempts but don't tie to a user
-        // Call the original end function
-        return originalEnd.call(this, chunk, encoding, callback);
+      // Determine audit category based on HTTP method
+      let category: AuditCategory;
+      if (req.method === 'GET') {
+        category = AuditCategory.DATA_ACCESS;
+      } else if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        category = AuditCategory.DATA_MODIFICATION;
+      } else if (req.method === 'DELETE') {
+        category = AuditCategory.DATA_MODIFICATION;
+      } else {
+        category = AuditCategory.SYSTEM;
       }
-      
-      const userId = req.user?.id ? parseInt(req.user.id.toString()) : -1;
-      const tenantId = getTenantId(req);
-      const clientInfo = getClientInfo(req);
-      
-      // Determine audit properties
-      const category = determineAuditCategory(req);
-      const action = determineAuditAction(req);
-      const severity = determineAuditSeverity(req, res);
-      const success = res.statusCode >= 200 && res.statusCode < 400;
-      
-      // Create generic resource type and ID from path
-      const pathParts = req.path.split('/').filter(Boolean);
-      const resourceType = pathParts.length > 0 ? pathParts[0] : 'unknown';
-      const resourceId = pathParts.length > 1 ? pathParts[1] : undefined;
-      
-      // Generate a meaningful description
-      const description = `${req.method} ${req.path} - ${res.statusCode} (${responseTime}ms)`;
-      
-      // Log the audit event
-      AuditService.log({
-        userId,
-        tenantId,
+
+      // Determine severity based on status code and duration
+      let severity: AuditSeverity;
+      if (responseStatusCode >= 500) {
+        severity = AuditSeverity.ERROR;
+      } else if (responseStatusCode >= 400) {
+        severity = AuditSeverity.WARNING;
+      } else if (duration > 5000) { // Long-running requests
+        severity = AuditSeverity.WARNING;
+      } else {
+        severity = AuditSeverity.INFO;
+      }
+
+      // Extract resource info from URL
+      const urlParts = req.path.split('/').filter(Boolean);
+      let resourceType = urlParts[0] || 'api';
+      let resourceId = urlParts.length > 1 ? urlParts[1] : undefined;
+
+      // If this is a nested resource, adjust resource type
+      if (urlParts.length >= 3 && !isNaN(Number(urlParts[1]))) {
+        resourceType = `${urlParts[0]}/${urlParts[2]}`;
+      }
+
+      // Determine action based on HTTP method
+      const action = `${resourceType}.${req.method.toLowerCase()}`;
+
+      // Prepare audit log entry
+      const auditEntry = {
+        userId: req.user?.id || 0, // Anonymous user has ID 0
         action,
         category,
         severity,
         resourceType,
         resourceId,
-        description,
+        description: `${req.method} ${req.path}`,
+        success: responseStatusCode < 400,
         metadata: {
-          requestMethod: req.method,
-          requestPath: req.path,
+          requestParams: req.params,
           requestQuery: req.query,
-          requestBody: getSanitizedRequestData(req),
-          responseStatus: res.statusCode,
-          responseTime,
-          userAgent: clientInfo.userAgent,
-          ipAddress: clientInfo.ipAddress,
-        },
-        ipAddress: clientInfo.ipAddress,
-        userAgent: clientInfo.userAgent,
-        success,
-        sessionId: req.sessionID
-      });
+          requestBody: req.body,
+          responseStatus: responseStatusCode,
+          responseDuration: duration,
+        }
+      };
+
+      // Log the audit event
+      await AuditService.logFromRequest(req, auditEntry);
     } catch (error) {
-      // Log error but don't block response
-      console.error('Error in audit middleware:', error);
+      console.error('Failed to log audit event:', error);
     }
-    
-    // Call the original end function
-    return originalEnd.call(this, chunk, encoding, callback);
-  };
-  
-  // Proceed with the request
-  next();
-}
+  });
+};
 
 /**
- * Middleware to log failed authentication attempts
- * Specialized middleware for authentication endpoints
- * 
- * @param req Express request
- * @param res Express response
- * @param next Express next function
+ * Specialized audit middleware for authentication-related routes
  */
-export function authAuditMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Store original end function to intercept it
+export const authAuditMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const originalEnd = res.end;
+  const path = req.path.toLowerCase();
   
-  // Get original request time
-  const requestTime = Date.now();
-  
-  // Intercept the response end function
-  res.end = function(chunk?: any, encoding?: any, callback?: any) {
-    // Restore original end function
-    res.end = originalEnd;
-    
-    // Calculate response time
-    const responseTime = Date.now() - requestTime;
-    
-    // Check if authentication failed
-    const authFailed = res.statusCode === 401 || res.statusCode === 403;
-    
-    if (authFailed) {
-      // Log failed authentication attempt
-      try {
-        const clientInfo = getClientInfo(req);
-        const username = req.body?.username || 'unknown';
-        
-        AuditService.log({
-          userId: -1, // No valid user ID for failed auth
-          action: AuditActions.AUTH.LOGIN_FAILURE,
-          category: AuditCategory.AUTH,
-          severity: AuditSeverity.WARNING,
-          resourceType: 'auth',
-          description: `Failed authentication attempt for user ${username}`,
-          metadata: {
-            username,
-            method: req.method,
-            path: req.path,
-            responseTime,
-          },
-          ipAddress: clientInfo.ipAddress,
-          userAgent: clientInfo.userAgent,
-          success: false
-        });
-      } catch (error) {
-        console.error('Error in auth audit middleware:', error);
-      }
-    }
-    
-    // Call the original end function
-    return originalEnd.call(this, chunk, encoding, callback);
-  };
-  
-  // Proceed with the request
+  // Continue with request processing
   next();
-}
+
+  // After response is sent
+  res.on('finish', async () => {
+    try {
+      let action = '';
+      let description = '';
+      
+      // Determine action based on path
+      if (path.includes('/login')) {
+        action = AuditActions.AUTH.LOGIN_SUCCESS;
+        description = 'User login attempt';
+      } else if (path.includes('/logout')) {
+        action = AuditActions.AUTH.LOGOUT;
+        description = 'User logout';
+      } else if (path.includes('/register')) {
+        action = AuditActions.AUTH.REGISTER;
+        description = 'User registration';
+      } else if (path.includes('/password/reset')) {
+        action = AuditActions.AUTH.PASSWORD_RESET;
+        description = 'Password reset request';
+      } else if (path.includes('/password/change')) {
+        action = AuditActions.AUTH.PASSWORD_CHANGE;
+        description = 'Password change';
+      } else if (path.includes('/token/refresh')) {
+        action = AuditActions.AUTH.TOKEN_REFRESH;
+        description = 'Auth token refresh';
+      } else if (path.includes('/mfa/setup')) {
+        action = AuditActions.AUTH.MFA_SETUP;
+        description = 'MFA setup';
+      } else if (path.includes('/mfa/verify')) {
+        action = AuditActions.AUTH.MFA_VERIFY;
+        description = 'MFA verification';
+      } else if (path.includes('/sso')) {
+        action = AuditActions.AUTH.SSO_AUTHENTICATE;
+        description = 'SSO authentication attempt';
+      } else if (path.includes('/saml')) {
+        action = AuditActions.AUTH.SAML_AUTHENTICATE;
+        description = 'SAML authentication attempt';
+      } else if (path.includes('/oauth')) {
+        action = AuditActions.AUTH.OAUTH_AUTHENTICATE;
+        description = 'OAuth authentication attempt';
+      } else {
+        action = 'auth.unknown';
+        description = `Auth operation: ${req.method} ${req.path}`;
+      }
+
+      // Determine severity
+      const severity = res.statusCode >= 400 
+        ? (res.statusCode >= 500 ? AuditSeverity.ERROR : AuditSeverity.WARNING)
+        : AuditSeverity.INFO;
+
+      // Create audit entry
+      const auditEntry = {
+        userId: req.user?.id || 0,
+        action,
+        category: AuditCategory.AUTH,
+        severity,
+        resourceType: 'auth',
+        description,
+        success: res.statusCode < 400,
+        metadata: {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode
+        }
+      };
+
+      // Log the event
+      await AuditService.logFromRequest(req, auditEntry);
+    } catch (error) {
+      console.error('Failed to log auth audit event:', error);
+    }
+  });
+};
 
 /**
- * Middleware to specifically audit destructive operations
- * 
- * @param req Express request
- * @param res Express response
- * @param next Express next function
+ * Middleware to log destructive operations (DELETE, mass updates)
  */
-export function destructiveOperationAuditMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Only intercept DELETE and PUT operations
-  if (req.method !== 'DELETE' && req.method !== 'PUT') {
+export const destructiveOperationAuditMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  // Only apply to DELETE requests and PUT/PATCH requests with certain paths
+  const isDestructive = 
+    req.method === 'DELETE' || 
+    ((req.method === 'PUT' || req.method === 'PATCH') && 
+      (req.path.includes('/delete') || req.path.includes('/remove') || req.path.includes('/reset')));
+
+  if (!isDestructive) {
     return next();
   }
+
+  // Store original body for logging
+  const originalBody = JSON.parse(JSON.stringify(req.body || {}));
   
-  // Store original end function to intercept it
-  const originalEnd = res.end;
-  
-  // Intercept the response end function
-  res.end = function(chunk?: any, encoding?: any, callback?: any) {
-    // Restore original end function
-    res.end = originalEnd;
-    
-    // Log all destructive operations
+  // Continue with request processing
+  next();
+
+  // After response is sent
+  res.on('finish', async () => {
     try {
-      // Skip if no user is authenticated
-      if (!req.user) {
-        // Call the original end function
-        return originalEnd.call(this, chunk, encoding, callback);
+      // Parse resource information from URL
+      const urlParts = req.path.split('/').filter(Boolean);
+      let resourceType = urlParts[0] || 'unknown';
+      let resourceId = urlParts.length > 1 ? urlParts[1] : undefined;
+
+      // Customize for nested resources
+      if (urlParts.length > 2 && !isNaN(Number(urlParts[1]))) {
+        resourceType = `${urlParts[0]}/${urlParts[2]}`;
+        resourceId = urlParts.length > 3 ? urlParts[3] : undefined;
       }
-      
-      const userId = req.user?.id ? parseInt(req.user.id.toString()) : -1;
-      const tenantId = getTenantId(req);
-      const clientInfo = getClientInfo(req);
-      
-      // Parse path to determine resource
-      const pathParts = req.path.split('/').filter(Boolean);
-      const resourceType = pathParts.length > 0 ? pathParts[0] : 'unknown';
-      const resourceId = pathParts.length > 1 ? pathParts[1] : undefined;
-      
-      // Determine operation type
-      const operation = req.method === 'DELETE' ? 'deletion' : 'update';
-      
-      // Log the destructive operation with higher severity
-      AuditService.log({
-        userId,
-        tenantId,
-        action: req.method === 'DELETE' ? AuditActions.DATA.DELETE : AuditActions.DATA.UPDATE,
+
+      // Set severity based on results
+      const severity = res.statusCode >= 400 
+        ? (res.statusCode >= 500 ? AuditSeverity.ERROR : AuditSeverity.WARNING)
+        : AuditSeverity.WARNING; // Destructive operations are always at least WARNING
+
+      // Construct action string
+      const action = `${resourceType}.${req.method === 'DELETE' ? 'delete' : 'update'}`;
+
+      // Create audit entry
+      const auditEntry = {
+        userId: req.user?.id || 0,
+        action,
         category: AuditCategory.DATA_MODIFICATION,
-        severity: AuditSeverity.WARNING, // All destructive ops are at least WARNING
+        severity,
         resourceType,
         resourceId,
-        description: `${operation} operation on ${resourceType}${resourceId ? ` (ID: ${resourceId})` : ''}`,
+        description: `Destructive operation: ${req.method} ${req.path}`,
+        success: res.statusCode < 400,
         metadata: {
-          requestMethod: req.method,
-          requestPath: req.path,
-          requestBody: getSanitizedRequestData(req),
-          responseStatus: res.statusCode,
-        },
-        ipAddress: clientInfo.ipAddress,
-        userAgent: clientInfo.userAgent,
-        success: res.statusCode >= 200 && res.statusCode < 400
-      });
+          method: req.method,
+          path: req.path,
+          requestBody: originalBody,
+          statusCode: res.statusCode
+        }
+      };
+
+      // Log the event with elevated priority
+      await AuditService.logFromRequest(req, auditEntry);
     } catch (error) {
-      console.error('Error in destructive operation audit middleware:', error);
+      console.error('Failed to log destructive operation audit event:', error);
     }
-    
-    // Call the original end function
-    return originalEnd.call(this, chunk, encoding, callback);
-  };
-  
-  // Proceed with the request
-  next();
-}
+  });
+};

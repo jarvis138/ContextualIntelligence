@@ -9,7 +9,7 @@ import { Request } from 'express';
 import { db } from '../db';
 import { auditLogs } from '@shared/schema';
 import { getClientInfo, getTenantId, getSanitizedRequestData } from '../utils/requestUtils';
-import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm';
 import { AuditLog } from '@shared/schema';
 
 // Audit action categories
@@ -406,6 +406,105 @@ export class AuditService {
       .map(([userId, count]) => ({ userId, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10); // Return top 10
+  }
+
+  /**
+   * Get the count of audit logs matching the given filters
+   * 
+   * @param filters Filter criteria
+   * @returns Count of matching audit logs
+   */
+  static async count(filters: {
+    userId?: number;
+    tenantId?: number;
+    action?: string;
+    category?: AuditCategory;
+    resourceType?: string;
+    resourceId?: string | number;
+    severity?: AuditSeverity;
+    fromDate?: Date;
+    toDate?: Date;
+    success?: boolean;
+    search?: string;
+  }): Promise<number> {
+    try {
+      // Build the query conditions based on filters
+      let query = db.select({ count: count() }).from(auditLogs);
+      
+      // Apply filters if provided
+      if (filters.userId !== undefined) {
+        query = query.where(eq(auditLogs.userId, filters.userId));
+      }
+      
+      if (filters.tenantId !== undefined) {
+        query = query.where(eq(auditLogs.tenantId, filters.tenantId));
+      }
+      
+      if (filters.action) {
+        query = query.where(eq(auditLogs.action, filters.action));
+      }
+      
+      if (filters.category) {
+        query = query.where(eq(auditLogs.category, filters.category));
+      }
+      
+      if (filters.resourceType) {
+        query = query.where(eq(auditLogs.resourceType, filters.resourceType));
+      }
+      
+      if (filters.resourceId !== undefined) {
+        query = query.where(eq(auditLogs.resourceId, filters.resourceId.toString()));
+      }
+      
+      if (filters.severity) {
+        query = query.where(eq(auditLogs.severity, filters.severity));
+      }
+      
+      if (filters.success !== undefined) {
+        query = query.where(eq(auditLogs.success, filters.success));
+      }
+      
+      // Date range filters
+      if (filters.fromDate) {
+        query = query.where(gte(auditLogs.timestamp, filters.fromDate));
+      }
+      
+      if (filters.toDate) {
+        query = query.where(lte(auditLogs.timestamp, filters.toDate));
+      }
+
+      // Search filter (simplified implementation)
+      if (filters.search) {
+        // In a real implementation, you might use more sophisticated search like ILIKE or full-text search
+        // This is a simplified version that just searches the description field
+        query = query.where(
+          sql`${auditLogs.description} ILIKE ${`%${filters.search}%`}`
+        );
+      }
+
+      // Execute the count query
+      const result = await query;
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('Failed to count audit logs:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get an audit log entry by ID
+   * 
+   * @param id The ID of the audit log entry
+   * @returns The audit log entry or null if not found
+   */
+  static async getById(id: number): Promise<AuditLog | null> {
+    try {
+      const results = await db.select().from(auditLogs).where(eq(auditLogs.id, id)).limit(1);
+      return results.length > 0 ? results[0] : null;
+    } catch (error) {
+      console.error(`Failed to get audit log with ID ${id}:`, error);
+      return null;
+    }
   }
 }
 
