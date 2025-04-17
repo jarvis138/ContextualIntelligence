@@ -958,25 +958,36 @@ export class ModelGovernanceService {
     modelId: string,
     prompt: string,
     completion: string,
-    parameters: Record<string, any>
+    requestId?: string,
+    explanation?: string
   ): Record<string, any> {
     // Check if model governance features are enabled
     if (!this.isModelGovernanceEnabled()) {
       return { 
         modelId,
+        requestId: requestId || crypto.randomUUID(),
         explanation: "Explainability features not enabled",
         generated: new Date()
       };
     }
     
+    // Get the model definition if available
+    const model = this.registeredModels.get(modelId);
+    const modelProvider = model?.provider || 'unknown';
+    const modelCapabilities = model?.capabilities || [];
+    
     // In a real implementation, this would analyze the model's decision-making
-    // For now, we'll return a simple report
+    // For now, we'll return a simulated report
     return {
+      requestId: requestId || crypto.randomUUID(),
       modelId,
+      modelProvider,
+      modelCapabilities,
       generated: new Date(),
       promptTokens: Math.ceil(prompt.length / 4),
       completionTokens: Math.ceil(completion.length / 4),
-      parameters,
+      totalTokens: Math.ceil(prompt.length / 4) + Math.ceil(completion.length / 4),
+      explanation: explanation || "Automated explainability report",
       contentAnalysis: {
         topicProbabilities: {
           "information": 0.75,
@@ -993,6 +1004,287 @@ export class ModelGovernanceService {
         cultural: 0.03
       },
       confidenceScore: 0.87
+    };
+  }
+  
+  /**
+   * Get validation history
+   * This is an enterprise feature for compliance and audit purposes
+   */
+  public getValidationHistory(options: { 
+    modelId?: string;
+    userId?: number;
+    tenantId?: number;
+    fromDate?: string;
+    toDate?: string;
+    action?: string;
+    limit?: number;
+    offset?: number;
+  }): { items: any[]; total: number } {
+    // Check if model governance is enabled
+    if (!this.isModelGovernanceEnabled()) {
+      return { items: [], total: 0 };
+    }
+    
+    // In a real implementation, this would query a database for validation history
+    // For demo purposes, we'll generate a mock history
+    
+    const mockHistory = [];
+    const total = 125; // Simulate a larger dataset
+    
+    // Generate mock records based on options
+    const limit = options.limit || 10;
+    const offset = options.offset || 0;
+    
+    for (let i = 0; i < limit; i++) {
+      if (i + offset >= total) break;
+      
+      const record = {
+        id: crypto.randomUUID(),
+        timestamp: new Date(Date.now() - (i + offset) * 60000),
+        modelId: options.modelId || "gpt-4o",
+        userId: options.userId || Math.floor(Math.random() * 10) + 1,
+        tenantId: options.tenantId || Math.floor(Math.random() * 5) + 1,
+        promptSnippet: "This is a partial view of the prompt content...",
+        action: (options.action || ["allowed", "modified", "blocked"][Math.floor(Math.random() * 3)]),
+        riskLevel: ["safe", "low", "medium", "high"][Math.floor(Math.random() * 4)],
+        policyId: crypto.randomUUID(),
+        violationCount: Math.floor(Math.random() * 3)
+      };
+      
+      mockHistory.push(record);
+    }
+    
+    return {
+      items: mockHistory,
+      total
+    };
+  }
+  
+  /**
+   * Get model usage analytics
+   * Enterprise feature for usage tracking and billing
+   */
+  public getModelUsageAnalytics(options: {
+    modelId?: string;
+    tenantId?: number;
+    timeframe?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Record<string, any> {
+    // Check if model governance is enabled
+    if (!this.isModelGovernanceEnabled()) {
+      return { 
+        usage: [],
+        summary: {
+          totalRequests: 0,
+          totalTokens: 0
+        }
+      };
+    }
+    
+    // In a real implementation, this would query a database for model usage
+    // For demo purposes, we'll generate synthetic analytics
+    
+    // Generate timeframes based on the requested period
+    const timeframe = options.timeframe || 'month';
+    const now = new Date();
+    const dataPoints = [];
+    
+    let interval;
+    let format;
+    let points;
+    
+    switch(timeframe) {
+      case 'day':
+        interval = 60 * 60 * 1000; // hourly
+        points = 24;
+        format = 'hour';
+        break;
+      case 'week':
+        interval = 24 * 60 * 60 * 1000; // daily
+        points = 7;
+        format = 'day';
+        break;
+      case 'year':
+        interval = 30 * 24 * 60 * 60 * 1000; // monthly
+        points = 12;
+        format = 'month';
+        break;
+      case 'month':
+      default:
+        interval = 24 * 60 * 60 * 1000; // daily
+        points = 30;
+        format = 'day';
+    }
+    
+    let totalRequests = 0;
+    let totalTokens = 0;
+    
+    // Generate data points
+    for (let i = 0; i < points; i++) {
+      const timestamp = new Date(now.getTime() - (points - i - 1) * interval);
+      
+      // Generate synthetic data with some variability
+      const baseValue = 50 + Math.random() * 100;
+      const requests = Math.floor(baseValue);
+      const tokens = requests * (250 + Math.floor(Math.random() * 250));
+      
+      totalRequests += requests;
+      totalTokens += tokens;
+      
+      dataPoints.push({
+        timestamp,
+        requests,
+        tokens,
+        cost: (tokens / 1000) * 0.002 // Synthetic cost calculation
+      });
+    }
+    
+    // Generate model breakdown if no specific model requested
+    const modelBreakdown = [];
+    if (!options.modelId) {
+      const models = Array.from(this.registeredModels.values());
+      models.slice(0, Math.min(5, models.length)).forEach(model => {
+        const modelRequests = Math.floor(totalRequests * Math.random() * 0.5);
+        const modelTokens = modelRequests * (250 + Math.floor(Math.random() * 250));
+        
+        modelBreakdown.push({
+          modelId: model.id,
+          requests: modelRequests,
+          tokens: modelTokens,
+          cost: (modelTokens / 1000) * 0.002
+        });
+      });
+    }
+    
+    return {
+      timeframe,
+      format,
+      usage: dataPoints,
+      models: modelBreakdown,
+      summary: {
+        totalRequests,
+        totalTokens,
+        estimatedCost: (totalTokens / 1000) * 0.002
+      }
+    };
+  }
+  
+  /**
+   * Initialize default models in the registry
+   * Enterprise feature for pre-populating the model registry
+   */
+  public initializeDefaultModels(): ModelDefinition[] {
+    // Check if model governance is enabled
+    if (!this.isModelGovernanceEnabled()) {
+      return [];
+    }
+    
+    // Define default models to register
+    const defaultModels: ModelDefinition[] = [
+      {
+        id: 'gpt-4o',
+        provider: 'openai',
+        version: '2024-05-13',
+        capabilities: ['text_generation', 'chat'],
+        status: 'approved',
+        approvedBy: 'system',
+        approvalDate: new Date(),
+        performanceMetrics: {
+          latencyMs: 250,
+          tokensPerSecond: 80,
+          costPerToken: 0.00002
+        }
+      },
+      {
+        id: 'gpt-4o-mini',
+        provider: 'openai',
+        version: '2024-05-13',
+        capabilities: ['text_generation', 'chat'],
+        status: 'approved',
+        approvedBy: 'system',
+        approvalDate: new Date(),
+        performanceMetrics: {
+          latencyMs: 150,
+          tokensPerSecond: 120,
+          costPerToken: 0.00001
+        }
+      },
+      {
+        id: 'text-embedding-3-large',
+        provider: 'openai',
+        version: '2024-05-13',
+        capabilities: ['embeddings'],
+        status: 'approved',
+        approvedBy: 'system',
+        approvalDate: new Date(),
+        performanceMetrics: {
+          latencyMs: 100,
+          tokensPerSecond: 200,
+          costPerToken: 0.000001
+        }
+      },
+      {
+        id: 'text-embedding-3-small',
+        provider: 'openai',
+        version: '2024-05-13',
+        capabilities: ['embeddings'],
+        status: 'approved',
+        approvedBy: 'system',
+        approvalDate: new Date(),
+        performanceMetrics: {
+          latencyMs: 50,
+          tokensPerSecond: 250,
+          costPerToken: 0.0000005
+        }
+      },
+      {
+        id: 'claude-3-opus',
+        provider: 'anthropic',
+        version: '2024-04-01',
+        capabilities: ['text_generation', 'chat'],
+        status: 'pending_approval',
+        performanceMetrics: {
+          latencyMs: 300,
+          tokensPerSecond: 60,
+          costPerToken: 0.00003
+        }
+      }
+    ];
+    
+    // Register each model if it doesn't already exist
+    const registeredModels: ModelDefinition[] = [];
+    for (const model of defaultModels) {
+      if (!this.registeredModels.has(model.id)) {
+        this.registerModel(model);
+        registeredModels.push(model);
+      }
+    }
+    
+    return registeredModels;
+  }
+  
+  /**
+   * Create a validation result with standard fields
+   */
+  private createValidationResult(
+    valid: boolean, 
+    modelId: string,
+    riskLevel: ContentRiskLevel
+  ): ValidationResult {
+    return {
+      valid,
+      requestId: crypto.randomUUID(),
+      timestamp: new Date(),
+      violations: [],
+      overallRiskLevel: riskLevel,
+      modelId,
+      action: valid ? 'allowed' : 'blocked',
+      metadata: {
+        validatedBy: 'governance-service',
+        policyId: 'default'
+      }
     };
   }
 }
