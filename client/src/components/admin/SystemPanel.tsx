@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AreaChart,
   BarChart,
+  Brain,
   Database,
   Download,
   HardDrive,
@@ -25,6 +26,7 @@ import {
   Settings,
   Wrench
 } from "lucide-react";
+import ModelRegistryPanel from "./ModelRegistryPanel";
 import {
   AlertDialog,
   AlertDialogAction,

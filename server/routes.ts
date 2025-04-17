@@ -28,6 +28,7 @@ import {
 } from "./services/aiService";
 import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
+import modelRegistryRouter from "./routes/model-registry-api";
 import { registerAdminRoutes } from "./routes/admin-api";
 import { registerTenantRoutes } from "./routes/tenant-routes";
 import adminAuditRoutes from "./routes/admin-audit-routes";
@@ -182,6 +183,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Set up the API router
   app.use("/api", apiRouter);
+  
+  // Set up the Model Registry API router
+  app.use("/api/model-registry", modelRegistryRouter);
 
   // User routes
   router.get("/users", authenticateToken, async (req, res) => {
