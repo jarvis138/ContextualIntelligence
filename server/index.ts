@@ -5,6 +5,9 @@ import { setupObservability, logger } from "./services/observability";
 import { featureFlagService } from "../shared/feature-flags";
 import { tenantMiddleware, TenantIdentificationStrategy } from "./middleware/tenant-middleware";
 import { tenantService } from "./tenant-service";
+import { SamlService } from "./services/samlService";
+import ScimService from "./services/scimService";
+import EncryptionService from "./services/encryptionService";
 
 const app = express();
 app.use(express.json());
@@ -85,6 +88,24 @@ if (featureFlagService.isEnabled('enhanced-logging')) {
 }
 
 (async () => {
+  // Initialize enterprise security services
+  await Promise.allSettled([
+    SamlService.initialize().catch(err => {
+      logger.error('Failed to initialize SAML service', { error: err });
+    }),
+    ScimService.initialize().catch(err => {
+      logger.error('Failed to initialize SCIM service', { error: err });
+    })
+  ]);
+  
+  // Initialize field-level encryption
+  try {
+    EncryptionService.initialize();
+    logger.info('Field-level encryption service initialized');
+  } catch (err) {
+    logger.error('Failed to initialize encryption service', { error: err });
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

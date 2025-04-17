@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   users, type User, type InsertUser,
-  oauthTokens, insertOAuthTokenSchema,
+  oauthCredentials, insertOAuthCredentialsSchema, type OAuthCredential, type InsertOAuthCredential,
   projects, type Project, type InsertProject,
   teams, type Team, type InsertTeam,
   teamMembers, type TeamMember, type InsertTeamMember,
@@ -39,10 +39,10 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   
-  // OAuth Tokens
-  saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any>;
-  getOAuthToken(userId: number, provider: string): Promise<any | undefined>;
-  deleteOAuthToken(userId: number, provider: string): Promise<boolean>;
+  // OAuth Credentials
+  saveOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential>;
+  getOAuthCredential(userId: number, providerId: string): Promise<OAuthCredential | undefined>;
+  deleteOAuthCredential(userId: number, providerId: string): Promise<boolean>;
   
   // Refresh Tokens
   saveRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
@@ -581,7 +581,7 @@ export class MemStorage implements IStorage {
   }
 
   // OAuth Tokens
-  private oauthTokens: Map<string, any> = new Map();
+  private oauthCredentials: Map<string, OAuthCredential> = new Map();
   
   async saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any> {
     const key = `${token.userId}:${token.provider}`;

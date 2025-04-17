@@ -6,7 +6,7 @@
  */
 
 import { db } from '../db';
-import { oauthTokens } from '@shared/schema';
+import { oauthCredentials } from '@shared/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import * as encryption from '../utils/encryption';
 
@@ -33,7 +33,7 @@ export class TokenStorage {
    * Store an OAuth token in the database
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @param accessToken The access token
    * @param refreshToken The refresh token (if available)
    * @param expiresAt The token expiration time
@@ -41,7 +41,7 @@ export class TokenStorage {
    */
   static async storeOAuthToken(
     userId: number,
-    provider: string,
+    providerId: string,
     accessToken: string,
     refreshToken: string | null,
     expiresAt: Date
@@ -53,11 +53,11 @@ export class TokenStorage {
     // Check if token already exists for this user and provider
     const existingToken = await db
       .select()
-      .from(oauthTokens)
+      .from(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       )
       .limit(1);
@@ -72,12 +72,12 @@ export class TokenStorage {
     // Update or insert token
     if (existingToken.length > 0) {
       const [updatedToken] = await db
-        .update(oauthTokens)
+        .update(oauthCredentials)
         .set(tokenData)
         .where(
           and(
-            eq(oauthTokens.userId, userId),
-            eq(oauthTokens.provider, provider)
+            eq(oauthCredentials.userId, userId),
+            eq(oauthCredentials.providerId, providerId)
           )
         )
         .returning();
@@ -85,10 +85,11 @@ export class TokenStorage {
       return updatedToken;
     } else {
       const [newToken] = await db
-        .insert(oauthTokens)
+        .insert(oauthCredentials)
         .values({
           userId,
-          provider,
+          providerId,
+          providerUserId: '', // This would be populated later from user info
           ...tokenData,
           createdAt: new Date()
         })
@@ -102,17 +103,17 @@ export class TokenStorage {
    * Get an access token for a user and provider
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @returns The decrypted access token or null if not found
    */
-  static async getAccessToken(userId: number, provider: string): Promise<string | null> {
+  static async getAccessToken(userId: number, providerId: string): Promise<string | null> {
     const [token] = await db
       .select()
-      .from(oauthTokens)
+      .from(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       );
     
@@ -128,17 +129,17 @@ export class TokenStorage {
    * Get a refresh token for a user and provider
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @returns The decrypted refresh token or null if not found
    */
-  static async getRefreshToken(userId: number, provider: string): Promise<string | null> {
+  static async getRefreshToken(userId: number, providerId: string): Promise<string | null> {
     const [token] = await db
       .select()
-      .from(oauthTokens)
+      .from(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       );
     
@@ -154,17 +155,17 @@ export class TokenStorage {
    * Get token information for a user and provider
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @returns The token information or null if not found
    */
-  static async getToken(userId: number, provider: string) {
+  static async getToken(userId: number, providerId: string) {
     const [token] = await db
       .select()
-      .from(oauthTokens)
+      .from(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       );
     
@@ -177,7 +178,8 @@ export class TokenStorage {
     return {
       id: token.id,
       userId: token.userId,
-      provider: token.provider,
+      providerId: token.providerId,
+      providerUserId: token.providerUserId,
       expiresAt: token.expiresAt,
       hasRefreshToken: !!token.refreshToken,
       isExpired: token.expiresAt ? token.expiresAt < new Date() : true,
@@ -190,17 +192,17 @@ export class TokenStorage {
    * Check if a token is expired
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @returns Whether the token is expired
    */
-  static async isTokenExpired(userId: number, provider: string): Promise<boolean> {
+  static async isTokenExpired(userId: number, providerId: string): Promise<boolean> {
     const [token] = await db
-      .select({ expiresAt: oauthTokens.expiresAt })
-      .from(oauthTokens)
+      .select({ expiresAt: oauthCredentials.expiresAt })
+      .from(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       );
     
@@ -216,16 +218,16 @@ export class TokenStorage {
    * Revoke a token by removing it from the database
    * 
    * @param userId The user ID
-   * @param provider The OAuth provider ID
+   * @param providerId The OAuth provider ID
    * @returns Whether the token was successfully revoked
    */
-  static async revokeToken(userId: number, provider: string): Promise<boolean> {
+  static async revokeToken(userId: number, providerId: string): Promise<boolean> {
     const result = await db
-      .delete(oauthTokens)
+      .delete(oauthCredentials)
       .where(
         and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.provider, provider)
+          eq(oauthCredentials.userId, userId),
+          eq(oauthCredentials.providerId, providerId)
         )
       );
     
@@ -240,8 +242,8 @@ export class TokenStorage {
   static async cleanupExpiredTokens(): Promise<number> {
     const now = new Date();
     const result = await db
-      .delete(oauthTokens)
-      .where(lt(oauthTokens.expiresAt, now));
+      .delete(oauthCredentials)
+      .where(lt(oauthCredentials.expiresAt, now));
     
     return result.rowCount || 0;
   }
@@ -255,14 +257,15 @@ export class TokenStorage {
   static async getUserOAuthTokens(userId: number) {
     const tokens = await db
       .select()
-      .from(oauthTokens)
-      .where(eq(oauthTokens.userId, userId));
+      .from(oauthCredentials)
+      .where(eq(oauthCredentials.userId, userId));
     
     // Return tokens without exposing the actual token values
     return tokens.map(token => ({
       id: token.id,
       userId: token.userId,
-      provider: token.provider,
+      providerId: token.providerId,
+      providerUserId: token.providerUserId,
       expiresAt: token.expiresAt,
       hasRefreshToken: !!token.refreshToken,
       isExpired: token.expiresAt ? token.expiresAt < new Date() : true,

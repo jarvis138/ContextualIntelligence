@@ -160,33 +160,48 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   documents: many(documents, { relationName: "creator" }),
   updatedDocuments: many(documents, { relationName: "updater" }),
   integrations: many(integrations),
-  oauthTokens: many(oauthTokens),
+  oauthCredentials: many(oauthCredentials),
 }));
 
-// OAuth provider tokens
-export const oauthTokens = pgTable("oauth_tokens", {
+// OAuth credentials for secure PKCE-enhanced authentication
+export const oauthCredentials = pgTable("oauth_credentials", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 50 }).notNull(),
+  providerId: varchar("provider_id", { length: 50 }).notNull(), // e.g., 'google', 'microsoft', 'github'
+  providerUserId: varchar("provider_user_id", { length: 255 }).notNull(), // External user ID from the provider
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
+  tokenType: varchar("token_type", { length: 50 }),
+  scope: text("scope"),
+  idToken: text("id_token"),
   expiresAt: timestamp("expires_at"),
-  tokenData: jsonb("token_data"),  // Additional token data
+  tokenData: jsonb("token_data"),  // Additional token data (email, picture, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => {
   return {
-    userProviderIdx: uniqueIndex("user_provider_idx").on(table.userId, table.provider),
+    userProviderIdx: uniqueIndex("oauth_user_provider_idx").on(table.userId, table.providerId),
+    providerUserIdIdx: index("oauth_provider_user_id_idx").on(table.providerId, table.providerUserId),
   };
 });
 
-// OAuth token relations
-export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
+// OAuth credentials relations
+export const oauthCredentialsRelations = relations(oauthCredentials, ({ one }) => ({
   user: one(users, {
-    fields: [oauthTokens.userId],
+    fields: [oauthCredentials.userId],
     references: [users.id],
   }),
 }));
+
+// Insert schema for OAuth credentials
+export const insertOAuthCredentialsSchema = createInsertSchema(oauthCredentials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type OAuthCredential = typeof oauthCredentials.$inferSelect;
+export type InsertOAuthCredential = z.infer<typeof insertOAuthCredentialsSchema>;
 
 // Project schema
 export const projects = pgTable("projects", {
@@ -811,11 +826,9 @@ export const insertUserSchema = createInsertSchema(users).omit({
   // No createdAt or updatedAt to omit because they don't exist in the schema
 });
 
-export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// OAuth tokens have been replaced with oauthCredentials
+// Old schema reference kept for backwards compatibility during migration
+export const insertOAuthTokenSchema = insertOAuthCredentialsSchema;
 
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
@@ -969,8 +982,9 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;
 
-export type OAuthToken = typeof oauthTokens.$inferSelect;
-export type InsertOAuthToken = z.infer<typeof insertOAuthTokenSchema>;
+// OAuthToken type kept for backward compatibility during migration
+export type OAuthToken = OAuthCredential;
+export type InsertOAuthToken = InsertOAuthCredential;
 
 // Admin feature types
 export type SystemMetric = typeof systemMetrics.$inferSelect;

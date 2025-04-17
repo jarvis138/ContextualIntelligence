@@ -2257,6 +2257,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin audit routes
   app.use('/api/admin', adminAuditRoutes);
   
+  // Register enterprise authentication routes (SAML/SCIM)
+  app.use('/', enterpriseAuthRoutes);
+  
   // Register tenant management routes
   registerTenantRoutes(app);
 

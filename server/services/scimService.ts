@@ -6,21 +6,14 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { 
-  Schema, 
-  Resource, 
-  Filter,
-  Messages,
-  Types 
-} from 'scimmy';
+import scimmy from 'scimmy';
 import { db } from '../db';
 import { users, tenants } from '@shared/schema';
 import { eq, like, and, or, sql } from 'drizzle-orm';
 import { AuditService, AuditCategory, AuditSeverity } from './auditService';
 
-// Configure the schemas we'll need
-const UserSchema = new Schema.User();
-const GroupSchema = new Schema.Group();
+// We'll use scimmy's schemas directly when needed
+// No need to instantiate them at import time
 
 // Interface for API key validation
 interface ScimConfig {
@@ -221,7 +214,7 @@ export class ScimService {
       const userData = req.body;
       
       // Use SCIMMY to validate the user data
-      const user = new Resource.User(userData);
+      const user = new scimmy.Resources.User(userData);
       
       // Map SCIM user to our database schema
       const mappedUser = {
@@ -266,7 +259,7 @@ export class ScimService {
     } catch (error) {
       console.error('SCIM create user error:', error);
       
-      if (error instanceof Resource.Error) {
+      if (error instanceof scimmy.Resources.Error) {
         // Handle SCIM-specific errors
         res.status(400).json({
           schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
@@ -365,7 +358,7 @@ export class ScimService {
       const userData = req.body;
       
       // Use SCIMMY to validate the update
-      const scimUser = new Resource.User(userData);
+      const scimUser = new scimmy.Resources.User(userData);
       
       // Map SCIM user to our database schema
       const updateData: Record<string, any> = {};
@@ -413,7 +406,7 @@ export class ScimService {
     } catch (error) {
       console.error('SCIM update user error:', error);
       
-      if (error instanceof Resource.Error) {
+      if (error instanceof scimmy.Resources.Error) {
         // Handle SCIM-specific errors
         res.status(400).json({
           schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
@@ -521,18 +514,31 @@ export class ScimService {
       // Apply specific filters if provided
       if (filter) {
         try {
-          const parsedFilter = Filter.parse(filter, { schema: UserSchema });
+          // Simple filter parsing implementation since scimmy doesn't export Filter directly
+          // This is a very simple implementation that only handles basic equality filters
           
-          // Convert SCIM filter to Drizzle query
-          // This is a simplified implementation
-          if (parsedFilter.attribute === 'userName' && parsedFilter.operator === 'eq') {
-            query = query.where(eq(users.username, parsedFilter.value));
-          } else if (parsedFilter.attribute === 'emails.value' && parsedFilter.operator === 'eq') {
-            query = query.where(eq(users.email, parsedFilter.value));
-          } else if (parsedFilter.attribute === 'active' && parsedFilter.operator === 'eq') {
-            query = query.where(eq(users.active, parsedFilter.value === 'true'));
-          } else if (parsedFilter.attribute === 'externalId' && parsedFilter.operator === 'eq') {
-            query = query.where(eq(users.externalId, parsedFilter.value));
+          // Example filters:
+          // userName eq "john.doe"
+          // emails.value eq "john.doe@example.com"
+          // active eq "true"
+          
+          const parts = filter.split(' ');
+          if (parts.length === 3) {
+            const [attribute, operator, rawValue] = parts;
+            // Remove quotes if present
+            const value = rawValue.replace(/^"(.*)"$/, '$1');
+            
+            if (operator === 'eq') {
+              if (attribute === 'userName') {
+                query = query.where(eq(users.username, value));
+              } else if (attribute === 'emails.value') {
+                query = query.where(eq(users.email, value));
+              } else if (attribute === 'active') {
+                query = query.where(eq(users.active, value === 'true'));
+              } else if (attribute === 'externalId') {
+                query = query.where(eq(users.externalId, value));
+              }
+            }
           }
         } catch (error) {
           console.error('SCIM filter parse error:', error);
