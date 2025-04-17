@@ -600,51 +600,30 @@ export class MemStorage implements IStorage {
     );
   }
 
-  // OAuth Tokens
+  // OAuth Credentials
   private oauthCredentials: Map<string, OAuthCredential> = new Map();
   
-  async saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any> {
-    const key = `${token.userId}:${token.provider}`;
-    this.oauthTokens.set(key, token);
-    return token;
-  }
-  
-  async getOAuthToken(userId: number, provider: string): Promise<any | undefined> {
-    const key = `${userId}:${provider}`;
-    return this.oauthTokens.get(key);
-  }
-  
-  async updateOAuthToken(tokenId: number, updates: Partial<any>): Promise<any> {
-    // Find the token by ID
-    let foundKey: string | undefined;
-    let foundToken: any | undefined;
-    
-    for (const [key, token] of this.oauthTokens.entries()) {
-      if (token.id === tokenId) {
-        foundKey = key;
-        foundToken = token;
-        break;
-      }
-    }
-    
-    if (!foundKey || !foundToken) {
-      throw new Error(`Token with ID ${tokenId} not found`);
-    }
-    
-    // Update the token
-    const updatedToken = {
-      ...foundToken,
-      ...updates,
-      updatedAt: new Date()
+  async saveOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
+    const key = `${credential.userId}:${credential.providerId}`;
+    const id = credential.id || Date.now(); // Generate an ID if not provided
+    const oauthCredential: OAuthCredential = { 
+      ...credential, 
+      id,
+      createdAt: credential.createdAt || new Date(),
+      updatedAt: credential.updatedAt || new Date()
     };
-    
-    this.oauthTokens.set(foundKey, updatedToken);
-    return updatedToken;
+    this.oauthCredentials.set(key, oauthCredential);
+    return oauthCredential;
   }
   
-  async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
-    const key = `${userId}:${provider}`;
-    return this.oauthTokens.delete(key);
+  async getOAuthCredential(userId: number, providerId: string): Promise<OAuthCredential | undefined> {
+    const key = `${userId}:${providerId}`;
+    return this.oauthCredentials.get(key);
+  }
+  
+  async deleteOAuthCredential(userId: number, providerId: string): Promise<boolean> {
+    const key = `${userId}:${providerId}`;
+    return this.oauthCredentials.delete(key);
   }
 
   // Projects
