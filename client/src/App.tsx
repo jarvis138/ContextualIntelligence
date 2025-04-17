@@ -145,6 +145,10 @@ function App() {
               </MainLayout>
             </Route>
           </Switch>
+          {/* Tour Manager for guided tours */}
+          <TourManager />
+          {/* Chatbot Interface */}
+          <ChatInterface />
           <Toaster />
         </ProjectAssistantProvider>
       </TourContextProvider>
