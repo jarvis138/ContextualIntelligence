@@ -1091,6 +1091,92 @@ export class MemStorage implements IStorage {
     this.oauthProviderSettings.set(id, setting);
     return setting;
   }
+
+  // SAML Provider methods
+  async getSamlProviders(): Promise<SamlProvider[]> {
+    return Array.from(this.samlProviders.values());
+  }
+
+  async getSamlProvider(id: number): Promise<SamlProvider | undefined> {
+    return this.samlProviders.get(id);
+  }
+
+  async getSamlProviderByProviderId(providerId: string): Promise<SamlProvider | undefined> {
+    return Array.from(this.samlProviders.values()).find(
+      provider => provider.providerId === providerId
+    );
+  }
+
+  async saveSamlProvider(provider: InsertSamlProvider): Promise<SamlProvider> {
+    // Check if provider already exists
+    const existingProvider = await this.getSamlProviderByProviderId(provider.providerId);
+    
+    if (existingProvider) {
+      // Update existing provider
+      const updatedProvider = {
+        ...existingProvider,
+        name: provider.name,
+        entityId: provider.entityId,
+        ssoUrl: provider.ssoUrl,
+        sloUrl: provider.sloUrl,
+        certificateContent: provider.certificateContent,
+        issuer: provider.issuer,
+        callbackUrl: provider.callbackUrl,
+        enabled: provider.enabled !== undefined ? provider.enabled : existingProvider.enabled,
+        allowedDomains: provider.allowedDomains,
+        attributeMapping: provider.attributeMapping,
+        tenantId: provider.tenantId,
+        updatedAt: new Date()
+      };
+      
+      this.samlProviders.set(existingProvider.id, updatedProvider);
+      return updatedProvider;
+    }
+    
+    // Create new provider
+    const id = this.currentIds.samlProviders++;
+    const newProvider: SamlProvider = {
+      ...provider,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.samlProviders.set(id, newProvider);
+    return newProvider;
+  }
+
+  async updateSamlProvider(id: number, provider: Partial<InsertSamlProvider>): Promise<SamlProvider | undefined> {
+    const existingProvider = this.samlProviders.get(id);
+    if (!existingProvider) {
+      return undefined;
+    }
+    
+    const updatedProvider = {
+      ...existingProvider,
+      ...provider,
+      updatedAt: new Date()
+    };
+    
+    this.samlProviders.set(id, updatedProvider);
+    return updatedProvider;
+  }
+
+  async deleteSamlProvider(id: number): Promise<boolean> {
+    return this.samlProviders.delete(id);
+  }
+
+  async getSamlProvidersByTenant(tenantId: number): Promise<SamlProvider[]> {
+    return Array.from(this.samlProviders.values()).filter(
+      provider => provider.tenantId === tenantId
+    );
+  }
+
+  async getEnabledSamlProviders(): Promise<SamlProvider[]> {
+    return Array.from(this.samlProviders.values()).filter(
+      provider => provider.enabled === true
+    );
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1414,57 +1500,53 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
   
-  // OAuth Tokens
-  async saveOAuthToken(token: z.infer<typeof insertOAuthTokenSchema>): Promise<any> {
-    // Check if token exists
-    const [existingToken] = await db.select()
-      .from(oauthTokens)
+  // OAuth Credentials
+  async saveOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
+    // Check if credential exists
+    const [existingCredential] = await db.select()
+      .from(oauthCredentials)
       .where(
-        sql`${oauthTokens.userId} = ${token.userId} AND ${oauthTokens.provider} = ${token.provider}`
+        sql`${oauthCredentials.userId} = ${credential.userId} AND ${oauthCredentials.providerId} = ${credential.providerId}`
       );
     
-    if (existingToken) {
-      // Update existing token
-      const [updatedToken] = await db.update(oauthTokens)
-        .set(token)
+    if (existingCredential) {
+      // Update existing credential
+      const [updatedCredential] = await db.update(oauthCredentials)
+        .set({
+          ...credential,
+          updatedAt: new Date()
+        })
         .where(
-          sql`${oauthTokens.userId} = ${token.userId} AND ${oauthTokens.provider} = ${token.provider}`
+          sql`${oauthCredentials.userId} = ${credential.userId} AND ${oauthCredentials.providerId} = ${credential.providerId}`
         )
         .returning();
-      return updatedToken;
+      return updatedCredential;
     } else {
-      // Insert new token
-      const [newToken] = await db.insert(oauthTokens)
-        .values(token)
+      // Insert new credential
+      const [newCredential] = await db.insert(oauthCredentials)
+        .values({
+          ...credential,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
         .returning();
-      return newToken;
+      return newCredential;
     }
   }
   
-  async getOAuthToken(userId: number, provider: string): Promise<any | undefined> {
-    const [token] = await db.select()
-      .from(oauthTokens)
+  async getOAuthCredential(userId: number, providerId: string): Promise<OAuthCredential | undefined> {
+    const [credential] = await db.select()
+      .from(oauthCredentials)
       .where(
-        sql`${oauthTokens.userId} = ${userId} AND ${oauthTokens.provider} = ${provider}`
+        sql`${oauthCredentials.userId} = ${userId} AND ${oauthCredentials.providerId} = ${providerId}`
       );
-    return token || undefined;
+    return credential || undefined;
   }
   
-  async getLatestOAuthToken(userId: number, provider: string): Promise<any | undefined> {
-    // In this implementation, there's only one token per user/provider combination
-    // So this is the same as getOAuthToken
-    return this.getOAuthToken(userId, provider);
-  }
-  
-  async revokeOAuthToken(userId: number, provider: string): Promise<boolean> {
-    // This implementation simply deletes the token
-    return this.deleteOAuthToken(userId, provider);
-  }
-  
-  async deleteOAuthToken(userId: number, provider: string): Promise<boolean> {
-    await db.delete(oauthTokens)
+  async deleteOAuthCredential(userId: number, providerId: string): Promise<boolean> {
+    await db.delete(oauthCredentials)
       .where(
-        sql`${oauthTokens.userId} = ${userId} AND ${oauthTokens.provider} = ${provider}`
+        sql`${oauthCredentials.userId} = ${userId} AND ${oauthCredentials.providerId} = ${providerId}`
       );
     return true; // We don't actually get a boolean back from drizzle
   }
