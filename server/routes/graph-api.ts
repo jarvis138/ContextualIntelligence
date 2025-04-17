@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../auth';
-import { getMockGraphData, getMockNodeDetails, mockGraphSearch, createMockGraphData } from '../../client/src/lib/mockData';
+import { getMockGraphData, getMockNodeDetails, mockGraphSearch, createMockGraphData } from '../utils/mockGraphData';
 
 export const graphApiRouter = Router();
 

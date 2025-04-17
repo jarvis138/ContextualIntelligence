@@ -16,6 +16,7 @@ import {
   Search, ZoomIn, ZoomOut, RotateCcw, Download, Share2, 
   Info, Filter, Sun, Moon, Maximize2, Minimize2
 } from 'lucide-react';
+import { getMockGraphData } from '../../lib/mockData';
 
 // Define types for graph data structures
 export interface GraphNode {
@@ -148,18 +149,30 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     const fetchGraphData = async () => {
       try {
         setLoading(true);
-        let url = `/api/graph/visualization?depth=${depth}`;
-        if (initialNodeId) {
-          url += `&nodeId=${initialNodeId}`;
+        
+        // In development, use mock data
+        // In production, this would fetch from an API endpoint
+        try {
+          // Try to fetch from API first
+          let url = `/api/graph/visualization?depth=${depth}`;
+          if (initialNodeId) {
+            url += `&nodeId=${initialNodeId}`;
+          }
+          
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error('API endpoint not available');
+          }
+          
+          const data = await response.json();
+          setGraphData(data);
+        } catch (apiError) {
+          console.log('Using mock data for graph visualization', apiError);
+          // If API fails, fall back to mock data
+          const mockData = getMockGraphData(initialNodeId, depth);
+          setGraphData(mockData);
         }
         
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch graph data: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        setGraphData(data);
         setError(null);
       } catch (err) {
         console.error('Error loading graph data:', err);
@@ -177,9 +190,18 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     const filteredNodes = graphData.nodes.filter(node => nodeFilters[node.type]);
     const filteredNodeIds = new Set(filteredNodes.map(node => node.id));
     const filteredLinks = graphData.links.filter(
-      link => 
-        filteredNodeIds.has(typeof link.source === 'object' ? link.source.id : link.source as number) && 
-        filteredNodeIds.has(typeof link.target === 'object' ? link.target.id : link.target as number)
+      link => {
+        // Handle the case where source/target could be number or object with id property
+        const sourceId = typeof link.source === 'object' && link.source !== null 
+          ? (link.source as any).id 
+          : link.source as number;
+          
+        const targetId = typeof link.target === 'object' && link.target !== null 
+          ? (link.target as any).id 
+          : link.target as number;
+        
+        return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
+      }
     );
     
     return { nodes: filteredNodes, links: filteredLinks };
@@ -407,29 +429,14 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
                 linkWidth={(link) => (link as GraphEdge).weight || 1}
                 linkDirectionalArrowLength={(link) => (link as GraphEdge).type === 'DEPENDS_ON' ? 4 : 0}
                 onNodeClick={(node) => handleNodeClick(node as GraphNode)}
-                nodeThreeObject={(node) => {
+                nodeThreeObject={(node: any) => {
                   if (!showLabels) return null;
                   const label = (node as GraphNode).label;
                   
-                  // Create a sprite to display the label
-                  const sprite = new THREE.Sprite(
-                    new THREE.SpriteMaterial({
-                      map: createTextTexture(label),
-                      color: darkMode ? 0xffffff : 0x000000,
-                      sizeAttenuation: false
-                    })
-                  );
-                  
-                  // Position the sprite above the node
-                  sprite.position.y = 5;
-                  return sprite;
-                }}
-                
-                // Helper function to create text texture
-                function createTextTexture(text: string) {
+                  // Create a canvas for the label
                   const canvas = document.createElement('canvas');
                   const context = canvas.getContext('2d');
-                  if (!context) return new THREE.Texture();
+                  if (!context) return null;
                   
                   // Set canvas dimensions
                   canvas.width = 256;
@@ -444,13 +451,25 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
                   context.fillStyle = 'white';
                   context.textAlign = 'center';
                   context.textBaseline = 'middle';
-                  context.fillText(text, canvas.width / 2, canvas.height / 2);
+                  context.fillText(label, canvas.width / 2, canvas.height / 2);
                   
                   // Create texture from canvas
                   const texture = new THREE.Texture(canvas);
                   texture.needsUpdate = true;
-                  return texture;
-                }
+                  
+                  // Create a sprite to display the label
+                  const sprite = new THREE.Sprite(
+                    new THREE.SpriteMaterial({
+                      map: texture,
+                      color: darkMode ? 0xffffff : 0x000000,
+                      sizeAttenuation: false
+                    })
+                  );
+                  
+                  // Position the sprite above the node
+                  sprite.position.y = 5;
+                  return sprite;
+                }}
                 backgroundColor={darkMode ? '#1f2937' : '#ffffff'}
                 enableNodeDrag={true}
                 enableNavigationControls={true}

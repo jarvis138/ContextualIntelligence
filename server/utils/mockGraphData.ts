@@ -1,8 +1,34 @@
-// Mock data generation for development purposes
-import { GraphData, GraphNode, GraphEdge } from "../components/visualizations/GraphVisualizer";
+// Server-side mock graph data utilities
+
+// GraphNode interface
+interface GraphNode {
+  id: number;
+  type: "DOCUMENT" | "MESSAGE" | "ENTITY" | "TOPIC" | "USER" | "PROJECT" | "TASK";
+  label: string;
+  properties?: Record<string, any>;
+  embeddings?: Record<string, any>;
+  importance?: number;
+  externalId: string;
+}
+
+// GraphEdge interface
+interface GraphEdge {
+  source: number;
+  target: number;
+  id?: number;
+  type?: "CONTAINS" | "MENTIONED_IN" | "DISCUSSES" | "AUTHORED_BY" | "REPLIED" | "RELATED" | "DEPENDS_ON" | "REFERS_TO" | "SIMILAR_TO" | "ASSOCIATED_WITH" | "PART_OF";
+  properties?: Record<string, any>;
+  weight?: number;
+}
+
+// GraphData interface
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphEdge[];
+}
 
 // Generate mock graph data for visualization
-export const getMockGraphData = (initialNodeId?: number, depth: number = 2): GraphData => {
+export const getMockGraphData = (initialNodeId?: number, depth: number = 2, limit: number = 100): GraphData => {
   const nodes: GraphNode[] = [];
   const links: GraphEdge[] = [];
   
@@ -52,9 +78,12 @@ export const getMockGraphData = (initialNodeId?: number, depth: number = 2): Gra
     // For each node in current level
     for (const sourceId of currentLevel) {
       // Generate between 2-5 connected nodes for each current node
-      const connectionsCount = Math.floor(Math.random() * 4) + 2;
+      const connectionsCount = Math.min(Math.floor(Math.random() * 4) + 2, Math.floor(limit / (level + 1) / currentLevel.length));
       
       for (let i = 0; i < connectionsCount; i++) {
+        // Stop if we reach the node limit
+        if (nodes.length >= limit) break;
+        
         nodeId++;
         
         // Create a new node
@@ -84,39 +113,69 @@ export const getMockGraphData = (initialNodeId?: number, depth: number = 2): Gra
           }
         }
       }
+      
+      // Stop if we reach the node limit
+      if (nodes.length >= limit) break;
     }
     
     // Move to next level
     currentLevel = nextLevel;
     nextLevel = [];
+    
+    // Stop if we reach the node limit
+    if (nodes.length >= limit) break;
   }
   
   // Add some extra connections for more complex graph
-  const extraConnectionsCount = Math.floor(nodes.length * 0.2);
-  for (let i = 0; i < extraConnectionsCount; i++) {
-    const sourceIdx = Math.floor(Math.random() * nodes.length);
-    let targetIdx = Math.floor(Math.random() * nodes.length);
-    
-    // Ensure we don't connect a node to itself
-    while (targetIdx === sourceIdx) {
-      targetIdx = Math.floor(Math.random() * nodes.length);
+  if (nodes.length < limit) {
+    const extraConnectionsCount = Math.floor(nodes.length * 0.2);
+    for (let i = 0; i < extraConnectionsCount; i++) {
+      const sourceIdx = Math.floor(Math.random() * nodes.length);
+      let targetIdx = Math.floor(Math.random() * nodes.length);
+      
+      // Ensure we don't connect a node to itself
+      while (targetIdx === sourceIdx) {
+        targetIdx = Math.floor(Math.random() * nodes.length);
+      }
+      
+      links.push({
+        source: nodes[sourceIdx].id,
+        target: nodes[targetIdx].id,
+        type: edgeTypes[Math.floor(Math.random() * edgeTypes.length)],
+        weight: 0.5 + Math.random()
+      });
     }
-    
-    links.push({
-      source: nodes[sourceIdx].id,
-      target: nodes[targetIdx].id,
-      type: edgeTypes[Math.floor(Math.random() * edgeTypes.length)],
-      weight: 0.5 + Math.random()
-    });
   }
   
   return { nodes, links };
 };
 
+// Get detailed information about a specific node
+export const getMockNodeDetails = (nodeId: number): GraphNode | null => {
+  const node = getMockGraphData().nodes.find(node => node.id === nodeId);
+  
+  if (!node) return null;
+  
+  // Add some additional mock details
+  return {
+    ...node,
+    properties: {
+      ...node.properties,
+      creator: "John Doe",
+      lastModified: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toISOString(),
+      version: "1." + Math.floor(Math.random() * 10),
+      tags: ["important", "reviewed", "validated"].slice(0, Math.floor(Math.random() * 4)),
+      description: "This is a detailed description for node " + nodeId,
+      size: Math.floor(Math.random() * 1000) + "KB",
+      accessLevel: ["public", "private", "restricted"][Math.floor(Math.random() * 3)]
+    }
+  };
+};
+
 // Mock function to search for nodes in the graph
 export const mockGraphSearch = async (searchTerm: string): Promise<GraphNode[]> => {
   // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 100));
   
   // Generate a set of random nodes as search results
   const results: GraphNode[] = [];
@@ -149,4 +208,14 @@ export const mockGraphSearch = async (searchTerm: string): Promise<GraphNode[]> 
   }
   
   return results;
+};
+
+// Function to create initial graph data
+export const createMockGraphData = async (): Promise<void> => {
+  // This would normally create data in the database
+  // For mock purposes, we just wait a bit to simulate processing
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  console.log('Mock graph data created successfully');
+  return;
 };
