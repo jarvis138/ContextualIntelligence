@@ -566,9 +566,17 @@ export class OAuthService {
       // Additional fields as required
     };
     
-    // Create the user
+    // Create the user using the schema field names (not DB column names)
     const [createdUser] = await db.insert(users)
-      .values(userData)
+      .values({
+        username: userData.username,
+        email: userData.email,
+        fullName: userData.fullName,
+        avatar: userData.profilePicture,
+        role: userData.role,
+        authMethod: userData.authMethod,
+        externalId: externalId
+      })
       .returning();
     
     // Store OAuth credentials
