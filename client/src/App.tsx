@@ -9,6 +9,7 @@ import WorkspacePage from "@/pages/workspace-page";
 import AnalyticsPage from "@/pages/analytics-page";
 import ReportsAlertsPage from "@/pages/reports-alerts-page";
 import InsightsPage from "@/pages/insights-page";
+import IntelligenceDashboard from "@/pages/intelligence-dashboard";
 import SearchPage from "@/pages/search-page";
 import SettingsPage from "@/pages/settings-page";
 import AdminPage from "@/pages/admin-page";
@@ -130,6 +131,7 @@ function App() {
                   <Route path="/analytics" component={AnalyticsPage} />
                   <Route path="/reports-alerts" component={ReportsAlertsPage} />
                   <Route path="/insights" component={InsightsPage} />
+                  <Route path="/intelligence" component={IntelligenceDashboard} />
                   <Route path="/integrations" component={ConnectorsPage} />
                   <Route path="/connectors" component={ConnectorsPage} />
                   <Route path="/graph" component={GraphPage} />
