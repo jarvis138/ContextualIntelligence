@@ -31,8 +31,12 @@ export function useEntityExtraction() {
   
   return useMutation<Entity[], Error, string>({
     mutationFn: async (text: string) => {
-      const response = await apiRequest('POST', '/api/ai/entities', { text });
-      const data = await response.json() as EntitiesResponse;
+      const response = await apiRequest({
+        url: '/api/ai/entities',
+        method: 'POST',
+        data: { text }
+      });
+      const data = response.data as EntitiesResponse;
       return data.entities;
     },
     onError: (error) => {
@@ -53,8 +57,12 @@ export function useRelationExtraction() {
   
   return useMutation<Relation[], Error, { text: string; entities?: Entity[] }>({
     mutationFn: async ({ text, entities }) => {
-      const response = await apiRequest('POST', '/api/ai/relations', { text, entities });
-      const data = await response.json() as RelationsResponse;
+      const response = await apiRequest({
+        url: '/api/ai/relations',
+        method: 'POST',
+        data: { text, entities }
+      });
+      const data = response.data as RelationsResponse;
       return data.relations;
     },
     onError: (error) => {
@@ -75,8 +83,12 @@ export function useDocumentAnalysis() {
   
   return useMutation<DocumentAnalysis, Error, string>({
     mutationFn: async (text: string) => {
-      const response = await apiRequest('POST', '/api/ai/document-analysis', { text });
-      const data = await response.json() as DocumentAnalysisResponse;
+      const response = await apiRequest({
+        url: '/api/ai/document-analysis',
+        method: 'POST',
+        data: { text }
+      });
+      const data = response.data as DocumentAnalysisResponse;
       return data.analysis;
     },
     onError: (error) => {
@@ -97,8 +109,12 @@ export function useProjectInsights() {
   
   return useMutation<ProjectInsight[], Error, ProjectInsightsRequest>({
     mutationFn: async (context) => {
-      const response = await apiRequest('POST', '/api/ai/project-insights', context);
-      const data = await response.json() as ProjectInsightsResponse;
+      const response = await apiRequest({
+        url: '/api/ai/project-insights',
+        method: 'POST',
+        data: context
+      });
+      const data = response.data as ProjectInsightsResponse;
       return data.insights;
     },
     onError: (error) => {
@@ -119,8 +135,12 @@ export function useSentimentAnalysis() {
   
   return useMutation<SentimentAnalysis, Error, string>({
     mutationFn: async (text: string) => {
-      const response = await apiRequest('POST', '/api/ai/sentiment', { text });
-      const data = await response.json() as SentimentResponse;
+      const response = await apiRequest({
+        url: '/api/ai/sentiment',
+        method: 'POST',
+        data: { text }
+      });
+      const data = response.data as SentimentResponse;
       return data.sentiment;
     },
     onError: (error) => {
@@ -141,8 +161,12 @@ export function useTextSummarization() {
   
   return useMutation<string, Error, { text: string; maxLength?: number }>({
     mutationFn: async ({ text, maxLength }) => {
-      const response = await apiRequest('POST', '/api/ai/summarize', { text, maxLength });
-      const data = await response.json() as SummarizeResponse;
+      const response = await apiRequest({
+        url: '/api/ai/summarize',
+        method: 'POST',
+        data: { text, maxLength }
+      });
+      const data = response.data as SummarizeResponse;
       return data.summary;
     },
     onError: (error) => {

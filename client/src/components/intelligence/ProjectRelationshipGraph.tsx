@@ -27,6 +27,9 @@ interface GraphNode {
   size?: number;
   val?: number;
   metadata?: Record<string, any>;
+  // Position properties added by force-graph library at runtime
+  x?: number;
+  y?: number;
 }
 
 interface GraphLink {
@@ -44,11 +47,15 @@ interface GraphData {
 
 export default function ProjectRelationshipGraph({ projectId }: { projectId: number }) {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
-  const [graphFilter, setGraphFilter] = useState<string>('all');
+  const [graphFilter, setGraphFilter] = useState<'all' | 'document' | 'task' | 'person' | 'project' | 'topic' | 'message' | 'entity'>('all');
   const [highlightedNode, setHighlightedNode] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'details'>('graph');
   
-  const graphRef = useRef<any>(null);
+  // ForceGraph2D has a complex type structure, so we're using a more specific type for its ref
+  const graphRef = useRef<{
+    centerAt: (x: number, y: number, ms: number) => void;
+    zoom: (zoomLevel: number, ms: number) => number;
+  } | null>(null);
   
   const { isOpenAIAvailable, isLoading: aiServiceCheckLoading } = useAIServices();
   
@@ -158,9 +165,11 @@ export default function ProjectRelationshipGraph({ projectId }: { projectId: num
     if (!node) return null;
     
     // Find connected nodes
-    const connectedLinks = graphData.links.filter(
-      link => link.source.toString() === highlightedNode || link.target.toString() === highlightedNode
-    );
+    const connectedLinks = graphData.links.filter(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      return sourceId.toString() === highlightedNode || targetId.toString() === highlightedNode;
+    });
     
     return (
       <div className="space-y-4 p-2">
@@ -187,8 +196,10 @@ export default function ProjectRelationshipGraph({ projectId }: { projectId: num
             <h4 className="font-medium text-sm text-muted-foreground">Connections ({connectedLinks.length})</h4>
             <div className="space-y-1">
               {connectedLinks.map((link, idx) => {
-                const isSource = link.source.toString() === highlightedNode;
-                const connectedNodeId = isSource ? link.target.toString() : link.source.toString();
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                const isSource = sourceId.toString() === highlightedNode;
+                const connectedNodeId = isSource ? targetId.toString() : sourceId.toString();
                 const connectedNode = graphData.nodes.find(n => n.id === connectedNodeId);
                 
                 return (
@@ -341,24 +352,28 @@ export default function ProjectRelationshipGraph({ projectId }: { projectId: num
                 ref={graphRef}
                 graphData={getFilteredGraphData()}
                 nodeLabel="name"
-                nodeColor={node => highlightedNode === node.id ? '#ff6b6b' : getNodeColor(node.type)}
-                nodeVal={node => node.size || 1}
-                linkColor={link => {
+                nodeColor={(node: GraphNode) => highlightedNode === node.id ? '#ff6b6b' : getNodeColor(node.type)}
+                nodeVal={(node: GraphNode) => node.size || 1}
+                linkColor={(link: GraphLink) => {
                   if (!highlightedNode) return '#cccccc';
-                  return (link.source === highlightedNode || link.target === highlightedNode) 
+                  const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                  const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                  return (sourceId === highlightedNode || targetId === highlightedNode) 
                     ? '#ff6b6b' 
                     : '#cccccc';
                 }}
-                linkWidth={link => {
+                linkWidth={(link: GraphLink) => {
                   if (!highlightedNode) return 1;
-                  return (link.source === highlightedNode || link.target === highlightedNode) ? 2 : 1;
+                  const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                  const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                  return (sourceId === highlightedNode || targetId === highlightedNode) ? 2 : 1;
                 }}
                 linkDirectionalArrowLength={3}
                 linkDirectionalArrowRelPos={1}
                 linkCurvature={0.2}
                 onNodeClick={handleNodeClick}
                 cooldownTicks={100}
-                nodeCanvasObject={(node, ctx, globalScale) => {
+                nodeCanvasObject={(node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
                   const label = node.name;
                   const fontSize = 12/globalScale;
                   ctx.font = `${fontSize}px Sans-Serif`;

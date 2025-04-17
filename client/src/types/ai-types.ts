@@ -56,6 +56,7 @@ export interface ProjectInsight {
 export interface SentimentAnalysis {
   sentiment: string;
   confidence: number;
+  score: number;
 }
 
 // Response types for AI API endpoints

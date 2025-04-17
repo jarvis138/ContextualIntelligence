@@ -12,6 +12,27 @@ export const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Creates a query function for React Query
+ * This function handles the common pattern of fetching data from an API endpoint
+ * @returns A function that can be used as the queryFn in useQuery
+ */
+export const getQueryFn = (defaultOptions = {}) => {
+  return async ({ queryKey }: { queryKey: string[] }) => {
+    const [endpoint, ...params] = queryKey;
+    const queryParams = params.length > 0 ? `/${params.join('/')}` : '';
+    const url = `${endpoint}${queryParams}`;
+    
+    const response = await apiRequest({
+      url,
+      method: 'GET',
+      ...defaultOptions,
+    });
+    
+    return response.data;
+  };
+};
+
 interface ApiRequestConfig extends AxiosRequestConfig {
   skipAuthHeader?: boolean;
 }
