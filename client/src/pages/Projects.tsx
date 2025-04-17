@@ -14,15 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -179,12 +171,12 @@ export default function Projects() {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <FormLabel htmlFor="name">Project Name</FormLabel>
+              <Label htmlFor="name">Project Name</Label>
               <Input id="name" placeholder="Enter project name" />
             </div>
             
             <div className="space-y-2">
-              <FormLabel htmlFor="description">Description</FormLabel>
+              <Label htmlFor="description">Description</Label>
               <Textarea 
                 id="description" 
                 placeholder="Describe the project purpose and goals" 
@@ -194,7 +186,7 @@ export default function Projects() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <FormLabel htmlFor="status">Status</FormLabel>
+                <Label htmlFor="status">Status</Label>
                 <Select defaultValue="planning">
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -210,7 +202,7 @@ export default function Projects() {
               </div>
               
               <div className="space-y-2">
-                <FormLabel htmlFor="team">Team</FormLabel>
+                <Label htmlFor="team">Team</Label>
                 <Select defaultValue="frontend">
                   <SelectTrigger>
                     <SelectValue placeholder="Assign team" />
@@ -352,7 +344,7 @@ export default function Projects() {
             
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <FormLabel>People with access</FormLabel>
+                <Label>People with access</Label>
                 <div className="space-y-3">
                   {[
                     { name: 'Sarah Chen', email: 'sarah.c@example.com', role: 'Editor' },
@@ -385,7 +377,7 @@ export default function Projects() {
               </div>
               
               <div className="space-y-2">
-                <FormLabel>Add people</FormLabel>
+                <Label>Add people</Label>
                 <div className="flex space-x-2">
                   <Input placeholder="Add email or name" className="flex-1" />
                   <Select defaultValue="editor">
@@ -401,7 +393,7 @@ export default function Projects() {
               </div>
               
               <div className="space-y-2">
-                <FormLabel>Share link</FormLabel>
+                <Label>Share link</Label>
                 <div className="flex space-x-2">
                   <Input value="https://cpihub.com/project/123" readOnly className="flex-1" />
                   <Button variant="outline" size="sm" onClick={() => {
@@ -447,12 +439,12 @@ export default function Projects() {
             
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <FormLabel htmlFor="name">Project Name</FormLabel>
+                <Label htmlFor="name">Project Name</Label>
                 <Input id="name" defaultValue={currentProject.name} />
               </div>
               
               <div className="space-y-2">
-                <FormLabel htmlFor="description">Description</FormLabel>
+                <Label htmlFor="description">Description</Label>
                 <Textarea 
                   id="description" 
                   defaultValue={currentProject.description}
@@ -462,7 +454,7 @@ export default function Projects() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <FormLabel htmlFor="status">Status</FormLabel>
+                  <Label htmlFor="status">Status</Label>
                   <Select defaultValue={currentProject.status}>
                     <SelectTrigger>
                       <SelectValue />
@@ -478,7 +470,7 @@ export default function Projects() {
                 </div>
                 
                 <div className="space-y-2">
-                  <FormLabel htmlFor="progress">Progress</FormLabel>
+                  <Label htmlFor="progress">Progress</Label>
                   <div className="flex items-center space-x-4">
                     <Input 
                       id="progress" 
@@ -493,7 +485,7 @@ export default function Projects() {
               </div>
               
               <div className="space-y-2">
-                <FormLabel>Danger Zone</FormLabel>
+                <Label>Danger Zone</Label>
                 <div className="border border-destructive/20 rounded-md p-4">
                   <h4 className="font-medium text-destructive mb-2">Archive Project</h4>
                   <p className="text-sm text-muted-foreground mb-4">
