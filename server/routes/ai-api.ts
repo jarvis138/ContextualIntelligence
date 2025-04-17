@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { openaiService } from '../services/openai';
 import { authenticateToken } from '../auth';
 import { logger } from '../services/observability';
+import { analyzeDocument } from '../services/aiService';
 
 const router = Router();
 const aiLogger = logger.createChildLogger({ component: 'AIApiRouter' });
@@ -71,23 +72,23 @@ router.post('/relations', authenticateToken, async (req, res) => {
 router.post('/document-analysis', authenticateToken, async (req, res) => {
   try {
     const schema = z.object({
-      text: z.string().min(1, 'Document text is required')
+      documentId: z.number().int().positive('Document ID is required')
     });
     
-    const { text } = schema.parse(req.body);
+    const { documentId } = schema.parse(req.body);
     
-    const analysis = await openaiService.analyzeDocument(text);
+    const analysis = await analyzeDocument(documentId);
     
     aiLogger.info('Document analysis performed', {
       userId: req.user?.id,
-      textLength: text.length,
+      documentId,
       topics: analysis.topics
     });
     
-    res.json({ analysis });
+    res.json({ success: true, analysis });
   } catch (error: any) {
     aiLogger.error('Document analysis failed', { error: error.message });
-    res.status(400).json({ error: error.message || 'Failed to analyze document' });
+    res.status(400).json({ success: false, error: error.message || 'Failed to analyze document' });
   }
 });
 
