@@ -407,6 +407,91 @@ export async function detectAnomalies(projectId: number): Promise<any> {
   }
 }
 
+/**
+ * Analyze document content with AI
+ * This is a key Phase 3 feature for AI-powered document analysis
+ */
+export async function analyzeDocument(documentId: number): Promise<any> {
+  try {
+    // Check if OpenAI is configured
+    if (!isOpenAIConfigured()) {
+      console.warn("OpenAI API key not configured. Cannot analyze document.");
+      return {
+        summary: "AI analysis unavailable - API key not configured",
+        entities: [],
+        keywords: [],
+        topics: [],
+        sentiment: { score: 0, label: "neutral" },
+        importance: 0.5
+      };
+    }
+    
+    // Get document by ID
+    const [document] = await db.query.documents.findMany({
+      where: eq(db.schema.documents.id, documentId),
+      limit: 1
+    });
+    
+    if (!document) {
+      throw new Error(`Document with ID ${documentId} not found`);
+    }
+    
+    // Extract content for analysis
+    const content = document.content || document.title;
+    
+    if (!content || content.length < 10) {
+      throw new Error("Document content too short for meaningful analysis");
+    }
+    
+    // Build prompt for document analysis
+    const prompt = `
+      Analyze this document thoroughly:
+      
+      Title: ${document.title}
+      Content: ${content.substring(0, 8000)} ${content.length > 8000 ? '...(truncated)' : ''}
+      
+      Provide a comprehensive analysis including:
+      1. A concise summary (max 200 words)
+      2. Key entities mentioned (people, organizations, concepts, etc.)
+      3. Important keywords
+      4. Main topics covered
+      5. Overall sentiment (score from -1 to 1, and label)
+      6. Document importance rating (0.0 to 1.0)
+      
+      Return the analysis in JSON format with these sections.
+    `;
+    
+    // Call OpenAI for document analysis
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        { role: "system", content: "You are an AI expert in document analysis and information extraction." },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 2000
+    });
+    
+    // Parse response
+    const content_response = response.choices[0].message.content || "{}";
+    const result = JSON.parse(content_response);
+    
+    return {
+      documentId,
+      title: document.title,
+      ...result
+    };
+  } catch (error: unknown) {
+    console.error("Error analyzing document:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to analyze document: ${error.message}`);
+    } else {
+      throw new Error("Failed to analyze document: Unknown error");
+    }
+  }
+}
+
 // Helper functions
 
 /**
