@@ -8,9 +8,22 @@
  * https://oauth.net/2/pkce/
  */
 
-import pkceChallenge from 'pkce-challenge';
 import crypto from 'crypto';
 import { AuditSeverity } from '../services/auditService';
+
+// Simplified version of PKCE challenge generation since we're having issues with the library
+function generatePKCEPair() {
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto
+    .createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+  
+  return {
+    code_verifier: codeVerifier,
+    code_challenge: codeChallenge
+  };
+}
 
 /**
  * PKCE verification data structure
@@ -37,7 +50,7 @@ const pkceStore = new Map<string, PKCEData>();
  */
 export function generatePKCE(expirationMinutes = 10): PKCEData {
   // Generate PKCE values
-  const pkce = pkceChallenge();
+  const pkce = generatePKCEPair();
   
   // Generate random state for CSRF protection
   const state = crypto.randomBytes(32).toString('hex');
@@ -130,7 +143,7 @@ export function verifyPKCE(state: string): PKCEData | null {
         {
           success: false,
           reason: 'Expired code',
-          severity: 'WARNING',
+          severity: AuditSeverity.WARNING,
           metadata: { 
             state,
             expiredAt: pkceData.expiresAt.toISOString(),
@@ -311,7 +324,7 @@ export class PKCEOAuthProvider {
           { 
             success: false,
             reason: errorMessage,
-            severity: 'ERROR',
+            severity: AuditSeverity.ERROR,
             metadata: {
               status: response.status,
               redirectUri
@@ -355,7 +368,7 @@ export class PKCEOAuthProvider {
           { 
             success: false,
             reason: error instanceof Error ? error.message : String(error),
-            severity: 'ERROR'
+            severity: AuditSeverity.ERROR
           }
         );
       }
