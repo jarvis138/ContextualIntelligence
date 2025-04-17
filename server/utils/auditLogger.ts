@@ -1,187 +1,373 @@
 /**
  * Audit Logger
  * 
- * Centralized logging system for security-related and document processing events
- * to maintain a complete audit trail of system activities.
+ * This utility provides audit logging functionality for enterprise security
+ * and compliance requirements, including detailed event recording and exportable logs.
  */
 
-import { storage } from '../storage';
+// Core imports
+import fs from 'fs';
+import path from 'path';
+import { FeatureFlags } from '../../shared/feature-flags';
+import { featureFlagService } from '../services/feature-flag';
 
-// Types of audit events
-export enum AuditEventType {
-  // Authentication events
-  AUTH_LOGIN_SUCCESS = 'auth.login.success',
-  AUTH_LOGIN_FAILED = 'auth.login.failed',
-  AUTH_LOGOUT = 'auth.logout',
-  AUTH_TOKEN_REFRESH = 'auth.token.refresh',
-  AUTH_TOKEN_REVOKED = 'auth.token.revoked',
-  AUTH_PERMISSION_DENIED = 'auth.permission.denied',
+// Define event types and interfaces
+export interface AuditLogEvent {
+  // Action that was performed
+  action: string;
   
-  // Account events
-  ACCOUNT_CREATED = 'account.created',
-  ACCOUNT_UPDATED = 'account.updated',
-  ACCOUNT_DELETED = 'account.deleted',
-  ACCOUNT_PASSWORD_CHANGED = 'account.password.changed',
-  ACCOUNT_PASSWORD_RESET = 'account.password.reset',
+  // Actor who performed the action (user ID, system, etc.)
+  actor: string;
   
-  // Project events
-  PROJECT_CREATED = 'project.created',
-  PROJECT_UPDATED = 'project.updated',
-  PROJECT_DELETED = 'project.deleted',
-  PROJECT_MEMBER_ADDED = 'project.member.added',
-  PROJECT_MEMBER_REMOVED = 'project.member.removed',
-  PROJECT_PERMISSION_CHANGED = 'project.permission.changed',
+  // Target of the action (e.g., "user:123", "document:456", "feature:xyz")
+  target: string;
   
-  // Document events
-  DOCUMENT_CREATED = 'document.created',
-  DOCUMENT_UPDATED = 'document.updated',
-  DOCUMENT_DELETED = 'document.deleted',
-  DOCUMENT_ACCESSED = 'document.accessed',
-  DOCUMENT_SHARED = 'document.shared',
-  DOCUMENT_PERMISSION_CHANGED = 'document.permission.changed',
-  DOCUMENT_PROCESSED = 'document.processed',
-  DOCUMENT_PROCESSING_FAILED = 'document.processing.failed',
-  DOCUMENT_VERSION_CREATED = 'document.version.created',
-  DOCUMENT_STATE_CHANGED = 'document.state.changed',
-  DOCUMENT_METADATA_UPDATED = 'document.metadata.updated',
+  // Type of target (e.g., "user", "document", "feature_flag")
+  targetType: string;
   
-  // Email specific events
-  EMAIL_PROCESSED = 'email.processed',
-  EMAIL_THREAD_DETECTED = 'email.thread.detected',
-  EMAIL_ATTACHMENT_EXTRACTED = 'email.attachment.extracted',
-  EMAIL_ATTACHMENT_PROCESSED = 'email.attachment.processed',
-  EMAIL_ATTACHMENT_FAILED = 'email.attachment.failed',
-  EMAIL_THREAD_LINKED = 'email.thread.linked',
+  // Tenant context, if applicable
+  tenant?: string;
   
-  // Correlation events
-  ENTITY_CORRELATION_STARTED = 'entity.correlation.started',
-  ENTITY_CORRELATION_COMPLETED = 'entity.correlation.completed',
-  ENTITY_RELATIONSHIP_CREATED = 'entity.relationship.created',
-  ENTITY_RELATIONSHIP_UPDATED = 'entity.relationship.updated',
-  ENTITY_CORRELATION_FAILED = 'entity.correlation.failed',
-  
-  // Integration events
-  INTEGRATION_CONNECTED = 'integration.connected',
-  INTEGRATION_DISCONNECTED = 'integration.disconnected',
-  INTEGRATION_SYNC_STARTED = 'integration.sync.started',
-  INTEGRATION_SYNC_COMPLETED = 'integration.sync.completed',
-  INTEGRATION_SYNC_FAILED = 'integration.sync.failed',
-  INTEGRATION_PERMISSION_CHANGED = 'integration.permission.changed',
-  
-  // System events
-  SYSTEM_ERROR = 'system.error',
-  SYSTEM_CONFIG_CHANGED = 'system.config.changed',
-  SYSTEM_MAINTENANCE_STARTED = 'system.maintenance.started',
-  SYSTEM_MAINTENANCE_COMPLETED = 'system.maintenance.completed',
-  SYSTEM_CORRELATION_STARTED = 'system.correlation.started',
-  SYSTEM_CORRELATION_COMPLETE = 'system.correlation.complete',
-  SYSTEM_CORRELATION_FAILED = 'system.correlation.failed',
-  
-  // Data events
-  DATA_EXPORT_STARTED = 'data.export.started',
-  DATA_EXPORT_COMPLETED = 'data.export.completed',
-  DATA_EXPORT_FAILED = 'data.export.failed',
-  DATA_IMPORT_STARTED = 'data.import.started',
-  DATA_IMPORT_COMPLETED = 'data.import.completed',
-  DATA_IMPORT_FAILED = 'data.import.failed',
-  DATA_NORMALIZATION_STARTED = 'data.normalization.started',
-  DATA_NORMALIZATION_COMPLETED = 'data.normalization.completed',
-  DATA_NORMALIZATION_FAILED = 'data.normalization.failed',
-  
-  // AI processing events
-  AI_ANALYSIS_STARTED = 'ai.analysis.started',
-  AI_ANALYSIS_COMPLETED = 'ai.analysis.completed',
-  AI_ANALYSIS_FAILED = 'ai.analysis.failed',
-  AI_INSIGHT_GENERATED = 'ai.insight.generated',
-  
-  // Search events
-  SEARCH_PERFORMED = 'search.performed',
-  SEARCH_INDEX_UPDATED = 'search.index.updated',
-  SEARCH_INDEX_FAILED = 'search.index.failed'
-}
-
-// Severity levels for audit events
-export enum AuditEventSeverity {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error',
-  CRITICAL = 'critical'
-}
-
-// Interface for audit events
-export interface AuditEvent {
-  id?: number;
-  timestamp?: Date;
-  eventType: AuditEventType;
-  userId?: number;
-  projectId?: number;
+  // IP address, if available
   ipAddress?: string;
-  userAgent?: string;
-  description: string;
-  severity?: AuditEventSeverity;
-  metadata?: any;
+  
+  // Additional details about the action
+  details?: Record<string, any>;
+  
+  // Severity level (default is 'info')
+  severity?: 'debug' | 'info' | 'warning' | 'error' | 'critical';
+  
+  // Success status
+  success?: boolean;
+  
+  // Optional session ID for correlation
+  sessionId?: string;
+  
+  // Optional request ID for correlation
+  requestId?: string;
 }
 
-/**
- * Log an audit event
- */
-export function logAuditEvent(event: AuditEvent): Promise<void> {
-  try {
-    // Set default values
-    const timestamp = event.timestamp || new Date();
-    const severity = event.severity || getSeverityForEventType(event.eventType);
+// Define log storage location
+const LOG_DIR = process.env.AUDIT_LOG_DIR || './logs/audit';
+const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_LOG_FILES = 5;
+
+class AuditLogger {
+  private logStream: fs.WriteStream | null = null;
+  private currentLogFile: string = '';
+  
+  constructor() {
+    this.initializeLogDirectory();
+    this.rotateLogsIfNeeded();
+    this.openLogStream();
     
-    // Format the event for storage
-    const formattedEvent = {
+    // Handle process exit to properly close the stream
+    process.on('exit', () => this.closeLogStream());
+  }
+  
+  /**
+   * Initialize log directory if it doesn't exist
+   */
+  private initializeLogDirectory(): void {
+    if (!fs.existsSync(LOG_DIR)) {
+      fs.mkdirSync(LOG_DIR, { recursive: true });
+    }
+  }
+  
+  /**
+   * Open log stream for writing
+   */
+  private openLogStream(): void {
+    const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+    const logFileName = `audit-${timestamp}.log`;
+    this.currentLogFile = path.join(LOG_DIR, logFileName);
+    
+    this.logStream = fs.createWriteStream(this.currentLogFile, { flags: 'a' });
+    this.logStream.on('error', (err) => {
+      console.error('Error writing to audit log:', err);
+    });
+  }
+  
+  /**
+   * Close log stream
+   */
+  private closeLogStream(): void {
+    if (this.logStream) {
+      this.logStream.end();
+      this.logStream = null;
+    }
+  }
+  
+  /**
+   * Rotate logs if needed based on size
+   */
+  private rotateLogsIfNeeded(): void {
+    try {
+      // Get log files
+      const logFiles = fs.readdirSync(LOG_DIR)
+        .filter(file => file.startsWith('audit-') && file.endsWith('.log'))
+        .map(file => path.join(LOG_DIR, file))
+        .filter(file => fs.statSync(file).isFile());
+      
+      // Sort by modification time (oldest first)
+      logFiles.sort((a, b) => {
+        return fs.statSync(a).mtime.getTime() - fs.statSync(b).mtime.getTime();
+      });
+      
+      // Delete oldest logs if we have too many
+      while (logFiles.length >= MAX_LOG_FILES) {
+        const oldestLog = logFiles.shift();
+        if (oldestLog) {
+          fs.unlinkSync(oldestLog);
+        }
+      }
+      
+      // Check current log size and rotate if needed
+      if (this.currentLogFile && fs.existsSync(this.currentLogFile)) {
+        const stats = fs.statSync(this.currentLogFile);
+        if (stats.size >= MAX_LOG_SIZE) {
+          this.closeLogStream();
+          this.openLogStream();
+        }
+      }
+    } catch (error) {
+      console.error('Error rotating audit logs:', error);
+    }
+  }
+  
+  /**
+   * Log an audit event
+   */
+  public async log(event: AuditLogEvent): Promise<void> {
+    // Make sure required fields are present
+    if (!event.action || !event.actor || !event.target || !event.targetType) {
+      console.error('Invalid audit event - missing required fields');
+      return;
+    }
+    
+    // Add timestamp and format log entry
+    const logEntry = {
+      timestamp: new Date().toISOString(),
       ...event,
-      timestamp,
-      severity,
-      metadata: event.metadata ? JSON.stringify(event.metadata) : null
+      // Set defaults for optional fields
+      severity: event.severity || 'info',
+      success: event.success === undefined ? true : event.success,
     };
     
-    // Log to console for development
-    console.log(`[AUDIT] [${severity.toUpperCase()}] ${event.eventType}: ${event.description}`);
+    // Write to log file if auditing is enabled
+    if (featureFlagService.isEnabled(FeatureFlags.AUDITING)) {
+      try {
+        this.rotateLogsIfNeeded();
+        
+        if (this.logStream) {
+          this.logStream.write(JSON.stringify(logEntry) + '\n');
+        }
+        
+        // Store in database (would be implemented in a real system)
+        await this.storeAuditLog(logEntry);
+      } catch (error) {
+        console.error('Failed to write audit log:', error);
+      }
+    }
     
-    // In a real implementation, this would store in the database
-    // For now, we'll just return a resolved promise
+    // Always log critical events to console regardless of audit settings
+    if (event.severity === 'critical' || event.severity === 'error') {
+      console.error(`AUDIT [${logEntry.severity}]: ${logEntry.action} by ${logEntry.actor} on ${logEntry.target}`);
+    } else if (process.env.NODE_ENV === 'development') {
+      // In development, log all events to console
+      console.log(`AUDIT [${logEntry.severity}]: ${logEntry.action} by ${logEntry.actor} on ${logEntry.target}`);
+    }
+  }
+  
+  /**
+   * Store audit log in database
+   */
+  private async storeAuditLog(logData: {
+    timestamp: Date;
+    action: string;
+    actor: string;
+    target: string;
+    targetType: string;
+    tenant?: string;
+    severity?: string;
+    details?: Record<string, any>;
+    success?: boolean;
+  }): Promise<void> {
+    // In a real implementation, this would store the log in a database
+    // For now, we'll just pretend we've stored it
     return Promise.resolve();
-  } catch (error) {
-    console.error('Error logging audit event:', error);
-    return Promise.resolve();
+  }
+  
+  /**
+   * Log user activity
+   */
+  public logUserActivity(
+    userId: string,
+    action: string,
+    targetType: string,
+    targetId: string,
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action,
+      actor: userId,
+      target: `${targetType}:${targetId}`,
+      targetType,
+      tenant,
+      ipAddress,
+      details,
+      severity: 'info'
+    });
+  }
+  
+  /**
+   * Log security events
+   */
+  public logSecurityEvent(
+    action: string,
+    actor: string,
+    targetType: string,
+    targetId: string,
+    severity: 'info' | 'warning' | 'error' | 'critical' = 'warning',
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action: `security_${action}`,
+      actor,
+      target: `${targetType}:${targetId}`,
+      targetType,
+      tenant,
+      ipAddress,
+      details,
+      severity
+    });
+  }
+  
+  /**
+   * Log data access
+   */
+  public logDataAccess(
+    userId: string,
+    targetType: string,
+    targetId: string,
+    accessType: 'read' | 'list' | 'query' | 'export',
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action: `data_${accessType}`,
+      actor: userId,
+      target: `${targetType}:${targetId}`,
+      targetType,
+      tenant,
+      ipAddress,
+      details,
+      severity: 'info'
+    });
+  }
+  
+  /**
+   * Log administrative actions
+   */
+  public logAdminAction(
+    adminId: string,
+    action: string,
+    targetType: string,
+    targetId: string,
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action: `admin_${action}`,
+      actor: adminId,
+      target: `${targetType}:${targetId}`,
+      targetType,
+      tenant,
+      ipAddress,
+      details,
+      severity: 'warning'
+    });
+  }
+  
+  /**
+   * Log API usage
+   */
+  public logApiUsage(
+    userId: string,
+    endpoint: string,
+    method: string,
+    statusCode: number,
+    responseTime: number,
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action: 'api_request',
+      actor: userId,
+      target: endpoint,
+      targetType: 'api_endpoint',
+      tenant,
+      ipAddress,
+      details: {
+        method,
+        statusCode,
+        responseTime,
+        ...details
+      },
+      severity: statusCode >= 400 ? 'warning' : 'info',
+      success: statusCode < 400
+    });
+  }
+  
+  /**
+   * Log authentication events
+   */
+  public logAuthEvent(
+    userId: string,
+    action: 'login' | 'logout' | 'login_failed' | 'password_reset' | 'mfa_verified' | 'token_issued',
+    success: boolean,
+    details?: Record<string, any>,
+    tenant?: string,
+    ipAddress?: string
+  ): void {
+    this.log({
+      action: `auth_${action}`,
+      actor: userId,
+      target: `user:${userId}`,
+      targetType: 'user',
+      tenant,
+      ipAddress,
+      details,
+      severity: success ? 'info' : 'warning',
+      success
+    });
+  }
+  
+  /**
+   * Log system events
+   */
+  public logSystemEvent(
+    action: string,
+    details?: Record<string, any>,
+    severity: 'debug' | 'info' | 'warning' | 'error' | 'critical' = 'info'
+  ): void {
+    this.log({
+      action: `system_${action}`,
+      actor: 'system',
+      target: 'system',
+      targetType: 'system',
+      details,
+      severity
+    });
   }
 }
 
-/**
- * Get the default severity for an event type
- */
-function getSeverityForEventType(eventType: AuditEventType): AuditEventSeverity {
-  // Authentication failures and security events are higher severity
-  if (
-    eventType === AuditEventType.AUTH_LOGIN_FAILED ||
-    eventType === AuditEventType.AUTH_PERMISSION_DENIED ||
-    eventType === AuditEventType.AUTH_TOKEN_REVOKED
-  ) {
-    return AuditEventSeverity.WARNING;
-  }
-  
-  // System errors and security issues are critical
-  if (
-    eventType === AuditEventType.SYSTEM_ERROR ||
-    eventType === AuditEventType.DOCUMENT_PROCESSING_FAILED ||
-    eventType === AuditEventType.INTEGRATION_SYNC_FAILED ||
-    eventType === AuditEventType.AI_ANALYSIS_FAILED
-  ) {
-    return AuditEventSeverity.ERROR;
-  }
-  
-  // Account deletions and major system changes are critical
-  if (
-    eventType === AuditEventType.ACCOUNT_DELETED ||
-    eventType === AuditEventType.SYSTEM_CONFIG_CHANGED
-  ) {
-    return AuditEventSeverity.CRITICAL;
-  }
-  
-  // Default to info level
-  return AuditEventSeverity.INFO;
-}
+// Create and export the singleton instance
+export const auditLogger = new AuditLogger();

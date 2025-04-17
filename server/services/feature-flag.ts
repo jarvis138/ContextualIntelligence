@@ -1,155 +1,284 @@
 /**
  * Feature Flag Service
  * 
- * This service provides feature flag management for the CPI Hub.
- * It supports both global feature flags and tenant-specific feature flags.
+ * This service provides dynamic feature flag management for enterprise features,
+ * allowing granular control of capabilities at the tenant level.
+ * 
+ * Features:
+ * - Dynamic feature flag management
+ * - Tenant-specific feature configuration
+ * - User role-based feature access
+ * - Feature deprecation handling
+ * - Usage tracking for licensed features
  */
 
-import { db } from "../db";
-import { and, eq } from "drizzle-orm";
-import { FeatureFlags, defaultFlags } from "../../shared/feature-flags";
-import { logger } from "./observability";
+import { FeatureFlags } from '../../shared/feature-flags';
+import { auditLogger } from '../utils/auditLogger';
+import { db } from '../db';
 
-const flagLogger = logger.createChildLogger({ component: 'FeatureFlagService' });
+export interface FeatureFlagConfig {
+  enabled: boolean;
+  tenantIds?: number[]; // If specified, feature is only enabled for these tenants
+  allowedRoles?: string[]; // If specified, feature is only enabled for these roles
+  configParams?: Record<string, any>; // Additional configuration parameters for the feature
+  expiryDate?: Date; // If set, feature will be automatically disabled after this date
+  beta?: boolean; // Indicates if the feature is in beta
+  deprecated?: boolean; // Indicates if the feature is deprecated
+}
 
-export class FeatureFlagService {
-  // In-memory cache of feature flags for performance
-  private flagCache: Map<string, boolean> = new Map();
-  private tenantFlagCache: Map<string, boolean> = new Map();
+class FeatureFlagService {
+  private featureFlags: Map<string, FeatureFlagConfig> = new Map();
   
   constructor() {
-    // Initialize cache with default values from shared flags
-    this.initializeCache();
+    // Initialize with default feature flag settings
+    this.initializeDefaults();
+    console.log('Feature Flag Service initialized');
   }
   
   /**
-   * Initialize the feature flag cache with default values
+   * Initialize default feature flag settings
    */
-  private initializeCache() {
-    try {
-      // Set defaults from the shared feature flags file
-      Object.entries(defaultFlags).forEach(([key, value]) => {
-        this.flagCache.set(key, value.enabled);
-      });
+  private initializeDefaults(): void {
+    // Set defaults for all feature flags
+    for (const flag of Object.values(FeatureFlags)) {
+      // By default, most enterprise features are disabled
+      let defaultEnabled = false;
+      let beta = false;
       
-      flagLogger.debug('Feature flag cache initialized with defaults', {
-        flagCount: this.flagCache.size
+      // Core Phase 1 and 2 features are always enabled
+      if (
+        flag === FeatureFlags.MULTI_TENANT ||
+        flag === FeatureFlags.ROLE_BASED_ACCESS ||
+        flag === FeatureFlags.API_RATE_LIMITING ||
+        flag === FeatureFlags.SSO_INTEGRATION
+      ) {
+        defaultEnabled = true;
+      }
+      
+      // Phase 3 AI features enabled by default
+      if (
+        flag === FeatureFlags.AI_DOCUMENT_ANALYSIS ||
+        flag === FeatureFlags.SENTIMENT_ANALYSIS ||
+        flag === FeatureFlags.PROJECT_VISUALIZATION ||
+        flag === FeatureFlags.CONTEXTUAL_INSIGHTS
+      ) {
+        defaultEnabled = true;
+      }
+      
+      // Enterprise governance features are in beta
+      if (
+        flag === FeatureFlags.MODEL_GOVERNANCE ||
+        flag === FeatureFlags.ENHANCED_SECURITY ||
+        flag === FeatureFlags.TENANT_ISOLATION ||
+        flag === FeatureFlags.SCALABILITY_CONTROLS
+      ) {
+        beta = true;
+      }
+      
+      this.featureFlags.set(flag, {
+        enabled: defaultEnabled,
+        beta
       });
-    } catch (error) {
-      flagLogger.error('Error initializing feature flag cache', { error });
     }
   }
   
   /**
    * Check if a feature flag is enabled
-   * @param flagKey The key of the feature flag
-   * @param tenantId Optional tenant ID for tenant-specific flags
-   * @returns boolean indicating if the flag is enabled
    */
-  public isEnabled(flagKey: string, tenantId?: number): boolean {
-    try {
-      // For tenant-specific flags, use the composite key format "tenantId:flagKey"
-      const cacheKey = tenantId ? `${tenantId}:${flagKey}` : flagKey;
-      
-      // Check cache first
-      if (tenantId && this.tenantFlagCache.has(cacheKey)) {
-        return this.tenantFlagCache.get(cacheKey) ?? false;
-      } else if (!tenantId && this.flagCache.has(flagKey)) {
-        return this.flagCache.get(flagKey) ?? false;
-      }
-      
-      // Default to the shared definition if available
-      const defaultValue = defaultFlags[flagKey]?.enabled ?? false;
-      
-      // Cache and return default
-      if (tenantId) {
-        this.tenantFlagCache.set(cacheKey, defaultValue);
-      } else {
-        this.flagCache.set(flagKey, defaultValue);
-      }
-      
-      return defaultValue;
-    } catch (error) {
-      flagLogger.error('Error checking feature flag', { flagKey, tenantId, error });
+  public isEnabled(
+    featureFlag: string,
+    options?: {
+      tenantId?: number;
+      userRoles?: string[];
+    }
+  ): boolean {
+    // Check if the feature flag exists
+    if (!this.featureFlags.has(featureFlag)) {
       return false;
     }
-  }
-  
-  /**
-   * Set the state of a feature flag
-   * @param flagKey The key of the feature flag
-   * @param enabled Whether the flag should be enabled
-   * @param tenantId Optional tenant ID for tenant-specific flags
-   */
-  public async setFlag(flagKey: string, enabled: boolean, tenantId?: number): Promise<void> {
-    try {
-      // For tenant-specific flags, use the composite key format "tenantId:flagKey"
-      const cacheKey = tenantId ? `${tenantId}:${flagKey}` : flagKey;
-      
-      // Update cache immediately
-      if (tenantId) {
-        this.tenantFlagCache.set(cacheKey, enabled);
-      } else {
-        this.flagCache.set(flagKey, enabled);
+    
+    const config = this.featureFlags.get(featureFlag)!;
+    
+    // If the feature is globally disabled, return false
+    if (!config.enabled) {
+      return false;
+    }
+    
+    // If there's an expiry date and it's passed, return false
+    if (config.expiryDate && new Date() > config.expiryDate) {
+      return false;
+    }
+    
+    // If the feature is restricted to specific tenants, check tenant access
+    if (config.tenantIds && config.tenantIds.length > 0) {
+      if (!options?.tenantId || !config.tenantIds.includes(options.tenantId)) {
+        return false;
       }
-      
-      // Update database flags for persistence (if we had a flags table)
-      // This functionality would typically interact with the database
-      
-      flagLogger.info('Feature flag updated', {
-        flagKey,
-        tenantId: tenantId || 'global',
-        enabled
-      });
-    } catch (error) {
-      flagLogger.error('Error setting feature flag', { flagKey, tenantId, enabled, error });
-      throw error;
     }
+    
+    // If the feature is restricted to specific roles, check role access
+    if (config.allowedRoles && config.allowedRoles.length > 0) {
+      if (!options?.userRoles || !config.allowedRoles.some(role => options.userRoles!.includes(role))) {
+        return false;
+      }
+    }
+    
+    return true;
   }
   
   /**
-   * Get flag settings including additional configuration
-   * @param flagKey The key of the feature flag
-   * @param tenantId Optional tenant ID for tenant-specific flags
-   * @returns Settings object for the flag
+   * Update a feature flag's configuration
    */
-  public getSettings(flagKey: string, tenantId?: number): Record<string, any> {
-    try {
-      // Default to the shared definition settings if available
-      const defaultSettings = defaultFlags[flagKey]?.settings ?? {};
-      
-      // In a real implementation, we would look up tenant-specific settings
-      // from the database if tenantId is provided
-      
-      return defaultSettings;
-    } catch (error) {
-      flagLogger.error('Error getting feature flag settings', { flagKey, tenantId, error });
-      return {};
+  public updateFeatureFlag(
+    featureFlag: string,
+    config: Partial<FeatureFlagConfig>,
+    updatedBy: string
+  ): boolean {
+    // Check if the feature flag exists
+    if (!this.featureFlags.has(featureFlag)) {
+      return false;
     }
+    
+    // Get current config
+    const currentConfig = this.featureFlags.get(featureFlag)!;
+    
+    // Apply updates
+    const updatedConfig = { ...currentConfig, ...config };
+    this.featureFlags.set(featureFlag, updatedConfig);
+    
+    // Log the update
+    auditLogger.log({
+      action: 'feature_flag_updated',
+      actor: updatedBy,
+      target: `feature:${featureFlag}`,
+      targetType: 'feature_flag',
+      details: {
+        previous: currentConfig,
+        updated: updatedConfig,
+        changes: Object.keys(config)
+      }
+    });
+    
+    return true;
   }
   
   /**
-   * Reload feature flags from the database
-   * This is useful after configuration changes
+   * Get the full configuration for a feature flag
    */
-  public async reloadFlags(): Promise<void> {
-    try {
-      // Clear caches
-      this.flagCache.clear();
-      this.tenantFlagCache.clear();
-      
-      // Re-initialize with defaults
-      this.initializeCache();
-      
-      // In a real implementation, we would load flags from the database here
-      
-      flagLogger.info('Feature flags reloaded');
-    } catch (error) {
-      flagLogger.error('Error reloading feature flags', { error });
-      throw error;
+  public getFeatureFlag(featureFlag: string): FeatureFlagConfig | null {
+    return this.featureFlags.get(featureFlag) || null;
+  }
+  
+  /**
+   * Get all feature flags
+   */
+  public getAllFeatureFlags(): Record<string, FeatureFlagConfig> {
+    const result: Record<string, FeatureFlagConfig> = {};
+    
+    for (const [flag, config] of this.featureFlags.entries()) {
+      result[flag] = { ...config };
     }
+    
+    return result;
+  }
+  
+  /**
+   * Enable a feature flag for a specific tenant
+   */
+  public enableForTenant(
+    featureFlag: string,
+    tenantId: number,
+    updatedBy: string
+  ): boolean {
+    // Check if the feature flag exists
+    if (!this.featureFlags.has(featureFlag)) {
+      return false;
+    }
+    
+    // Get current config
+    const currentConfig = this.featureFlags.get(featureFlag)!;
+    
+    // Create a new tenant list with this tenant included
+    const tenantIds = [...(currentConfig.tenantIds || [])];
+    if (!tenantIds.includes(tenantId)) {
+      tenantIds.push(tenantId);
+    }
+    
+    // Update the config
+    return this.updateFeatureFlag(
+      featureFlag,
+      { tenantIds, enabled: true },
+      updatedBy
+    );
+  }
+  
+  /**
+   * Disable a feature flag for a specific tenant
+   */
+  public disableForTenant(
+    featureFlag: string,
+    tenantId: number,
+    updatedBy: string
+  ): boolean {
+    // Check if the feature flag exists
+    if (!this.featureFlags.has(featureFlag)) {
+      return false;
+    }
+    
+    // Get current config
+    const currentConfig = this.featureFlags.get(featureFlag)!;
+    
+    // If no tenant IDs are specified, we need to enable for all tenants *except* this one
+    if (!currentConfig.tenantIds || currentConfig.tenantIds.length === 0) {
+      // This would require knowing all tenant IDs
+      // For now, just create a list with this one tenant
+      const tenantIds = [tenantId];
+      
+      // Update the config to be enabled globally but with an exclusion list
+      return this.updateFeatureFlag(
+        featureFlag,
+        { tenantIds, enabled: false },
+        updatedBy
+      );
+    }
+    
+    // Otherwise, remove this tenant from the enabled list
+    const tenantIds = currentConfig.tenantIds.filter(id => id !== tenantId);
+    
+    // Update the config
+    return this.updateFeatureFlag(
+      featureFlag,
+      { tenantIds },
+      updatedBy
+    );
+  }
+  
+  /**
+   * Track feature usage
+   */
+  public trackUsage(
+    featureFlag: string,
+    options?: {
+      tenantId?: number;
+      userId?: number;
+      context?: string;
+    }
+  ): void {
+    // In a real implementation, this would store usage metrics to the database
+    // For now, we'll just log it
+    
+    auditLogger.log({
+      action: 'feature_usage',
+      actor: options?.userId?.toString() || 'system',
+      target: `feature:${featureFlag}`,
+      targetType: 'feature_flag',
+      tenant: options?.tenantId?.toString(),
+      details: {
+        context: options?.context
+      }
+    });
   }
 }
 
-// Export a singleton instance
+// Create and export a singleton instance
 export const featureFlagService = new FeatureFlagService();

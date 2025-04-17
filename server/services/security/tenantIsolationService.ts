@@ -1,302 +1,544 @@
 /**
  * Tenant Isolation Service
  * 
- * This service provides enterprise-grade multi-tenant isolation capabilities
- * for AI processing and data. It ensures that data and processing resources
- * are properly segregated between different tenants.
- * 
- * Features:
- * - Strict tenant isolation for data and processing
- * - Support for dedicated resources per tenant
- * - Tenant-specific configuration management
- * - Validation of cross-tenant data access
+ * This service provides multi-tenant isolation capabilities for enterprise
+ * environments, ensuring data segregation and access control across tenants.
  */
 
-import { featureFlagService } from '../feature-flag';
+// Core imports
+import { Request, Response, NextFunction } from 'express';
 import { FeatureFlags } from '../../../shared/feature-flags';
+import { featureFlagService } from '../feature-flag';
+import { db } from '../../db';
 import { auditLogger } from '../../utils/auditLogger';
+import { auditTrailService, AuditCategory, AuditSeverity } from './auditTrailService';
 
-// Isolation levels
-export type IsolationLevel = 'basic' | 'standard' | 'strict';
-
-// Tenant isolation configuration
-interface TenantIsolationConfig {
-  isolationLevel: IsolationLevel;
-  dedicatedResources: boolean;
-  separateProcessingQueues: boolean;
-  separateModelInstances: boolean;
-  dataPartitioning: 'logical' | 'physical';
-  encryptionEnabled: boolean;
-  accessControlEnabled: boolean;
+// Export tenant context types for use by other modules
+export interface TenantContext {
+  tenantId: number;
+  tenantName: string;
+  tenantPlan: 'free' | 'standard' | 'professional' | 'enterprise' | 'custom';
+  dataResidency?: string; // e.g., 'US', 'EU', 'APAC'
+  customDomain?: string;
+  isolationLevel: 'logical' | 'schema' | 'database';
+  allowedFeatures: string[];
+  limits: {
+    maxUsers: number;
+    maxProjects: number;
+    maxStorage: number; // in GB
+    maxApiRequests: number; // per day
+  };
+  settings: Record<string, any>;
 }
 
-// Default isolation configuration
-const DEFAULT_CONFIG: TenantIsolationConfig = {
-  isolationLevel: 'standard',
-  dedicatedResources: false,
-  separateProcessingQueues: true,
-  separateModelInstances: false,
-  dataPartitioning: 'logical',
-  encryptionEnabled: true,
-  accessControlEnabled: true
-};
+export enum AccessOperation {
+  READ = 'read',
+  WRITE = 'write',
+  DELETE = 'delete',
+  ADMIN = 'admin'
+}
 
-export class TenantIsolationService {
-  private tenantConfigs: Map<number, TenantIsolationConfig> = new Map();
-  private activeIsolationContexts: Map<string, { tenantId: number, timestamp: Date }> = new Map();
+export enum ResourceType {
+  PROJECT = 'project',
+  DOCUMENT = 'document',
+  USER = 'user',
+  TEAM = 'team',
+  INTEGRATION = 'integration',
+  TASK = 'task',
+  API = 'api',
+  FEATURE = 'feature',
+  SETTING = 'setting',
+  REPORT = 'report',
+  INSIGHT = 'insight',
+  ANALYTICS = 'analytics'
+}
+
+class TenantIsolationService {
+  private tenantContexts: Map<number, TenantContext> = new Map();
+  private currentTenantId: number | null = null;
   
   constructor() {
     console.log('Tenant Isolation Service initialized');
+    
+    // Initialize with some default contexts for development
+    this.initializeDefaults();
   }
   
   /**
-   * Get isolation configuration for a tenant
+   * Initialize default tenant contexts
    */
-  public getTenantConfig(tenantId: number): TenantIsolationConfig {
-    // If there's no specific configuration for this tenant, use the default
-    if (!this.tenantConfigs.has(tenantId)) {
-      return { ...DEFAULT_CONFIG };
+  private initializeDefaults(): void {
+    // Standard tenant context
+    const defaultContext: TenantContext = {
+      tenantId: 1,
+      tenantName: 'Default Tenant',
+      tenantPlan: 'standard',
+      isolationLevel: 'logical',
+      dataResidency: 'US',
+      allowedFeatures: [
+        FeatureFlags.DOCUMENT_ANALYSIS,
+        FeatureFlags.SENTIMENT_ANALYSIS,
+        FeatureFlags.PROJECT_VISUALIZATION,
+        FeatureFlags.CONTEXTUAL_INSIGHTS
+      ],
+      limits: {
+        maxUsers: 20,
+        maxProjects: 50,
+        maxStorage: 50,
+        maxApiRequests: 10000
+      },
+      settings: {
+        enableAudit: true,
+        retentionPeriod: 90, // days
+        maxFileSize: 10 // MB
+      }
+    };
+    
+    // Enterprise tenant context
+    const enterpriseTenantContext: TenantContext = {
+      tenantId: 2,
+      tenantName: 'Enterprise Tenant',
+      tenantPlan: 'enterprise',
+      isolationLevel: 'database',
+      dataResidency: 'EU',
+      customDomain: 'enterprise.cpihub.com',
+      allowedFeatures: Object.values(FeatureFlags),
+      limits: {
+        maxUsers: 500,
+        maxProjects: 1000,
+        maxStorage: 1000,
+        maxApiRequests: 1000000
+      },
+      settings: {
+        enableAudit: true,
+        retentionPeriod: 365, // days
+        maxFileSize: 100, // MB
+        ssoEnabled: true,
+        mfaRequired: true,
+        dataEncryption: true,
+        customBranding: true,
+        aiModelGovernance: true
+      }
+    };
+    
+    // Store the contexts
+    this.tenantContexts.set(defaultContext.tenantId, defaultContext);
+    this.tenantContexts.set(enterpriseTenantContext.tenantId, enterpriseTenantContext);
+  }
+  
+  /**
+   * Get tenant context by ID
+   */
+  public getTenantContext(tenantId: number): TenantContext | null {
+    return this.tenantContexts.get(tenantId) || null;
+  }
+  
+  /**
+   * Set current tenant context for the request
+   */
+  public setCurrentTenant(tenantId: number): void {
+    if (!this.tenantContexts.has(tenantId)) {
+      throw new Error(`Tenant with ID ${tenantId} not found.`);
     }
     
-    return { ...this.tenantConfigs.get(tenantId)! };
-  }
-  
-  /**
-   * Configure isolation settings for a specific tenant
-   */
-  public configureTenant(tenantId: number, config: Partial<TenantIsolationConfig>): TenantIsolationConfig {
-    const currentConfig = this.getTenantConfig(tenantId);
-    const newConfig = { ...currentConfig, ...config };
+    this.currentTenantId = tenantId;
     
-    this.tenantConfigs.set(tenantId, newConfig);
-    
-    // Log the configuration change
+    // Log tenant context switch
     auditLogger.log({
-      action: 'tenant_isolation_configured',
-      actor: 'system', // This would normally be an admin or system ID
+      action: 'tenant_context_switched',
+      actor: 'system',
       target: `tenant:${tenantId}`,
       targetType: 'tenant',
+      tenant: tenantId.toString(),
       details: {
-        isolationLevel: newConfig.isolationLevel,
-        dedicatedResources: newConfig.dedicatedResources,
-        separateProcessingQueues: newConfig.separateProcessingQueues
+        tenantId,
+        tenantName: this.tenantContexts.get(tenantId)?.tenantName
       }
     });
-    
-    return newConfig;
   }
   
   /**
-   * Begin a tenant-isolated execution context
-   * This should be called at the beginning of any operation that processes tenant data
+   * Get current tenant context
    */
-  public beginIsolatedContext(contextId: string, tenantId: number): boolean {
-    if (!this.isTenantIsolationEnabled()) {
-      return true; // No isolation enforcement
-    }
-    
-    // Check if this context is already being used by another tenant
-    if (this.activeIsolationContexts.has(contextId)) {
-      const existingContext = this.activeIsolationContexts.get(contextId)!;
-      
-      // If the context is being reused by the same tenant, that's fine
-      if (existingContext.tenantId === tenantId) {
-        return true;
-      }
-      
-      // Log the isolation breach attempt
-      auditLogger.log({
-        action: 'tenant_isolation_breach_attempt',
-        actor: 'system',
-        target: `tenant:${tenantId}`,
-        targetType: 'tenant',
-        details: {
-          contextId,
-          existingTenantId: existingContext.tenantId,
-          requestingTenantId: tenantId
-        }
-      });
-      
-      return false; // Reject the context switch
-    }
-    
-    // Register the new isolation context
-    this.activeIsolationContexts.set(contextId, {
-      tenantId,
-      timestamp: new Date()
-    });
-    
-    return true;
-  }
-  
-  /**
-   * End a tenant-isolated execution context
-   */
-  public endIsolatedContext(contextId: string): void {
-    this.activeIsolationContexts.delete(contextId);
-  }
-  
-  /**
-   * Validate that the current context belongs to the expected tenant
-   */
-  public validateTenantContext(contextId: string, tenantId: number): boolean {
-    if (!this.isTenantIsolationEnabled()) {
-      return true; // No isolation enforcement
-    }
-    
-    // If the context isn't registered, that's a problem
-    if (!this.activeIsolationContexts.has(contextId)) {
-      // Log the missing context
-      auditLogger.log({
-        action: 'tenant_isolation_context_missing',
-        actor: 'system',
-        target: `tenant:${tenantId}`,
-        targetType: 'tenant',
-        details: {
-          contextId,
-          requestingTenantId: tenantId
-        }
-      });
-      
-      return false;
-    }
-    
-    const existingContext = this.activeIsolationContexts.get(contextId)!;
-    
-    // Check if the tenant matches
-    if (existingContext.tenantId !== tenantId) {
-      // Log the isolation breach attempt
-      auditLogger.log({
-        action: 'tenant_isolation_breach_attempt',
-        actor: 'system',
-        target: `tenant:${tenantId}`,
-        targetType: 'tenant',
-        details: {
-          contextId,
-          existingTenantId: existingContext.tenantId,
-          requestingTenantId: tenantId
-        }
-      });
-      
-      return false;
-    }
-    
-    return true;
-  }
-  
-  /**
-   * Get the tenant ID for the current context
-   */
-  public getContextTenant(contextId: string): number | null {
-    if (!this.activeIsolationContexts.has(contextId)) {
+  public getCurrentTenantContext(): TenantContext | null {
+    if (this.currentTenantId === null) {
       return null;
     }
     
-    return this.activeIsolationContexts.get(contextId)!.tenantId;
+    return this.tenantContexts.get(this.currentTenantId) || null;
   }
   
   /**
-   * Check if data access between tenants is allowed
+   * Clear current tenant context
    */
-  public isDataAccessAllowed(sourceTenantId: number, targetTenantId: number): boolean {
-    // If tenant isolation is not enabled, allow all access
-    if (!this.isTenantIsolationEnabled()) {
-      return true;
+  public clearCurrentTenant(): void {
+    const previousTenantId = this.currentTenantId;
+    this.currentTenantId = null;
+    
+    if (previousTenantId !== null) {
+      // Log tenant context cleared
+      auditLogger.log({
+        action: 'tenant_context_cleared',
+        actor: 'system',
+        target: `tenant:${previousTenantId}`,
+        targetType: 'tenant',
+        tenant: previousTenantId.toString()
+      });
     }
-    
-    // If it's the same tenant, access is allowed
-    if (sourceTenantId === targetTenantId) {
-      return true;
-    }
-    
-    // Get the isolation levels for both tenants
-    const sourceConfig = this.getTenantConfig(sourceTenantId);
-    const targetConfig = this.getTenantConfig(targetTenantId);
-    
-    // In strict isolation mode, cross-tenant access is always denied
-    if (sourceConfig.isolationLevel === 'strict' || targetConfig.isolationLevel === 'strict') {
+  }
+  
+  /**
+   * Check if tenant is allowed to access a feature
+   */
+  public canAccessFeature(tenantId: number, featureFlag: string): boolean {
+    const tenantContext = this.getTenantContext(tenantId);
+    if (!tenantContext) {
       return false;
     }
     
-    // In standard isolation mode, cross-tenant access requires additional checks
-    // (e.g., explicit sharing or entitlements)
-    if (sourceConfig.isolationLevel === 'standard' || targetConfig.isolationLevel === 'standard') {
-      // For now, default to disallowing access in standard mode
-      // In a real implementation, this would check sharing permissions
+    // Check if feature is in allowed features
+    return tenantContext.allowedFeatures.includes(featureFlag);
+  }
+  
+  /**
+   * Verify if tenant is within limits
+   */
+  public checkTenantLimits(
+    tenantId: number,
+    limitType: 'users' | 'projects' | 'storage' | 'apiRequests',
+    currentValue: number
+  ): boolean {
+    const tenantContext = this.getTenantContext(tenantId);
+    if (!tenantContext) {
       return false;
     }
     
-    // In basic isolation mode, cross-tenant access may be allowed
-    // Additional rules could be applied here
-    
-    return false; // Default to denying access for safety
+    // Check specific limit type
+    switch (limitType) {
+      case 'users':
+        return currentValue <= tenantContext.limits.maxUsers;
+      case 'projects':
+        return currentValue <= tenantContext.limits.maxProjects;
+      case 'storage':
+        return currentValue <= tenantContext.limits.maxStorage;
+      case 'apiRequests':
+        return currentValue <= tenantContext.limits.maxApiRequests;
+      default:
+        return false;
+    }
   }
   
   /**
-   * Check if tenant isolation is enabled
+   * Get query filters for tenant-scoped data access
    */
-  private isTenantIsolationEnabled(): boolean {
-    return featureFlagService.isEnabled(FeatureFlags.TENANT_ISOLATION);
+  public getTenantQueryFilter(tenantId: number): Record<string, any> {
+    const tenantContext = this.getTenantContext(tenantId);
+    if (!tenantContext) {
+      throw new Error(`Tenant with ID ${tenantId} not found.`);
+    }
+    
+    // For logical isolation, we add a tenantId filter to all queries
+    return { tenantId };
   }
   
   /**
-   * Apply tenant isolation to an AI request
+   * Express middleware to enforce tenant isolation
    */
-  public isolateAIRequest(request: any, tenantId: number): any {
-    if (!this.isTenantIsolationEnabled()) {
-      return request; // No isolation to apply
-    }
-    
-    const config = this.getTenantConfig(tenantId);
-    
-    // Create a deep copy of the request to avoid modifying the original
-    const isolatedRequest = JSON.parse(JSON.stringify(request));
-    
-    // Add tenant context to the request
-    isolatedRequest.tenantId = tenantId;
-    
-    // Apply isolation-level specific modifications
-    if (config.isolationLevel === 'strict') {
-      // For strict isolation, ensure no cross-tenant data appears in the request
-      // Additional logic for strict isolation would go here
-      
-      // For example, add a special header for routing to dedicated infrastructure
-      isolatedRequest.headers = isolatedRequest.headers || {};
-      isolatedRequest.headers['X-Tenant-Isolation'] = 'strict';
-      
-      // Flag for dedicated resources
-      if (config.dedicatedResources) {
-        isolatedRequest.headers['X-Dedicated-Resources'] = 'true';
+  public enforceTenantIsolation() {
+    return (req: Request, res: Response, next: NextFunction) => {
+      // Only enforce if multi-tenancy is enabled
+      if (!featureFlagService.isEnabled(FeatureFlags.MULTI_TENANCY)) {
+        return next();
       }
       
-      // Flag for separate model instances
-      if (config.separateModelInstances) {
-        isolatedRequest.headers['X-Separate-Model-Instances'] = 'true';
+      // Extract tenant ID from request
+      const tenantId = this.extractTenantId(req);
+      
+      if (tenantId === null) {
+        return res.status(403).json({
+          error: 'Tenant context required',
+          message: 'This request requires a valid tenant context.'
+        });
+      }
+      
+      try {
+        // Set the current tenant for this request
+        this.setCurrentTenant(tenantId);
+        
+        // Add tenant context to request for downstream use
+        (req as any).tenantContext = this.getCurrentTenantContext();
+        
+        // Continue to next middleware
+        next();
+        
+        // Clean up after request is complete
+        res.on('finish', () => {
+          this.clearCurrentTenant();
+        });
+      } catch (error) {
+        auditTrailService.logSecurityEvent(
+          'tenant_isolation_error',
+          AuditSeverity.ERROR,
+          'system',
+          'tenant',
+          tenantId.toString(),
+          req.ip,
+          req.headers['user-agent'] as string,
+          { error: (error as Error).message },
+          tenantId
+        );
+        
+        return res.status(403).json({
+          error: 'Tenant isolation error',
+          message: 'Error applying tenant isolation.',
+          details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+        });
+      }
+    };
+  }
+  
+  /**
+   * Extract tenant ID from request
+   */
+  private extractTenantId(req: Request): number | null {
+    // Try to extract tenant ID from various sources
+    
+    // 1. From request header
+    const tenantHeader = req.header('X-Tenant-ID');
+    if (tenantHeader && !isNaN(parseInt(tenantHeader, 10))) {
+      return parseInt(tenantHeader, 10);
+    }
+    
+    // 2. From subdomain (e.g., tenant1.cpihub.com)
+    const host = req.header('Host');
+    if (host && host.includes('.') && !host.startsWith('www.')) {
+      const subdomain = host.split('.')[0];
+      // In a real implementation, we would look up the tenant by subdomain
+      // For now, we'll just use a simple mapping for demo purposes
+      if (subdomain === 'enterprise') {
+        return 2;
       }
     }
     
-    // Add isolation metadata
-    isolatedRequest.isolationMetadata = {
-      level: config.isolationLevel,
-      tenantId,
-      timestamp: new Date().toISOString()
+    // 3. From query parameter
+    if (req.query.tenantId && !isNaN(parseInt(req.query.tenantId as string, 10))) {
+      return parseInt(req.query.tenantId as string, 10);
+    }
+    
+    // 4. From JWT token payload
+    // In a real implementation, we would extract the tenant ID from the JWT token
+    const user = (req as any).user;
+    if (user && user.tenantId) {
+      return user.tenantId;
+    }
+    
+    // Default to tenant ID 1 for development purposes
+    // In production, we would return null here instead
+    return process.env.NODE_ENV === 'development' ? 1 : null;
+  }
+  
+  /**
+   * Enforce access control based on tenant, resource type, and operation
+   */
+  public enforceAccessControl(
+    resourceType: ResourceType,
+    operation: AccessOperation,
+    resourceIdExtractor?: (req: Request) => string | number | null
+  ) {
+    return (req: Request, res: Response, next: NextFunction) => {
+      // Only enforce if multi-tenancy is enabled
+      if (!featureFlagService.isEnabled(FeatureFlags.MULTI_TENANCY)) {
+        return next();
+      }
+      
+      // Get tenant context from request
+      const tenantContext = (req as any).tenantContext as TenantContext | undefined;
+      
+      if (!tenantContext) {
+        return res.status(403).json({
+          error: 'Tenant context required',
+          message: 'This request requires a valid tenant context.'
+        });
+      }
+      
+      // Get resource ID if provided
+      const resourceId = resourceIdExtractor ? resourceIdExtractor(req) : null;
+      
+      // In a real implementation, we would check if the user has permission to perform
+      // the operation on the resource within the tenant's context
+      
+      // Log the access control check
+      auditTrailService.logSecurityEvent(
+        'access_control_check',
+        AuditSeverity.INFO,
+        (req as any).user?.id || 'anonymous',
+        resourceType,
+        resourceId?.toString() || 'unknown',
+        req.ip,
+        req.headers['user-agent'] as string,
+        {
+          operation,
+          tenantId: tenantContext.tenantId,
+          tenantName: tenantContext.tenantName,
+          allowed: true // In a real implementation, this would be the result of the permission check
+        },
+        tenantContext.tenantId
+      );
+      
+      // For now, we'll just allow all access
+      next();
+    };
+  }
+  
+  /**
+   * Register a new tenant
+   */
+  public async registerTenant(tenantData: Omit<TenantContext, 'tenantId'>): Promise<TenantContext> {
+    // In a real implementation, we would:
+    // 1. Create a new tenant record in the database
+    // 2. Create default resources for the tenant
+    // 3. Return the new tenant context
+    
+    // For now, we'll just create a mock tenant
+    const newTenantId = Math.max(...Array.from(this.tenantContexts.keys())) + 1;
+    
+    const newTenant: TenantContext = {
+      tenantId: newTenantId,
+      ...tenantData
     };
     
-    return isolatedRequest;
+    // Store the context
+    this.tenantContexts.set(newTenantId, newTenant);
+    
+    // Log tenant registration
+    auditLogger.log({
+      action: 'tenant_registered',
+      actor: 'system',
+      target: `tenant:${newTenantId}`,
+      targetType: 'tenant',
+      tenant: newTenantId.toString(),
+      details: {
+        tenantName: newTenant.tenantName,
+        tenantPlan: newTenant.tenantPlan
+      }
+    });
+    
+    return newTenant;
   }
   
   /**
-   * Clean up stale isolation contexts
+   * Update tenant details
    */
-  public cleanupStaleContexts(maxAgeMinutes: number = 60): void {
-    const now = new Date();
-    const staleCutoff = new Date(now.getTime() - (maxAgeMinutes * 60 * 1000));
-    
-    for (const [contextId, context] of this.activeIsolationContexts.entries()) {
-      if (context.timestamp < staleCutoff) {
-        this.activeIsolationContexts.delete(contextId);
-      }
+  public async updateTenant(
+    tenantId: number,
+    tenantData: Partial<Omit<TenantContext, 'tenantId'>>
+  ): Promise<TenantContext> {
+    // Get existing tenant
+    const existingTenant = this.getTenantContext(tenantId);
+    if (!existingTenant) {
+      throw new Error(`Tenant with ID ${tenantId} not found.`);
     }
+    
+    // Update tenant data
+    const updatedTenant: TenantContext = {
+      ...existingTenant,
+      ...tenantData
+    };
+    
+    // Store the updated context
+    this.tenantContexts.set(tenantId, updatedTenant);
+    
+    // Log tenant update
+    auditLogger.log({
+      action: 'tenant_updated',
+      actor: 'system',
+      target: `tenant:${tenantId}`,
+      targetType: 'tenant',
+      tenant: tenantId.toString(),
+      details: {
+        tenantName: updatedTenant.tenantName,
+        tenantPlan: updatedTenant.tenantPlan,
+        updatedFields: Object.keys(tenantData)
+      }
+    });
+    
+    return updatedTenant;
+  }
+  
+  /**
+   * Delete a tenant
+   */
+  public async deleteTenant(tenantId: number): Promise<boolean> {
+    // Get existing tenant
+    const existingTenant = this.getTenantContext(tenantId);
+    if (!existingTenant) {
+      throw new Error(`Tenant with ID ${tenantId} not found.`);
+    }
+    
+    // In a real implementation, we would:
+    // 1. Archive or delete tenant data
+    // 2. Remove tenant resources
+    // 3. Remove tenant record from database
+    
+    // Remove from context map
+    this.tenantContexts.delete(tenantId);
+    
+    // Log tenant deletion
+    auditLogger.log({
+      action: 'tenant_deleted',
+      actor: 'system',
+      target: `tenant:${tenantId}`,
+      targetType: 'tenant',
+      tenant: tenantId.toString(),
+      details: {
+        tenantName: existingTenant.tenantName,
+        tenantPlan: existingTenant.tenantPlan
+      }
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Get database connection for tenant
+   */
+  public getTenantDatabase(tenantId: number): any {
+    const tenantContext = this.getTenantContext(tenantId);
+    if (!tenantContext) {
+      throw new Error(`Tenant with ID ${tenantId} not found.`);
+    }
+    
+    // In a real implementation with database isolation:
+    // - For logical isolation: return the main database but set a tenant filter
+    // - For schema isolation: return database with schema set to tenant's schema
+    // - For database isolation: return tenant-specific database connection
+    
+    if (tenantContext.isolationLevel === 'logical') {
+      // Return main DB but with tenant context for query filtering
+      return db;
+    } else {
+      // For demo purposes, we'll just return the main DB for now
+      // In a real implementation, we would have separate connections
+      return db;
+    }
+  }
+  
+  /**
+   * Validate that a resource belongs to the specified tenant
+   */
+  public async validateTenantResource(
+    tenantId: number,
+    resourceType: ResourceType,
+    resourceId: string | number
+  ): Promise<boolean> {
+    // In a real implementation, we would:
+    // 1. Query the resource by ID
+    // 2. Check if the resource's tenant ID matches the specified tenant ID
+    // 3. Return true/false accordingly
+    
+    // For demo purposes, assume the resource belongs to the tenant
+    await new Promise(resolve => setTimeout(resolve, 1)); // Simulate async operation
+    return true;
   }
 }
 

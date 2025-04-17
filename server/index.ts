@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupObservability, logger } from "./services/observability";
-import { featureFlagService } from "../shared/feature-flags";
+import { featureFlagService } from "./services/feature-flag";
 import { tenantMiddleware, TenantIdentificationStrategy } from "./middleware/tenant-middleware";
 import { tenantService } from "./tenant-service";
 import { SamlService } from "./services/samlService";
@@ -49,7 +49,7 @@ app.use(tenantMiddleware({
 // TODO: Uncomment the above middleware after running the migration script
 
 // Initialize feature flags
-if (featureFlagService.isEnabled('enhanced-logging')) {
+if (featureFlagService.isEnabled('enhanced_logging')) {
   // Setup observability framework with enhanced logging
   setupObservability(app);
   

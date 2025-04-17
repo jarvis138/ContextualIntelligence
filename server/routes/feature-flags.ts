@@ -5,7 +5,8 @@
  */
 
 import { Router } from 'express';
-import { featureFlagService } from '../../shared/feature-flags';
+import { FeatureFlags } from '../../shared/feature-flags';
+import { featureFlagService } from '../services/feature-flag';
 import { logger } from '../services/observability';
 
 const featureFlagsRouter = Router();
@@ -18,7 +19,7 @@ const flagsLogger = logger.createChildLogger({ component: 'FeatureFlagsAPI' });
 featureFlagsRouter.get('/', (req, res) => {
   // In a real implementation, we would filter based on user permissions
   // and only return flags applicable to the current user
-  const flags = featureFlagService.getAllFlags();
+  const flags = featureFlagService.getAllFeatureFlags();
   
   flagsLogger.info('Feature flags retrieved', { userId: req.user?.id });
   
@@ -31,7 +32,7 @@ featureFlagsRouter.get('/', (req, res) => {
  */
 featureFlagsRouter.get('/:name', (req, res) => {
   const { name } = req.params;
-  const flag = featureFlagService.getFlag(name);
+  const flag = featureFlagService.getFeatureFlag(name);
   
   if (!flag) {
     return res.status(404).json({
@@ -59,7 +60,7 @@ featureFlagsRouter.put('/:name', (req, res) => {
   const { name } = req.params;
   
   try {
-    const updatedFlag = featureFlagService.updateFlag(name, req.body);
+    const updatedFlag = featureFlagService.updateFeatureFlag(name, req.body);
     
     flagsLogger.info(`Feature flag '${name}' updated`, {
       userId: req.user?.id,

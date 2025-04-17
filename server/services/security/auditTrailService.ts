@@ -1,491 +1,586 @@
 /**
  * Audit Trail Service
  * 
- * This service provides enterprise-grade audit trail capabilities for AI operations
- * and sensitive actions. It ensures that all operations can be tracked and reviewed
- * for compliance and governance purposes.
- * 
- * Features:
- * - Comprehensive audit logging of AI operations
- * - Tamper-evident audit trail
- * - Support for different audit detail levels
- * - Retention policy management
- * - Export capabilities for compliance reporting
+ * This service provides comprehensive audit trail capabilities for tracking user 
+ * and system actions, ensuring regulatory compliance, and supporting security 
+ * investigations.
  */
 
-import crypto from 'crypto';
-import { featureFlagService } from '../feature-flag';
+// Core imports
 import { FeatureFlags } from '../../../shared/feature-flags';
+import { featureFlagService } from '../feature-flag';
 import { db } from '../../db';
+import { encryptionService, KeyScope, EncryptionMode } from './encryptionService';
 import { auditLogger } from '../../utils/auditLogger';
 
-// Types of audit events
-export type AuditEventType = 
-  | 'ai_request'
-  | 'ai_response'
-  | 'model_access'
-  | 'data_access'
-  | 'configuration_change'
-  | 'security_event'
-  | 'user_authentication'
-  | 'admin_action'
-  | 'data_export'
-  | 'data_import';
+// Define audit categories
+export enum AuditCategory {
+  AUTHENTICATION = 'authentication',
+  DATA_ACCESS = 'data_access',
+  DATA_MODIFICATION = 'data_modification',
+  ADMIN_ACTION = 'admin_action',
+  SYSTEM = 'system',
+  SECURITY = 'security',
+  PAYMENT = 'payment',
+  API = 'api',
+  USER = 'user',
+  INTEGRATION = 'integration'
+}
 
-// Audit detail levels
-export type AuditDetailLevel = 'basic' | 'standard' | 'comprehensive';
+// Define audit severity levels
+export enum AuditSeverity {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
 
-// Audit event format
-export interface AuditEvent {
-  id: string;
+// Define the audit record interface
+export interface AuditRecord {
+  id?: number;
   timestamp: Date;
-  eventType: AuditEventType;
-  userId?: number;
-  tenantId?: number;
-  actionName: string;
-  resourceType?: string;
-  resourceId?: string;
-  sourceIp?: string;
-  userAgent?: string;
-  success: boolean;
+  userId: number | string | null;
+  tenantId: number | null;
+  action: string;
+  category: AuditCategory;
+  resourceType: string;
+  resourceId: string | number | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  description: string;
   details: Record<string, any>;
-  previousHash?: string;
-  hash?: string;
+  severity: AuditSeverity;
+  success: boolean;
+  encrypted: boolean;
+  sessionId: string | null;
+  requestId: string | null;
 }
 
-// Define audit trail configuration
-interface AuditTrailConfig {
-  detailLevel: AuditDetailLevel;
-  retentionPeriodDays: number;
-  captureInputOutput: boolean;
-  captureModelMetadata: boolean;
-  exportFormat: 'basic' | 'structured';
-  enabled: boolean;
+// Define audit trail options
+export interface AuditTrailOptions {
+  retentionPeriodDays?: number;
+  encryptDetails?: boolean;
+  encryptionScope?: KeyScope;
+  includeUserAgent?: boolean;
+  serverSideOnly?: boolean;
+  includeSessionData?: boolean;
+  redactSensitiveData?: boolean;
+  includeStackTrace?: boolean;
 }
 
-// Default configuration
-const DEFAULT_CONFIG: AuditTrailConfig = {
-  detailLevel: 'standard',
-  retentionPeriodDays: 90,
-  captureInputOutput: true,
-  captureModelMetadata: true,
-  exportFormat: 'structured',
-  enabled: true
-};
+// Default constants
+const DEFAULT_RETENTION_DAYS = 90;
+const SENSITIVE_FIELDS = [
+  'password',
+  'token',
+  'key',
+  'secret',
+  'credential',
+  'access_token',
+  'refresh_token',
+  'auth',
+  'authorization',
+  'sessionId',
+  'ssn',
+  'creditCard',
+  'cvv',
+  'social_security',
+  'private_key',
+  'otp'
+];
 
-export class AuditTrailService {
-  private config: AuditTrailConfig;
-  private lastEventHash: string | null = null;
-  private inMemoryAudits: AuditEvent[] = [];
-  private persistenceReady = false;
+class AuditTrailService {
+  private defaultOptions: AuditTrailOptions = {
+    retentionPeriodDays: DEFAULT_RETENTION_DAYS,
+    encryptDetails: true,
+    encryptionScope: KeyScope.TENANT,
+    includeUserAgent: true,
+    serverSideOnly: false,
+    includeSessionData: true,
+    redactSensitiveData: true,
+    includeStackTrace: false
+  };
   
   constructor() {
-    this.config = { ...DEFAULT_CONFIG };
-    // Set up persistence as soon as possible
-    this.initializePersistence();
     console.log('Audit Trail Service initialized');
-  }
-  
-  /**
-   * Initialize persistence for audit events
-   */
-  private async initializePersistence(): Promise<void> {
-    try {
-      // In a real implementation, this would create/verify the audit tables
-      // For now, we'll just set a flag that persistence is ready
-      this.persistenceReady = true;
-      
-      // Log the initialization
-      auditLogger.log({
-        action: 'audit_trail_initialized',
-        actor: 'system',
-        target: 'audit_system',
-        details: {
-          detailLevel: this.config.detailLevel,
-          retentionPeriodDays: this.config.retentionPeriodDays
-        }
-      });
-    } catch (error) {
-      console.error('Failed to initialize audit trail persistence:', error);
-      
-      // Log the failure
-      auditLogger.log({
-        action: 'audit_trail_initialization_failed',
-        actor: 'system',
-        target: 'audit_system',
-        details: { error: String(error) }
-      });
-    }
-  }
-  
-  /**
-   * Update the audit trail configuration
-   */
-  public updateConfig(config: Partial<AuditTrailConfig>): AuditTrailConfig {
-    this.config = { ...this.config, ...config };
     
-    // Log the configuration change
-    auditLogger.log({
-      action: 'audit_config_updated',
-      actor: 'system',
-      target: 'audit_system',
-      details: { newConfig: this.config }
-    });
-    
-    return { ...this.config };
+    // Set up any scheduled tasks (e.g., purging old records)
+    // In a real implementation, we would use a scheduler like node-cron
   }
   
   /**
-   * Get the current audit trail configuration
+   * Record an audit trail event
    */
-  public getConfig(): AuditTrailConfig {
-    return { ...this.config };
-  }
-  
-  /**
-   * Record an audit event
-   */
-  public async recordEvent(event: Omit<AuditEvent, 'id' | 'hash' | 'previousHash' | 'timestamp'>): Promise<string> {
-    // Check if audit trail is enabled
-    if (!this.isAuditTrailEnabled()) {
-      return 'audit_disabled';
+  public async record(auditRecord: Omit<AuditRecord, 'id' | 'timestamp' | 'encrypted'>, options?: Partial<AuditTrailOptions>): Promise<number | null> {
+    // Only record if auditing is enabled
+    if (!featureFlagService.isEnabled(FeatureFlags.AUDITING)) {
+      return null;
     }
     
-    // Generate event ID
-    const eventId = crypto.randomUUID();
-    const timestamp = new Date();
-    
-    // Create the complete audit event
-    const auditEvent: AuditEvent = {
-      id: eventId,
-      timestamp,
-      ...event,
-      previousHash: this.lastEventHash || '',
-      hash: '' // Will be calculated after
+    // Merge options with defaults
+    const mergedOptions: AuditTrailOptions = {
+      ...this.defaultOptions,
+      ...options
     };
     
-    // Calculate the hash for this event (including the previous hash for tamper evidence)
-    auditEvent.hash = this.calculateEventHash(auditEvent);
-    
-    // Store the event
-    await this.storeEvent(auditEvent);
-    
-    // Update the last event hash
-    this.lastEventHash = auditEvent.hash;
-    
-    return eventId;
-  }
-  
-  /**
-   * Record an AI model usage event
-   */
-  public async recordModelUsage(
-    userId: number,
-    tenantId: number,
-    modelId: string,
-    modelVersion: string,
-    operation: string,
-    input: any,
-    output: any,
-    success: boolean,
-    metadata?: Record<string, any>
-  ): Promise<string> {
-    // Filter input/output based on configuration
-    const filteredInput = this.config.captureInputOutput ? input : '[REDACTED]';
-    const filteredOutput = this.config.captureInputOutput ? output : '[REDACTED]';
-    
-    // Create details object based on detail level
-    let details: Record<string, any> = {
-      operation,
-      success
+    // Create a complete audit record
+    const fullRecord: AuditRecord = {
+      ...auditRecord,
+      timestamp: new Date(),
+      encrypted: mergedOptions.encryptDetails ?? this.defaultOptions.encryptDetails!
     };
     
-    // Add model metadata if configured
-    if (this.config.captureModelMetadata) {
-      details.model = {
-        id: modelId,
-        version: modelVersion
-      };
+    // Redact sensitive data if needed
+    if (mergedOptions.redactSensitiveData && fullRecord.details) {
+      fullRecord.details = this.redactSensitiveData(fullRecord.details);
     }
     
-    // Add additional details based on detail level
-    if (this.config.detailLevel !== 'basic') {
-      details.input = filteredInput;
-      details.output = filteredOutput;
-    }
-    
-    // For comprehensive detail level, include all metadata
-    if (this.config.detailLevel === 'comprehensive' && metadata) {
-      details = { ...details, ...metadata };
-    }
-    
-    // Record the event
-    return this.recordEvent({
-      eventType: 'ai_request',
-      userId,
-      tenantId,
-      actionName: 'model_usage',
-      resourceType: 'ai_model',
-      resourceId: modelId,
-      success,
-      details
-    });
-  }
-  
-  /**
-   * Calculate a hash for an audit event
-   */
-  private calculateEventHash(event: AuditEvent): string {
-    // Create a string representation of the event without the hash
-    const { hash, ...eventWithoutHash } = event;
-    const eventString = JSON.stringify(eventWithoutHash);
-    
-    // Calculate SHA-256 hash
-    return crypto
-      .createHash('sha256')
-      .update(eventString)
-      .digest('hex');
-  }
-  
-  /**
-   * Store an audit event
-   */
-  private async storeEvent(event: AuditEvent): Promise<void> {
-    // Keep in memory
-    this.inMemoryAudits.push(event);
-    
-    // Limit in-memory storage
-    if (this.inMemoryAudits.length > 1000) {
-      this.inMemoryAudits = this.inMemoryAudits.slice(-1000);
-    }
-    
-    // If persistence is ready, store to database
-    if (this.persistenceReady) {
+    // Encrypt details if needed
+    let encryptedDetails = null;
+    if (mergedOptions.encryptDetails && fullRecord.details) {
       try {
-        // In a real implementation, this would store to the database
-        // For now, we'll just log it
-        console.log(`Audit event recorded: ${event.id}`);
+        const encryptedData = encryptionService.encrypt(
+          fullRecord.details,
+          EncryptionMode.DATABASE,
+          mergedOptions.encryptionScope ?? KeyScope.TENANT,
+          fullRecord.tenantId?.toString()
+        );
+        encryptedDetails = JSON.stringify(encryptedData);
+        
+        // Replace the details with a placeholder in the original record
+        fullRecord.details = { __encrypted: true };
       } catch (error) {
-        console.error('Failed to persist audit event:', error);
+        console.error('Failed to encrypt audit details:', error);
+        // Continue with unencrypted details if encryption fails
+        fullRecord.encrypted = false;
       }
     }
+    
+    // In a real implementation, we would store this record in the database
+    // For now, we'll just log it and return a mock ID
+    
+    console.log(`AUDIT [${fullRecord.severity}]: ${fullRecord.action} by ${fullRecord.userId || 'system'} on ${fullRecord.resourceType}:${fullRecord.resourceId || 'unknown'}`);
+    
+    // Use the existing auditLogger to log the simplified record
+    auditLogger.log({
+      action: fullRecord.action,
+      actor: fullRecord.userId?.toString() || 'system',
+      target: `${fullRecord.resourceType}:${fullRecord.resourceId || 'unknown'}`,
+      targetType: fullRecord.resourceType,
+      severity: fullRecord.severity,
+      success: fullRecord.success,
+      tenant: fullRecord.tenantId?.toString(),
+      ipAddress: fullRecord.ipAddress || undefined,
+      details: fullRecord.encrypted ? { __encrypted: true } : fullRecord.details,
+      sessionId: fullRecord.sessionId || undefined,
+      requestId: fullRecord.requestId || undefined
+    });
+    
+    // Store in database (would be implemented in a real system)
+    // Here we'd use the encrypted details if we encrypted them
+    
+    // Return a mock ID for now
+    return Date.now();
   }
   
   /**
-   * Search for audit events matching criteria
+   * Query audit records with filtering
    */
-  public async searchEvents(
-    criteria: {
-      eventTypes?: AuditEventType[];
-      userId?: number;
+  public async query(
+    filters: {
       tenantId?: number;
-      actionName?: string;
+      userId?: number | string;
+      category?: AuditCategory;
+      action?: string;
       resourceType?: string;
-      resourceId?: string;
+      resourceId?: string | number;
+      severity?: AuditSeverity;
+      success?: boolean;
       startDate?: Date;
       endDate?: Date;
-      success?: boolean;
+      includeDetails?: boolean;
     },
-    pagination: { page: number; pageSize: number }
-  ): Promise<{ events: AuditEvent[]; total: number }> {
-    // Check if audit trail is enabled
-    if (!this.isAuditTrailEnabled()) {
-      return { events: [], total: 0 };
-    }
-    
-    // In a real implementation, this would query the database
-    // For now, we'll search the in-memory events
-    
-    // Filter events based on criteria
-    let filteredEvents = [...this.inMemoryAudits];
-    
-    if (criteria.eventTypes && criteria.eventTypes.length > 0) {
-      filteredEvents = filteredEvents.filter(e => criteria.eventTypes!.includes(e.eventType));
-    }
-    
-    if (criteria.userId !== undefined) {
-      filteredEvents = filteredEvents.filter(e => e.userId === criteria.userId);
-    }
-    
-    if (criteria.tenantId !== undefined) {
-      filteredEvents = filteredEvents.filter(e => e.tenantId === criteria.tenantId);
-    }
-    
-    if (criteria.actionName) {
-      filteredEvents = filteredEvents.filter(e => e.actionName === criteria.actionName);
-    }
-    
-    if (criteria.resourceType) {
-      filteredEvents = filteredEvents.filter(e => e.resourceType === criteria.resourceType);
-    }
-    
-    if (criteria.resourceId) {
-      filteredEvents = filteredEvents.filter(e => e.resourceId === criteria.resourceId);
-    }
-    
-    if (criteria.startDate) {
-      filteredEvents = filteredEvents.filter(e => e.timestamp >= criteria.startDate!);
-    }
-    
-    if (criteria.endDate) {
-      filteredEvents = filteredEvents.filter(e => e.timestamp <= criteria.endDate!);
-    }
-    
-    if (criteria.success !== undefined) {
-      filteredEvents = filteredEvents.filter(e => e.success === criteria.success);
-    }
-    
-    // Sort by timestamp (newest first)
-    filteredEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    
-    // Paginate
-    const start = pagination.page * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    const paginatedEvents = filteredEvents.slice(start, end);
+    pagination: {
+      page?: number;
+      pageSize?: number;
+      sortBy?: string;
+      sortDirection?: 'asc' | 'desc';
+    } = {}
+  ): Promise<{
+    records: AuditRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    // In a real implementation, we would query the database
+    // For now, return an empty array
     
     return {
-      events: paginatedEvents,
-      total: filteredEvents.length
+      records: [],
+      total: 0,
+      page: pagination.page || 1,
+      pageSize: pagination.pageSize || 10,
+      totalPages: 0
     };
   }
   
   /**
-   * Export audit events to a format suitable for compliance reporting
+   * Retrieve a single audit record by ID
    */
-  public async exportEvents(
-    criteria: {
-      eventTypes?: AuditEventType[];
+  public async getById(id: number, tenantId?: number): Promise<AuditRecord | null> {
+    // In a real implementation, we would query the database
+    // For now, return null
+    return null;
+  }
+  
+  /**
+   * Export audit records to a specified format
+   */
+  public async exportRecords(
+    format: 'csv' | 'json' | 'pdf',
+    filters: {
+      tenantId?: number;
+      category?: AuditCategory;
       startDate: Date;
       endDate: Date;
-      tenantId?: number;
-    },
-    format: 'json' | 'csv' = 'json'
-  ): Promise<string> {
-    // Check if audit trail is enabled
-    if (!this.isAuditTrailEnabled()) {
-      return '[]';
+      includeDetails?: boolean;
     }
+  ): Promise<{ data: any; filename: string }> {
+    // In a real implementation, we would export the records
+    // For now, return empty data
     
-    // Search for events matching criteria
-    const { events } = await this.searchEvents(criteria, { page: 0, pageSize: 10000 });
-    
-    // Return formatted output
-    if (format === 'json') {
-      return JSON.stringify(events, null, 2);
-    } else {
-      // CSV format
-      const headers = 'id,timestamp,eventType,userId,tenantId,actionName,resourceType,resourceId,success\n';
-      const rows = events.map(e => 
-        `${e.id},${e.timestamp.toISOString()},${e.eventType},${e.userId || ''},${e.tenantId || ''},${e.actionName},${e.resourceType || ''},${e.resourceId || ''},${e.success}`
-      ).join('\n');
-      
-      return headers + rows;
-    }
-  }
-  
-  /**
-   * Verify the integrity of the audit trail
-   */
-  public async verifyIntegrity(): Promise<{ valid: boolean; issues: any[] }> {
-    // Check if audit trail is enabled
-    if (!this.isAuditTrailEnabled()) {
-      return { valid: false, issues: [{ message: 'Audit trail is disabled' }] };
-    }
-    
-    const issues: any[] = [];
-    let lastHash: string | null = null;
-    
-    // In a real implementation, this would load events from the database in chunks
-    // For now, we'll verify the in-memory events
-    
-    // Sort events by timestamp (oldest first)
-    const sortedEvents = [...this.inMemoryAudits].sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-    );
-    
-    for (const event of sortedEvents) {
-      // Check if previous hash matches
-      if (lastHash !== null && event.previousHash !== lastHash) {
-        issues.push({
-          eventId: event.id,
-          timestamp: event.timestamp,
-          message: 'Previous hash mismatch',
-          expected: lastHash,
-          actual: event.previousHash
-        });
-      }
-      
-      // Verify the hash of this event
-      const calculatedHash = this.calculateEventHash(event);
-      if (calculatedHash !== event.hash) {
-        issues.push({
-          eventId: event.id,
-          timestamp: event.timestamp,
-          message: 'Event hash mismatch',
-          expected: calculatedHash,
-          actual: event.hash
-        });
-      }
-      
-      // Update last hash
-      lastHash = event.hash;
-    }
+    const filename = `audit_export_${new Date().toISOString().replace(/:/g, '-')}.${format}`;
     
     return {
-      valid: issues.length === 0,
-      issues
+      data: format === 'json' ? '[]' : '',
+      filename
     };
   }
   
   /**
-   * Check if audit trail is enabled
+   * Purge old audit records based on retention policy
    */
-  private isAuditTrailEnabled(): boolean {
-    return (
-      this.config.enabled && 
-      featureFlagService.isEnabled(FeatureFlags.AUDIT_TRAIL)
-    );
-  }
-  
-  /**
-   * Clean up old audit records based on retention policy
-   */
-  public async cleanupOldRecords(): Promise<number> {
-    // Check if audit trail is enabled
-    if (!this.isAuditTrailEnabled()) {
+  public async purgeOldRecords(retentionPeriodDays: number = DEFAULT_RETENTION_DAYS): Promise<number> {
+    if (!featureFlagService.isEnabled(FeatureFlags.AUDITING)) {
       return 0;
     }
     
-    const retentionDate = new Date();
-    retentionDate.setDate(retentionDate.getDate() - this.config.retentionPeriodDays);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionPeriodDays);
     
-    // In a real implementation, this would delete from the database
-    // For now, we'll just clean up the in-memory events
+    // In a real implementation, we would delete old records from the database
+    // For now, log the action and return 0
     
-    const initialCount = this.inMemoryAudits.length;
-    this.inMemoryAudits = this.inMemoryAudits.filter(
-      e => e.timestamp > retentionDate
-    );
+    console.log(`Purging audit records older than ${cutoffDate.toISOString()}`);
     
-    const deletedCount = initialCount - this.inMemoryAudits.length;
-    
-    // Log the cleanup
-    if (deletedCount > 0) {
-      auditLogger.log({
-        action: 'audit_records_cleanup',
-        actor: 'system',
-        target: 'audit_system',
-        details: {
-          deletedCount,
-          retentionPeriodDays: this.config.retentionPeriodDays,
-          retentionDate: retentionDate.toISOString()
-        }
-      });
+    return 0;
+  }
+  
+  /**
+   * Redact sensitive data from audit details
+   */
+  private redactSensitiveData(details: Record<string, any>): Record<string, any> {
+    if (!details || typeof details !== 'object') {
+      return details;
     }
     
-    return deletedCount;
+    const redactedDetails = { ...details };
+    
+    // Redact sensitive fields recursively
+    this.redactRecursive(redactedDetails, SENSITIVE_FIELDS);
+    
+    return redactedDetails;
+  }
+  
+  /**
+   * Recursively search and redact sensitive data
+   */
+  private redactRecursive(obj: any, sensitiveFields: string[]): void {
+    if (!obj || typeof obj !== 'object') {
+      return;
+    }
+    
+    for (const key of Object.keys(obj)) {
+      const lcKey = key.toLowerCase();
+      
+      // Check if this field should be redacted
+      const shouldRedact = sensitiveFields.some(field => lcKey.includes(field.toLowerCase()));
+      
+      if (shouldRedact && typeof obj[key] !== 'object') {
+        // Redact the value
+        if (typeof obj[key] === 'string') {
+          obj[key] = '********';
+        } else if (typeof obj[key] === 'number') {
+          obj[key] = 0;
+        } else if (typeof obj[key] === 'boolean') {
+          obj[key] = false;
+        }
+      } else if (obj[key] && typeof obj[key] === 'object') {
+        // Recursively check nested objects
+        this.redactRecursive(obj[key], sensitiveFields);
+      }
+    }
+  }
+  
+  /**
+   * Apply customized retention policy based on regulatory requirements
+   */
+  public async applyCustomRetentionPolicy(
+    categories: AuditCategory[],
+    retentionPeriodDays: number
+  ): Promise<number> {
+    if (!featureFlagService.isEnabled(FeatureFlags.AUDITING)) {
+      return 0;
+    }
+    
+    // In a real implementation, we would apply a custom retention policy to specific categories
+    // For now, log the action and return 0
+    
+    console.log(`Applying custom retention policy of ${retentionPeriodDays} days to categories: ${categories.join(', ')}`);
+    
+    return 0;
+  }
+  
+  /**
+   * Generate a compliance report for regulatory purposes
+   */
+  public async generateComplianceReport(
+    regulationType: 'GDPR' | 'HIPAA' | 'SOC2' | 'PCI',
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ reportData: any; reportFile: string }> {
+    // In a real implementation, we would generate a compliance report
+    // For now, log the action and return empty data
+    
+    console.log(`Generating ${regulationType} compliance report from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    
+    return {
+      reportData: {},
+      reportFile: `${regulationType.toLowerCase()}_report_${new Date().toISOString().replace(/:/g, '-')}.pdf`
+    };
+  }
+  
+  /**
+   * Set up real-time alerts for specific audit events
+   */
+  public async configureAlerts(
+    alertConfig: {
+      name: string;
+      description: string;
+      category: AuditCategory;
+      severity: AuditSeverity;
+      actions: string[];
+      notifyEmail?: string[];
+      notifyWebhook?: string;
+    }
+  ): Promise<{ id: string }> {
+    // In a real implementation, we would configure real-time alerts
+    // For now, log the action and return a mock ID
+    
+    console.log(`Configuring audit alert for ${alertConfig.category} events with ${alertConfig.severity} severity`);
+    
+    return {
+      id: `alert_${Date.now()}`
+    };
+  }
+  
+  /**
+   * Log authentication events
+   */
+  public async logAuthEvent(
+    userId: string | number,
+    action: 'login' | 'logout' | 'login_failed' | 'password_change' | 'password_reset' | 'mfa' | 'token_issue',
+    success: boolean,
+    resourceId: string | number | null = null,
+    description: string = '',
+    details: Record<string, any> = {},
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+    tenantId: number | null = null,
+    sessionId: string | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId,
+      tenantId,
+      action: `auth_${action}`,
+      category: AuditCategory.AUTHENTICATION,
+      resourceType: 'user',
+      resourceId: resourceId || userId.toString(),
+      ipAddress,
+      userAgent,
+      description: description || `Authentication ${action} ${success ? 'successful' : 'failed'}`,
+      details,
+      severity: success ? AuditSeverity.INFO : AuditSeverity.WARNING,
+      success,
+      sessionId,
+      requestId: null
+    });
+  }
+  
+  /**
+   * Log data access events
+   */
+  public async logDataAccess(
+    userId: string | number,
+    resourceType: string,
+    resourceId: string | number | null,
+    action: 'read' | 'list' | 'search' | 'export',
+    description: string = '',
+    details: Record<string, any> = {},
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+    tenantId: number | null = null,
+    sessionId: string | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId,
+      tenantId,
+      action: `data_${action}`,
+      category: AuditCategory.DATA_ACCESS,
+      resourceType,
+      resourceId,
+      ipAddress,
+      userAgent,
+      description: description || `Data ${action} on ${resourceType}${resourceId ? `:${resourceId}` : ''}`,
+      details,
+      severity: AuditSeverity.INFO,
+      success: true,
+      sessionId,
+      requestId: null
+    });
+  }
+  
+  /**
+   * Log data modification events
+   */
+  public async logDataModification(
+    userId: string | number,
+    resourceType: string,
+    resourceId: string | number | null,
+    action: 'create' | 'update' | 'delete' | 'restore' | 'archive',
+    success: boolean = true,
+    description: string = '',
+    details: Record<string, any> = {},
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+    tenantId: number | null = null,
+    sessionId: string | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId,
+      tenantId,
+      action: `data_${action}`,
+      category: AuditCategory.DATA_MODIFICATION,
+      resourceType,
+      resourceId,
+      ipAddress,
+      userAgent,
+      description: description || `Data ${action} on ${resourceType}${resourceId ? `:${resourceId}` : ''}`,
+      details,
+      severity: success ? AuditSeverity.INFO : AuditSeverity.WARNING,
+      success,
+      sessionId,
+      requestId: null
+    });
+  }
+  
+  /**
+   * Log admin actions
+   */
+  public async logAdminAction(
+    userId: string | number,
+    resourceType: string,
+    resourceId: string | number | null,
+    action: string,
+    success: boolean = true,
+    description: string = '',
+    details: Record<string, any> = {},
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+    tenantId: number | null = null,
+    sessionId: string | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId,
+      tenantId,
+      action: `admin_${action}`,
+      category: AuditCategory.ADMIN_ACTION,
+      resourceType,
+      resourceId,
+      ipAddress,
+      userAgent,
+      description: description || `Admin ${action} on ${resourceType}${resourceId ? `:${resourceId}` : ''}`,
+      details,
+      severity: success ? AuditSeverity.INFO : AuditSeverity.WARNING,
+      success,
+      sessionId,
+      requestId: null
+    });
+  }
+  
+  /**
+   * Log security events
+   */
+  public async logSecurityEvent(
+    action: string,
+    severity: AuditSeverity,
+    userId: string | number | null,
+    resourceType: string,
+    resourceId: string | number | null,
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+    details: Record<string, any> = {},
+    tenantId: number | null = null,
+    sessionId: string | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId,
+      tenantId,
+      action: `security_${action}`,
+      category: AuditCategory.SECURITY,
+      resourceType,
+      resourceId,
+      ipAddress,
+      userAgent,
+      description: `Security event: ${action} on ${resourceType}${resourceId ? `:${resourceId}` : ''}`,
+      details,
+      severity,
+      success: severity !== AuditSeverity.ERROR && severity !== AuditSeverity.CRITICAL,
+      sessionId,
+      requestId: null
+    });
+  }
+  
+  /**
+   * Log system events
+   */
+  public async logSystemEvent(
+    action: string,
+    resourceType: string,
+    resourceId: string | number | null = null,
+    details: Record<string, any> = {},
+    severity: AuditSeverity = AuditSeverity.INFO,
+    tenantId: number | null = null
+  ): Promise<number | null> {
+    return this.record({
+      userId: 'system',
+      tenantId,
+      action: `system_${action}`,
+      category: AuditCategory.SYSTEM,
+      resourceType,
+      resourceId,
+      ipAddress: null,
+      userAgent: null,
+      description: `System event: ${action} on ${resourceType}${resourceId ? `:${resourceId}` : ''}`,
+      details,
+      severity,
+      success: severity !== AuditSeverity.ERROR && severity !== AuditSeverity.CRITICAL,
+      sessionId: null,
+      requestId: null
+    });
   }
 }
 
-// Create and export a singleton instance
+// Create and export the singleton instance
 export const auditTrailService = new AuditTrailService();
