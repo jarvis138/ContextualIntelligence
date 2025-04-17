@@ -3,10 +3,40 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupObservability, logger } from "./services/observability";
 import { featureFlagService } from "../shared/feature-flags";
+import { tenantMiddleware, TenantIdentificationStrategy } from "./middleware/tenant-middleware";
+import { tenantService } from "./tenant-service";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Setup tenant middleware
+// In development mode, use a default tenant ID to simplify local development
+const isDevelopment = app.get("env") === "development";
+app.use(tenantMiddleware({
+  strategies: [
+    TenantIdentificationStrategy.SUBDOMAIN,
+    TenantIdentificationStrategy.HEADER,
+    TenantIdentificationStrategy.DOMAIN
+  ],
+  // In development mode, use tenant ID 1 as default if no tenant is identified
+  defaultTenantId: isDevelopment ? 1 : undefined,
+  // Paths that don't require tenant identification
+  ignorePaths: [
+    '/health',
+    '/metrics',
+    '/api/v1/auth/login',
+    '/api/v1/auth/register',
+    '/api/v1/tenants',
+    '/__vite_ping',
+    '/@vite',
+    '/node_modules',
+    '/src/components',
+    '/src/lib',
+    '/assets',
+    '/favicon.ico'
+  ]
+}));
 
 // Initialize feature flags
 if (featureFlagService.isEnabled('enhanced-logging')) {
