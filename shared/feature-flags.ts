@@ -45,6 +45,14 @@ export const FeatureFlags = {
   SENTIMENT_ANALYSIS: 'sentiment-analysis',
   TOPIC_MODELING: 'topic-modeling',
   
+  // Enterprise features (Phase 3)
+  MODEL_GOVERNANCE: 'model-governance',
+  ENHANCED_SECURITY: 'enhanced-security',
+  TENANT_ISOLATION: 'tenant-isolation',
+  AUDIT_TRAIL: 'audit-trail',
+  SCALABILITY_CONTROLS: 'scalability-controls',
+  ADMIN_DASHBOARD: 'admin-dashboard',
+  
   // Integration features
   SLACK_INTEGRATION: 'slack-integration',
   GOOGLE_DRIVE_INTEGRATION: 'google-drive-integration',
@@ -162,6 +170,92 @@ export const defaultFlags: Record<string, FeatureFlag> = {
       similarityThreshold: 0.7,
       useHierarchicalTopics: false,
       includeMetadata: true
+    }
+  },
+  // Enterprise features
+  [FeatureFlags.MODEL_GOVERNANCE]: {
+    name: FeatureFlags.MODEL_GOVERNANCE,
+    description: 'Enable enterprise model governance with versioning, audit trails, and performance monitoring',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      enableVersioning: true,
+      enableAuditTrail: true,
+      enablePerformanceMonitoring: true,
+      approvalWorkflowRequired: true,
+      complianceReporting: true,
+      biasDetection: true,
+      modelRegistryEnabled: true,
+      usageQuotas: {
+        enabled: true,
+        defaultTokenLimit: 1000000
+      }
+    }
+  },
+  [FeatureFlags.ENHANCED_SECURITY]: {
+    name: FeatureFlags.ENHANCED_SECURITY,
+    description: 'Enable enhanced enterprise security controls for data and AI processing',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      dataEncryptionAtRest: true,
+      piiDetection: true,
+      sensitiveDataMasking: true,
+      aiRequestSanitization: true,
+      dataLineageTracking: true,
+      complianceTagging: true
+    }
+  },
+  [FeatureFlags.TENANT_ISOLATION]: {
+    name: FeatureFlags.TENANT_ISOLATION,
+    description: 'Enable complete tenant isolation for AI processing and data segregation',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      isolationMode: 'strict', // Can be 'basic', 'standard', or 'strict'
+      separateModelInstances: true,
+      dedicatedProcessingQueues: true,
+      independentDataStorage: true
+    }
+  },
+  [FeatureFlags.AUDIT_TRAIL]: {
+    name: FeatureFlags.AUDIT_TRAIL,
+    description: 'Enable comprehensive audit trail for all AI operations',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      detailLevel: 'comprehensive', // Can be 'basic', 'standard', or 'comprehensive'
+      retentionPeriodDays: 365,
+      captureInputOutput: true,
+      captureModelMetadata: true,
+      exportFormat: 'structured' // Can be 'basic' or 'structured'
+    }
+  },
+  [FeatureFlags.SCALABILITY_CONTROLS]: {
+    name: FeatureFlags.SCALABILITY_CONTROLS,
+    description: 'Enable enterprise-grade scalability controls for AI processing',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      distributedProcessing: true,
+      asyncProcessingQueues: true,
+      priorityBasedQueuing: true,
+      horizontalScaling: true,
+      loadBalancing: true,
+      autoScalingEnabled: true
+    }
+  },
+  [FeatureFlags.ADMIN_DASHBOARD]: {
+    name: FeatureFlags.ADMIN_DASHBOARD,
+    description: 'Enable comprehensive admin dashboard for AI feature management',
+    enabled: false,
+    settings: {
+      level: 'enterprise', // Enterprise-only feature
+      aiUsageMetrics: true,
+      modelPerformanceTracking: true,
+      tenantManagement: true,
+      quotaConfiguration: true,
+      aiFeatureConfiguration: true
     }
   },
   [FeatureFlags.SLACK_INTEGRATION]: {
