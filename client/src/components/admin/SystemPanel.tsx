@@ -490,7 +490,7 @@ const SystemPanel = () => {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Server className="h-4 w-4" />
                 <span>Overview</span>
@@ -506,6 +506,10 @@ const SystemPanel = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
+              </TabsTrigger>
+              <TabsTrigger value="ai-models" className="flex items-center gap-2">
+                <Brain className="h-4 w-4" />
+                <span>AI Models</span>
               </TabsTrigger>
             </TabsList>
 
@@ -906,6 +910,10 @@ const SystemPanel = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+            
+            <TabsContent value="ai-models">
+              <ModelRegistryPanel />
             </TabsContent>
           </Tabs>
         </CardContent>
