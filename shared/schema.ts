@@ -1024,6 +1024,34 @@ export const insertOAuthProviderSettingsSchema = createInsertSchema(oauthProvide
 export type OAuthProviderSetting = typeof oauthProviderSettings.$inferSelect;
 export type InsertOAuthProviderSetting = z.infer<typeof insertOAuthProviderSettingsSchema>;
 
+// Schema for SAML identity providers
+export const samlProviders = pgTable('saml_providers', {
+  id: serial('id').primaryKey(),
+  providerId: text('provider_id').notNull(), // e.g., 'okta', 'azure-ad', 'onelogin'
+  name: text('name').notNull(),
+  enabled: boolean('enabled').notNull().default(false),
+  tenantId: integer('tenant_id').references(() => tenants.id),
+  entryPoint: text('entry_point').notNull(), // Identity provider SSO URL
+  issuer: text('issuer').notNull(), // Service provider entity ID
+  cert: text('cert').notNull(), // Identity provider certificate
+  privateKey: text('private_key'), // Optional service provider private key
+  callbackUrl: text('callback_url').notNull(), // Service provider ACS URL
+  signatureAlgorithm: text('signature_algorithm').default('sha256'),
+  digestAlgorithm: text('digest_algorithm').default('sha256'),
+  wantAssertionsSigned: boolean('want_assertions_signed').default(true),
+  disableRequestedAuthnContext: boolean('disable_requested_authn_context').default(false),
+  forceAuthn: boolean('force_authn').default(false),
+  additionalConfig: jsonb('additional_config'), // For other SAML-specific settings
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedBy: integer('updated_by').references(() => users.id)
+});
+
+export const insertSamlProviderSchema = createInsertSchema(samlProviders)
+  .omit({ id: true });
+
+export type SamlProvider = typeof samlProviders.$inferSelect;
+export type InsertSamlProvider = z.infer<typeof insertSamlProviderSchema>;
+
 // -------------------------------------------------------------------------------
 // Data Fetching System Schemas
 // -------------------------------------------------------------------------------

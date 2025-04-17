@@ -15,6 +15,7 @@ import {
   refreshTokens, type RefreshToken, type InsertRefreshToken,
   pkceCodeVerifiers, type PkceCodeVerifier, type InsertPkceCodeVerifier,
   oauthProviderSettings, type OAuthProviderSetting, type InsertOAuthProviderSetting,
+  samlProviders, type SamlProvider, type InsertSamlProvider,
   graphNodes, type GraphNode, type InsertGraphNode,
   graphEdges, type GraphEdge, type InsertGraphEdge
 } from "@shared/schema";
@@ -65,6 +66,16 @@ export interface IStorage {
   getOAuthProviderSettings(): Promise<OAuthProviderSetting[]>;
   getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined>;
   saveOAuthProviderSettings(providerSetting: InsertOAuthProviderSetting): Promise<OAuthProviderSetting>;
+  
+  // SAML Provider Settings
+  getSamlProviders(): Promise<SamlProvider[]>;
+  getSamlProvider(id: number): Promise<SamlProvider | undefined>;
+  getSamlProviderByProviderId(providerId: string): Promise<SamlProvider | undefined>;
+  saveSamlProvider(provider: InsertSamlProvider): Promise<SamlProvider>;
+  updateSamlProvider(id: number, provider: Partial<InsertSamlProvider>): Promise<SamlProvider | undefined>;
+  deleteSamlProvider(id: number): Promise<boolean>;
+  getSamlProvidersByTenant(tenantId: number): Promise<SamlProvider[]>;
+  getEnabledSamlProviders(): Promise<SamlProvider[]>;
 
   // Projects
   getProject(id: number): Promise<Project | undefined>;
@@ -129,10 +140,15 @@ export interface IStorage {
   getRelationships(projectId: number): Promise<Relationship[]>;
   createRelationship(relationship: InsertRelationship): Promise<Relationship>;
   
-  // OAuth Provider Settings
-  getOAuthProviderSettings(): Promise<OAuthProviderSetting[]>;
-  getOAuthProviderSetting(providerId: string): Promise<OAuthProviderSetting | undefined>;
-  saveOAuthProviderSettings(provider: InsertOAuthProviderSetting): Promise<OAuthProviderSetting>;
+  // SAML Provider Settings
+  getSamlProviders(): Promise<SamlProvider[]>;
+  getSamlProvider(id: number): Promise<SamlProvider | undefined>;
+  getSamlProviderByProviderId(providerId: string): Promise<SamlProvider | undefined>;
+  saveSamlProvider(provider: InsertSamlProvider): Promise<SamlProvider>;
+  updateSamlProvider(id: number, provider: Partial<InsertSamlProvider>): Promise<SamlProvider | undefined>;
+  deleteSamlProvider(id: number): Promise<boolean>;
+  getSamlProvidersByTenant(tenantId: number): Promise<SamlProvider[]>;
+  getEnabledSamlProviders(): Promise<SamlProvider[]>;
   
   // Context Graph Operations
   // Graph Nodes
