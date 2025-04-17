@@ -14,9 +14,10 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Search, ZoomIn, ZoomOut, RotateCcw, Download, Share2, 
-  Info, Filter, Sun, Moon, Maximize2, Minimize2
+  Info, Filter, Sun, Moon, Maximize2, Minimize2, Copy, Check, Link
 } from 'lucide-react';
 import { getMockGraphData } from '../../lib/mockData';
+import { useToast } from '@/hooks/use-toast';
 
 // Define types for graph data structures
 export interface GraphNode {
@@ -141,8 +142,12 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     PROJECT: true,
     TASK: true
   });
+  const [shareDialogOpen, setShareDialogOpen] = useState<boolean>(false);
+  const [shareUrl, setShareUrl] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
 
   const graphRef = useRef<any>(null);
+  const { toast } = useToast();
   
   // Fetch graph data on component mount
   useEffect(() => {
@@ -287,6 +292,61 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
       graphRef.current.zoom(graphRef.current.zoom() / 1.2, 400);
     }
   }, []);
+  
+  // Handle share graph
+  const handleShare = useCallback(() => {
+    // Create a shareable URL with current graph state
+    const params = new URLSearchParams();
+    
+    if (initialNodeId) {
+      params.set('nodeId', initialNodeId.toString());
+    }
+    
+    params.set('depth', depth.toString());
+    
+    // Add active filters
+    const activeFilterTypes = Object.entries(nodeFilters)
+      .filter(([_, isActive]) => isActive)
+      .map(([type]) => type);
+      
+    if (activeFilterTypes.length > 0 && activeFilterTypes.length < Object.keys(nodeFilters).length) {
+      params.set('filters', activeFilterTypes.join(','));
+    }
+    
+    // Format URL
+    const currentUrl = new URL(window.location.href);
+    currentUrl.search = params.toString();
+    
+    setShareUrl(currentUrl.toString());
+    setShareDialogOpen(true);
+  }, [initialNodeId, depth, nodeFilters]);
+  
+  // Handle copy share URL to clipboard
+  const handleCopyShareUrl = useCallback(() => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true);
+      toast({
+        title: "URL copied to clipboard",
+        description: "You can now paste and share this link with others.",
+      });
+      
+      setTimeout(() => setCopied(false), 3000);
+    });
+  }, [shareUrl, toast]);
+  
+  // Handle view graph details
+  const handleViewDetails = useCallback(() => {
+    // If no specific node is selected, show overall graph details
+    if (!selectedNode) {
+      toast({
+        title: "Graph Summary",
+        description: `${filteredData.nodes.length} nodes and ${filteredData.links.length} connections with depth ${depth}.`,
+      });
+    } else {
+      // If a node is selected, we show the node details dialog
+      // This is already handled by selectedNode state being used in NodeDetails component
+    }
+  }, [selectedNode, filteredData, depth, toast]);
 
   return (
     <Card className="w-full h-full shadow-md border">
@@ -501,11 +561,11 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
           {initialNodeId && <span className="ml-2">| Centered on node: {initialNodeId}</span>}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" />
             Share
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={handleViewDetails}>
             <Info className="h-4 w-4 mr-2" />
             View Details
           </Button>
@@ -514,6 +574,60 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
 
       {/* Node details dialog */}
       <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} />
+      
+      {/* Share dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Graph</DialogTitle>
+            <DialogDescription>
+              Anyone with this link will be able to view this graph visualization with the current settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 mt-4">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="shareUrl" className="sr-only">Link</Label>
+              <Input
+                id="shareUrl"
+                defaultValue={shareUrl}
+                readOnly
+                className="font-mono text-sm"
+              />
+            </div>
+            <Button 
+              type="button" 
+              size="icon" 
+              className="px-3" 
+              onClick={handleCopyShareUrl}
+              title="Copy to clipboard"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              <span className="sr-only">Copy</span>
+            </Button>
+          </div>
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-2">Graph Settings</h4>
+            <div className="text-sm">
+              <p><strong>Centered node:</strong> {initialNodeId ? `Node ${initialNodeId}` : 'None (using default)'}</p>
+              <p><strong>Depth:</strong> {depth}</p>
+              {Object.values(nodeFilters).some(v => !v) && (
+                <p>
+                  <strong>Filters:</strong>{' '}
+                  {Object.entries(nodeFilters)
+                    .filter(([_, isActive]) => isActive)
+                    .map(([type]) => type)
+                    .join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
