@@ -56,7 +56,7 @@ export type FeatureFlagName = keyof typeof FeatureFlags;
 
 // Initial flag definitions with default values
 // In a real application, these would be loaded from a database or configuration
-const defaultFlags: Record<string, FeatureFlag> = {
+export const defaultFlags: Record<string, FeatureFlag> = {
   [FeatureFlags.ADVANCED_SEARCH]: {
     name: FeatureFlags.ADVANCED_SEARCH,
     description: 'Enable advanced search capabilities including semantic search',
