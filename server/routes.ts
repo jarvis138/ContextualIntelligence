@@ -31,6 +31,7 @@ import * as searchController from "./controllers/searchController";
 import { registerAdminRoutes } from "./routes/admin-api";
 import { registerTenantRoutes } from "./routes/tenant-routes";
 import adminAuditRoutes from "./routes/admin-audit-routes";
+import enterpriseAuthRoutes from "./routes/enterprise-auth-routes";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
 import { TokenRefresh } from "./services/tokenRefresh";
