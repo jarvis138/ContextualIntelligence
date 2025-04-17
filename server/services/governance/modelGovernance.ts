@@ -1,343 +1,1001 @@
 /**
  * Model Governance Service
  * 
- * Provides enterprise-grade model governance capabilities:
- * - Model version tracking and history
- * - Usage auditing and logging
- * - Performance monitoring
- * - Bias detection and fairness metrics
- * - Compliance reporting
+ * This service provides enterprise-grade governance capabilities for AI models,
+ * supporting compliance, explainability, and ethical AI usage requirements.
+ * 
+ * Features:
+ * - Model usage approval workflows
+ * - Prompt and completion logging
+ * - Content filtering and policy enforcement
+ * - Explainability reports
+ * - Bias detection and mitigation
+ * - Usage tracking and reporting
  */
 
-import { db } from '../../db';
-import { auditLogger } from '../../utils/auditLogger';
-import { encryptionService } from '../encryptionService';
 import { featureFlagService } from '../feature-flag';
 import { FeatureFlags } from '../../../shared/feature-flags';
+import { auditLogger } from '../../utils/auditLogger';
+import { auditTrailService } from '../security/auditTrailService';
+import { enterpriseEncryptionService } from '../security/encryptionService';
+import { tenantIsolationService } from '../security/tenantIsolationService';
+import crypto from 'crypto';
 
-/**
- * Model metadata interface
- */
-export interface ModelMetadata {
-  modelId: string;
+// Model registry types
+export type ModelProvider = 'openai' | 'anthropic' | 'internal' | 'huggingface' | 'custom';
+
+export type ModelCapability = 
+  | 'text_generation'
+  | 'chat'
+  | 'embeddings'
+  | 'image_generation'
+  | 'text_classification'
+  | 'text_moderation'
+  | 'summarization'
+  | 'entity_extraction';
+
+export type ModelStatus = 
+  | 'approved'
+  | 'pending_approval'
+  | 'restricted'
+  | 'deprecated'
+  | 'testing';
+
+export type ContentRiskLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical';
+
+export type ContentFilter =
+  | 'profanity'
+  | 'hate_speech'
+  | 'sexual_content'
+  | 'violence'
+  | 'self_harm'
+  | 'pii'
+  | 'copyright'
+  | 'financial_info'
+  | 'health_info';
+
+// Model definition
+export interface ModelDefinition {
+  id: string;
+  provider: ModelProvider;
   version: string;
-  provider: string;
-  type: 'embedding' | 'completion' | 'classification' | 'summarization';
-  description: string;
-  createdAt: Date;
-  updatedAt: Date;
+  capabilities: ModelCapability[];
+  status: ModelStatus;
   approvedBy?: string;
   approvalDate?: Date;
-  parameters?: Record<string, any>;
-  capabilities?: string[];
-  limitations?: string[];
-  dataTypes?: ('pii' | 'financial' | 'health' | 'general')[];
-  riskLevel?: 'low' | 'medium' | 'high';
-  complianceStatus?: 'approved' | 'restricted' | 'unapproved';
+  restrictions?: {
+    allowedTenants?: number[];
+    allowedUserRoles?: string[];
+    maxTokens?: number;
+    requiredFilters?: ContentFilter[];
+  };
+  complianceInfo?: {
+    dataResidency?: string[];
+    certifications?: string[];
+    piiHandling?: boolean;
+    retentionPolicy?: string;
+  };
+  performanceMetrics?: {
+    latencyMs?: number;
+    tokensPerSecond?: number;
+    costPerToken?: number;
+  };
 }
 
-/**
- * Model usage event interface
- */
-export interface ModelUsageEvent {
-  modelId: string;
-  version: string;
-  userId: number;
-  tenantId: number;
-  timestamp: Date;
-  operation: string;
-  inputSize: number;
-  outputSize: number;
-  latency: number;
-  status: 'success' | 'failure';
-  errorType?: string;
-  feature?: string;
-  tokenCount?: number;
-  metadata?: Record<string, any>;
+// Governance policies
+export interface GovernancePolicy {
+  id: string;
+  name: string;
+  description: string;
+  scope: 'global' | 'tenant' | 'user';
+  tenantId?: number;
+  userId?: number;
+  filters: ContentFilter[];
+  thresholds: {
+    [key in ContentFilter]?: number;
+  };
+  actions: {
+    blockContent: boolean;
+    maskContent: boolean;
+    logViolation: boolean;
+    notifyAdmin: boolean;
+    requireApproval: boolean;
+  };
+  overrideRoles?: string[];
 }
 
-/**
- * Model performance metrics
- */
-export interface ModelPerformanceMetrics {
-  modelId: string;
-  version: string;
-  period: 'hourly' | 'daily' | 'weekly' | 'monthly';
+// Request validation results
+export interface ValidationResult {
+  valid: boolean;
+  requestId: string;
   timestamp: Date;
-  requestCount: number;
-  errorCount: number;
-  averageLatency: number;
-  tokenCount: number;
-  usageByFeature: Record<string, number>;
-  usageByTenant: Record<string, number>;
-}
-
-/**
- * Compliance report interface
- */
-export interface ComplianceReport {
-  id: number;
+  violations: {
+    filter: ContentFilter;
+    severity: number;
+    threshold: number;
+    location: 'prompt' | 'completion';
+    offsetStart?: number;
+    offsetEnd?: number;
+    maskedContent?: string;
+  }[];
+  overallRiskLevel: ContentRiskLevel;
   modelId: string;
-  version: string;
-  timestamp: Date;
-  reportType: string;
-  generatedBy: string;
-  approvedBy?: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  metrics: Record<string, any>;
-  issues: Array<{
-    type: string;
-    severity: 'low' | 'medium' | 'high';
-    description: string;
-    remediation?: string;
-  }>;
+  action: 'allowed' | 'modified' | 'blocked' | 'flagged_for_review';
+  metadata: {
+    usageContext?: string;
+    validatedBy: string;
+    policyId: string;
+  };
 }
 
 export class ModelGovernanceService {
-  private _activeModels: Map<string, ModelMetadata> = new Map();
-
-  /**
-   * Initialize the model governance service
-   */
+  private registeredModels: Map<string, ModelDefinition> = new Map();
+  private governancePolicies: Map<string, GovernancePolicy> = new Map();
+  private pendingApprovals: Map<string, { request: any; tenantId: number; userId: number }> = new Map();
+  
   constructor() {
-    this.loadApprovedModels();
-  }
-
-  /**
-   * Load the list of approved models from the database
-   */
-  private async loadApprovedModels(): Promise<void> {
-    try {
-      // In a real implementation, this would load from the database
-      // For now, we'll initialize with empty data
-      this._activeModels = new Map();
-      
-      // Log initialization
-      auditLogger.log({
-        action: 'model_governance_initialized',
-        actor: 'system',
-        target: 'model_registry',
-        details: { modelCount: this._activeModels.size }
-      });
-    } catch (error) {
-      console.error('Error loading approved models:', error);
-    }
-  }
-
-  /**
-   * Register a new model in the governance system
-   */
-  public async registerModel(metadata: Omit<ModelMetadata, 'createdAt' | 'updatedAt'>): Promise<ModelMetadata> {
-    const now = new Date();
-    const modelMetadata: ModelMetadata = {
-      ...metadata,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // In a real implementation, this would save to the database
-    this._activeModels.set(`${metadata.provider}/${metadata.modelId}/${metadata.version}`, modelMetadata);
-
-    // Log the registration
-    auditLogger.log({
-      action: 'model_registered',
-      actor: 'system', // This would be the actual user/system that registered the model
-      target: 'model_registry',
-      details: {
-        modelId: metadata.modelId,
-        version: metadata.version,
-        provider: metadata.provider
-      }
-    });
-
-    return modelMetadata;
-  }
-
-  /**
-   * Record a model usage event
-   */
-  public async recordUsage(event: Omit<ModelUsageEvent, 'timestamp'>): Promise<void> {
-    const usageEvent: ModelUsageEvent = {
-      ...event,
-      timestamp: new Date()
-    };
-
-    // In a real implementation, this would save to the database
-    // For now, we just log it
-    auditLogger.log({
-      action: 'model_usage',
-      actor: event.userId.toString(),
-      target: `model:${event.modelId}:${event.version}`,
-      targetType: 'ai_model',
-      tenant: event.tenantId.toString(),
-      details: {
-        operation: event.operation,
-        status: event.status,
-        latency: event.latency,
-        feature: event.feature
-      }
-    });
-  }
-
-  /**
-   * Get model details by ID and version
-   */
-  public getModel(modelId: string, version?: string): ModelMetadata | undefined {
-    if (version) {
-      return this._activeModels.get(`${modelId}/${version}`);
-    }
-    
-    // If no version specified, get the latest
-    const modelEntries = Array.from(this._activeModels.entries())
-      .filter(([key]) => key.startsWith(modelId))
-      .sort(([keyA], [keyB]) => keyB.localeCompare(keyA));
-    
-    return modelEntries.length > 0 ? modelEntries[0][1] : undefined;
-  }
-
-  /**
-   * Check if a model is approved for use
-   */
-  public isModelApproved(modelId: string, version?: string): boolean {
-    const model = this.getModel(modelId, version);
-    return model?.complianceStatus === 'approved';
-  }
-
-  /**
-   * Generate compliance report for a model
-   */
-  public async generateComplianceReport(
-    modelId: string, 
-    version: string, 
-    reportType: string, 
-    generatedBy: string
-  ): Promise<ComplianceReport> {
-    // In a real implementation, this would generate a real report
-    // based on model usage data, performance metrics, etc.
-    const report: ComplianceReport = {
-      id: Date.now(), // Placeholder ID
-      modelId,
-      version,
-      timestamp: new Date(),
-      reportType,
-      generatedBy,
-      status: 'draft',
-      metrics: {
-        accuracy: 0.95,
-        fairness: 0.92,
-        robustness: 0.87,
-        explainability: 0.75
-      },
-      issues: []
-    };
-
-    // Log report generation
-    auditLogger.log({
-      action: 'compliance_report_generated',
-      actor: generatedBy,
-      target: `model:${modelId}:${version}`,
-      targetType: 'ai_model',
-      details: {
-        reportType,
-        reportId: report.id
-      }
-    });
-
-    return report;
-  }
-
-  /**
-   * Get performance metrics for a model over a time period
-   */
-  public async getPerformanceMetrics(
-    modelId: string,
-    version: string,
-    period: 'hourly' | 'daily' | 'weekly' | 'monthly',
-    startDate: Date,
-    endDate: Date
-  ): Promise<ModelPerformanceMetrics[]> {
-    // In a real implementation, this would query metrics from the database
-    // For now, we return placeholder data
-    return [{
-      modelId,
-      version,
-      period,
-      timestamp: new Date(),
-      requestCount: 0,
-      errorCount: 0,
-      averageLatency: 0,
-      tokenCount: 0,
-      usageByFeature: {},
-      usageByTenant: {}
-    }];
-  }
-
-  /**
-   * Approve a model for production use
-   */
-  public async approveModel(
-    modelId: string,
-    version: string, 
-    approvedBy: string,
-    notes?: string
-  ): Promise<ModelMetadata | undefined> {
-    const modelKey = `${modelId}/${version}`;
-    const model = this._activeModels.get(modelKey);
-    
-    if (!model) {
-      return undefined;
-    }
-    
-    const updatedModel: ModelMetadata = {
-      ...model,
-      complianceStatus: 'approved',
-      approvedBy,
-      approvalDate: new Date(),
-      updatedAt: new Date()
-    };
-    
-    this._activeModels.set(modelKey, updatedModel);
-    
-    // Log approval
-    auditLogger.log({
-      action: 'model_approved',
-      actor: approvedBy,
-      target: `model:${modelId}:${version}`,
-      targetType: 'ai_model',
-      details: {
-        notes
-      }
-    });
-    
-    return updatedModel;
+    // Initialize with default governance policies
+    this.initializeDefaultPolicies();
+    console.log('Model Governance Service initialized');
   }
   
   /**
-   * Check if a tenant has the required permissions to use a model
+   * Initialize default governance policies
    */
-  public async canTenantUseModel(
-    tenantId: number,
-    modelId: string,
-    operation: string
-  ): Promise<boolean> {
-    // Check if the model governance feature is enabled
-    const isModelGovernanceEnabled = featureFlagService.isEnabled(
-      FeatureFlags.MODEL_GOVERNANCE, 
-      tenantId
-    );
+  private initializeDefaultPolicies(): void {
+    // Create a default global policy
+    const defaultPolicy: GovernancePolicy = {
+      id: crypto.randomUUID(),
+      name: 'Default Global Policy',
+      description: 'Default content filtering policy for all AI interactions',
+      scope: 'global',
+      filters: ['profanity', 'hate_speech', 'sexual_content', 'violence', 'self_harm', 'pii'],
+      thresholds: {
+        profanity: 0.7,
+        hate_speech: 0.5,
+        sexual_content: 0.6,
+        violence: 0.7,
+        self_harm: 0.4,
+        pii: 0.6
+      },
+      actions: {
+        blockContent: true,
+        maskContent: true,
+        logViolation: true,
+        notifyAdmin: true,
+        requireApproval: false
+      },
+      overrideRoles: ['admin', 'compliance_officer']
+    };
     
-    if (!isModelGovernanceEnabled) {
-      // If model governance is not enabled, default to permissive behavior
-      return true;
+    this.governancePolicies.set(defaultPolicy.id, defaultPolicy);
+    
+    // Log the initialization
+    auditLogger.log({
+      action: 'default_governance_policy_created',
+      actor: 'system',
+      target: `policy:${defaultPolicy.id}`,
+      targetType: 'governance_policy',
+      details: {
+        policyName: defaultPolicy.name,
+        filters: defaultPolicy.filters,
+        actions: defaultPolicy.actions
+      }
+    });
+  }
+  
+  /**
+   * Register a new model in the governance registry
+   */
+  public registerModel(model: ModelDefinition): string {
+    // Check if the model already exists
+    if (this.registeredModels.has(model.id)) {
+      throw new Error(`Model with ID ${model.id} already exists`);
     }
     
-    // In a real implementation, this would check against tenant permissions
-    // and model restrictions in the database
+    // Set defaults if not provided
+    if (!model.status) {
+      model.status = 'pending_approval';
+    }
     
-    // For now, assume all tenants can use all models
+    // Store the model
+    this.registeredModels.set(model.id, { ...model });
+    
+    // Log the registration
+    auditLogger.log({
+      action: 'model_registered',
+      actor: 'system',
+      target: `model:${model.id}`,
+      targetType: 'ai_model',
+      details: {
+        provider: model.provider,
+        version: model.version,
+        capabilities: model.capabilities,
+        status: model.status
+      }
+    });
+    
+    return model.id;
+  }
+  
+  /**
+   * Update an existing model in the registry
+   */
+  public updateModel(modelId: string, updates: Partial<ModelDefinition>): ModelDefinition {
+    // Check if the model exists
+    if (!this.registeredModels.has(modelId)) {
+      throw new Error(`Model with ID ${modelId} not found`);
+    }
+    
+    // Get current model definition
+    const currentModel = this.registeredModels.get(modelId)!;
+    
+    // Check if updating status from pending to approved
+    if (
+      currentModel.status === 'pending_approval' && 
+      updates.status === 'approved' &&
+      (!updates.approvedBy || !updates.approvalDate)
+    ) {
+      throw new Error('Approval requires approvedBy and approvalDate fields');
+    }
+    
+    // Apply updates
+    const updatedModel = { ...currentModel, ...updates };
+    
+    // Store updated model
+    this.registeredModels.set(modelId, updatedModel);
+    
+    // Log the update
+    auditLogger.log({
+      action: 'model_updated',
+      actor: 'system',
+      target: `model:${modelId}`,
+      targetType: 'ai_model',
+      details: {
+        updatedFields: Object.keys(updates),
+        newStatus: updates.status
+      }
+    });
+    
+    return { ...updatedModel };
+  }
+  
+  /**
+   * Get a registered model by ID
+   */
+  public getModel(modelId: string): ModelDefinition | null {
+    return this.registeredModels.get(modelId) || null;
+  }
+  
+  /**
+   * List all registered models, optionally filtered by status and capability
+   */
+  public listModels(
+    options?: {
+      status?: ModelStatus;
+      capability?: ModelCapability;
+      provider?: ModelProvider;
+    }
+  ): ModelDefinition[] {
+    let models = Array.from(this.registeredModels.values());
+    
+    // Apply filters
+    if (options) {
+      if (options.status) {
+        models = models.filter(m => m.status === options.status);
+      }
+      
+      if (options.capability) {
+        models = models.filter(m => m.capabilities.includes(options.capability!));
+      }
+      
+      if (options.provider) {
+        models = models.filter(m => m.provider === options.provider);
+      }
+    }
+    
+    return models;
+  }
+  
+  /**
+   * Create a new governance policy
+   */
+  public createPolicy(policy: Omit<GovernancePolicy, 'id'>): GovernancePolicy {
+    // Generate an ID for the policy
+    const id = crypto.randomUUID();
+    const newPolicy: GovernancePolicy = {
+      ...policy,
+      id
+    };
+    
+    // Store the policy
+    this.governancePolicies.set(id, newPolicy);
+    
+    // Log the creation
+    auditLogger.log({
+      action: 'governance_policy_created',
+      actor: 'system',
+      target: `policy:${id}`,
+      targetType: 'governance_policy',
+      tenant: policy.tenantId?.toString(),
+      details: {
+        policyName: policy.name,
+        scope: policy.scope,
+        filters: policy.filters
+      }
+    });
+    
+    return { ...newPolicy };
+  }
+  
+  /**
+   * Update an existing governance policy
+   */
+  public updatePolicy(policyId: string, updates: Partial<GovernancePolicy>): GovernancePolicy {
+    // Check if the policy exists
+    if (!this.governancePolicies.has(policyId)) {
+      throw new Error(`Policy with ID ${policyId} not found`);
+    }
+    
+    // Get current policy
+    const currentPolicy = this.governancePolicies.get(policyId)!;
+    
+    // Apply updates (don't allow changing the ID)
+    const { id, ...updatableFields } = updates;
+    const updatedPolicy = { ...currentPolicy, ...updatableFields };
+    
+    // Store updated policy
+    this.governancePolicies.set(policyId, updatedPolicy);
+    
+    // Log the update
+    auditLogger.log({
+      action: 'governance_policy_updated',
+      actor: 'system',
+      target: `policy:${policyId}`,
+      targetType: 'governance_policy',
+      tenant: updatedPolicy.tenantId?.toString(),
+      details: {
+        policyName: updatedPolicy.name,
+        updatedFields: Object.keys(updatableFields)
+      }
+    });
+    
+    return { ...updatedPolicy };
+  }
+  
+  /**
+   * Get a governance policy by ID
+   */
+  public getPolicy(policyId: string): GovernancePolicy | null {
+    return this.governancePolicies.get(policyId) || null;
+  }
+  
+  /**
+   * List all governance policies, optionally filtered by scope and tenant
+   */
+  public listPolicies(
+    options?: {
+      scope?: 'global' | 'tenant' | 'user';
+      tenantId?: number;
+      userId?: number;
+    }
+  ): GovernancePolicy[] {
+    let policies = Array.from(this.governancePolicies.values());
+    
+    // Apply filters
+    if (options) {
+      if (options.scope) {
+        policies = policies.filter(p => p.scope === options.scope);
+      }
+      
+      if (options.tenantId !== undefined) {
+        policies = policies.filter(p => 
+          p.scope === 'global' || 
+          (p.scope === 'tenant' && p.tenantId === options.tenantId)
+        );
+      }
+      
+      if (options.userId !== undefined) {
+        policies = policies.filter(p => 
+          p.scope === 'global' || 
+          (p.scope === 'user' && p.userId === options.userId)
+        );
+      }
+    }
+    
+    return policies;
+  }
+  
+  /**
+   * Get the applicable policy for a request
+   */
+  private getApplicablePolicy(tenantId: number, userId: number): GovernancePolicy {
+    let applicablePolicies: GovernancePolicy[] = [];
+    
+    // Get user-specific policies
+    const userPolicies = this.listPolicies({
+      scope: 'user',
+      userId
+    });
+    
+    if (userPolicies.length > 0) {
+      applicablePolicies = applicablePolicies.concat(userPolicies);
+    }
+    
+    // Get tenant-specific policies
+    const tenantPolicies = this.listPolicies({
+      scope: 'tenant',
+      tenantId
+    });
+    
+    if (tenantPolicies.length > 0) {
+      applicablePolicies = applicablePolicies.concat(tenantPolicies);
+    }
+    
+    // Get global policies
+    const globalPolicies = this.listPolicies({
+      scope: 'global'
+    });
+    
+    if (globalPolicies.length > 0) {
+      applicablePolicies = applicablePolicies.concat(globalPolicies);
+    }
+    
+    // If no applicable policies found, use the default
+    if (applicablePolicies.length === 0) {
+      // This should never happen as we initialize with a default policy
+      // But just in case, create a basic one
+      const defaultPolicy: GovernancePolicy = {
+        id: 'default',
+        name: 'Default Fallback Policy',
+        description: 'Basic content filtering for all AI interactions',
+        scope: 'global',
+        filters: ['hate_speech', 'sexual_content', 'violence'],
+        thresholds: {
+          hate_speech: 0.7,
+          sexual_content: 0.7,
+          violence: 0.7
+        },
+        actions: {
+          blockContent: true,
+          maskContent: true,
+          logViolation: true,
+          notifyAdmin: false,
+          requireApproval: false
+        }
+      };
+      
+      return defaultPolicy;
+    }
+    
+    // Get the highest priority policy (user > tenant > global)
+    const policy = applicablePolicies.reduce((prev, current) => {
+      const prevPriority = prev.scope === 'user' ? 3 : prev.scope === 'tenant' ? 2 : 1;
+      const currentPriority = current.scope === 'user' ? 3 : current.scope === 'tenant' ? 2 : 1;
+      
+      return currentPriority > prevPriority ? current : prev;
+    });
+    
+    return policy;
+  }
+  
+  /**
+   * Validate if a model can be used by a specific tenant/user
+   */
+  public canUseModel(
+    modelId: string,
+    tenantId: number,
+    userId: number,
+    userRoles: string[] = []
+  ): { allowed: boolean; reason?: string } {
+    // Check if model governance is enabled
+    if (!this.isModelGovernanceEnabled()) {
+      return { allowed: true };
+    }
+    
+    // Check if the model exists
+    if (!this.registeredModels.has(modelId)) {
+      return { allowed: false, reason: 'Model not registered in governance system' };
+    }
+    
+    const model = this.registeredModels.get(modelId)!;
+    
+    // Check model status
+    if (model.status !== 'approved') {
+      if (model.status === 'pending_approval') {
+        return { allowed: false, reason: 'Model pending approval' };
+      } else if (model.status === 'deprecated') {
+        return { allowed: false, reason: 'Model has been deprecated' };
+      } else if (model.status === 'restricted') {
+        // For restricted models, check if the tenant/user has specific permissions
+        if (
+          model.restrictions?.allowedTenants &&
+          !model.restrictions.allowedTenants.includes(tenantId)
+        ) {
+          return { allowed: false, reason: 'Tenant not authorized for restricted model' };
+        }
+        
+        if (
+          model.restrictions?.allowedUserRoles &&
+          !model.restrictions.allowedUserRoles.some(role => userRoles.includes(role))
+        ) {
+          return { allowed: false, reason: 'User role not authorized for restricted model' };
+        }
+      }
+    }
+    
+    // Log the access check
+    auditLogger.log({
+      action: 'model_access_checked',
+      actor: userId.toString(),
+      target: `model:${modelId}`,
+      targetType: 'ai_model',
+      tenant: tenantId.toString(),
+      details: {
+        modelStatus: model.status,
+        userRoles
+      }
+    });
+    
+    return { allowed: true };
+  }
+  
+  /**
+   * Validate a prompt against governance policies
+   */
+  public validatePrompt(
+    prompt: string,
+    modelId: string,
+    tenantId: number,
+    userId: number,
+    userRoles: string[] = [],
+    context?: string
+  ): ValidationResult {
+    // If model governance is disabled, return a valid result
+    if (!this.isModelGovernanceEnabled()) {
+      return this.createValidationResult(true, modelId, 'safe');
+    }
+    
+    // Get the applicable policy
+    const policy = this.getApplicablePolicy(tenantId, userId);
+    
+    // Check if the user has a role that can override policies
+    const canOverride = 
+      policy.overrideRoles && 
+      policy.overrideRoles.some(role => userRoles.includes(role));
+    
+    if (canOverride) {
+      // Still log the validation but allow it
+      const result = this.createValidationResult(true, modelId, 'safe');
+      result.metadata.policyId = policy.id;
+      
+      // Log that this was override
+      auditLogger.log({
+        action: 'governance_policy_override',
+        actor: userId.toString(),
+        target: `model:${modelId}`,
+        targetType: 'ai_model',
+        tenant: tenantId.toString(),
+        details: {
+          policyId: policy.id,
+          overrideRole: userRoles.find(role => policy.overrideRoles!.includes(role))
+        }
+      });
+      
+      return result;
+    }
+    
+    // In a real implementation, this would call a content moderation API
+    // For now, we'll simulate some basic filtering
+    const violations: ValidationResult['violations'] = [];
+    
+    // Simulate content detection for each filter in the policy
+    for (const filter of policy.filters) {
+      // Get threshold for this filter
+      const threshold = policy.thresholds[filter] || 0.7;
+      
+      // Check if the prompt contains keywords related to this filter
+      const severity = this.simulateContentDetection(prompt, filter);
+      
+      // If severity exceeds threshold, add a violation
+      if (severity > threshold) {
+        violations.push({
+          filter,
+          severity,
+          threshold,
+          location: 'prompt'
+        });
+      }
+    }
+    
+    // Determine overall risk level based on violations
+    let overallRiskLevel: ContentRiskLevel = 'safe';
+    let action: ValidationResult['action'] = 'allowed';
+    
+    if (violations.length > 0) {
+      // Sort violations by severity (highest first)
+      violations.sort((a, b) => b.severity - a.severity);
+      
+      const highestSeverity = violations[0].severity;
+      
+      if (highestSeverity > 0.9) {
+        overallRiskLevel = 'critical';
+      } else if (highestSeverity > 0.8) {
+        overallRiskLevel = 'high';
+      } else if (highestSeverity > 0.7) {
+        overallRiskLevel = 'medium';
+      } else if (highestSeverity > 0.6) {
+        overallRiskLevel = 'low';
+      }
+      
+      // Determine action based on policy
+      if (policy.actions.blockContent && (overallRiskLevel === 'critical' || overallRiskLevel === 'high')) {
+        action = 'blocked';
+      } else if (policy.actions.maskContent && overallRiskLevel !== 'safe') {
+        action = 'modified';
+        
+        // Simulate content masking (in a real implementation, this would
+        // actually mask the problematic parts of the content)
+        for (const violation of violations) {
+          violation.maskedContent = '[CONTENT FILTERED]';
+        }
+      } else if (policy.actions.requireApproval && overallRiskLevel !== 'safe') {
+        action = 'flagged_for_review';
+      }
+    }
+    
+    // Create validation result
+    const result: ValidationResult = {
+      valid: action === 'allowed' || action === 'modified',
+      requestId: crypto.randomUUID(),
+      timestamp: new Date(),
+      violations,
+      overallRiskLevel,
+      modelId,
+      action,
+      metadata: {
+        usageContext: context,
+        validatedBy: 'governance-service',
+        policyId: policy.id
+      }
+    };
+    
+    // Log the validation result
+    this.logValidationResult(result, tenantId, userId);
+    
+    // For flagged content, add to pending approvals
+    if (action === 'flagged_for_review') {
+      this.pendingApprovals.set(result.requestId, {
+        request: { prompt, modelId, context },
+        tenantId,
+        userId
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Validate a model completion against governance policies
+   */
+  public validateCompletion(
+    completion: string,
+    modelId: string,
+    tenantId: number,
+    userId: number,
+    userRoles: string[] = [],
+    context?: string
+  ): ValidationResult {
+    // The implementation is very similar to validatePrompt
+    // In a real system, there might be different validation logic for completions
+    
+    // If model governance is disabled, return a valid result
+    if (!this.isModelGovernanceEnabled()) {
+      return this.createValidationResult(true, modelId, 'safe');
+    }
+    
+    // Get the applicable policy
+    const policy = this.getApplicablePolicy(tenantId, userId);
+    
+    // Check if the user has a role that can override policies
+    const canOverride = 
+      policy.overrideRoles && 
+      policy.overrideRoles.some(role => userRoles.includes(role));
+    
+    if (canOverride) {
+      // Still log the validation but allow it
+      const result = this.createValidationResult(true, modelId, 'safe');
+      result.metadata.policyId = policy.id;
+      
+      return result;
+    }
+    
+    // Simulate content detection
+    const violations: ValidationResult['violations'] = [];
+    
+    for (const filter of policy.filters) {
+      const threshold = policy.thresholds[filter] || 0.7;
+      const severity = this.simulateContentDetection(completion, filter);
+      
+      if (severity > threshold) {
+        violations.push({
+          filter,
+          severity,
+          threshold,
+          location: 'completion'
+        });
+      }
+    }
+    
+    // Determine overall risk level and action
+    let overallRiskLevel: ContentRiskLevel = 'safe';
+    let action: ValidationResult['action'] = 'allowed';
+    
+    if (violations.length > 0) {
+      violations.sort((a, b) => b.severity - a.severity);
+      const highestSeverity = violations[0].severity;
+      
+      if (highestSeverity > 0.9) {
+        overallRiskLevel = 'critical';
+      } else if (highestSeverity > 0.8) {
+        overallRiskLevel = 'high';
+      } else if (highestSeverity > 0.7) {
+        overallRiskLevel = 'medium';
+      } else if (highestSeverity > 0.6) {
+        overallRiskLevel = 'low';
+      }
+      
+      if (policy.actions.blockContent && (overallRiskLevel === 'critical' || overallRiskLevel === 'high')) {
+        action = 'blocked';
+      } else if (policy.actions.maskContent && overallRiskLevel !== 'safe') {
+        action = 'modified';
+        
+        for (const violation of violations) {
+          violation.maskedContent = '[CONTENT FILTERED]';
+        }
+      }
+    }
+    
+    // Completions don't get flagged for review (they're already generated)
+    
+    // Create validation result
+    const result: ValidationResult = {
+      valid: action === 'allowed' || action === 'modified',
+      requestId: crypto.randomUUID(),
+      timestamp: new Date(),
+      violations,
+      overallRiskLevel,
+      modelId,
+      action,
+      metadata: {
+        usageContext: context,
+        validatedBy: 'governance-service',
+        policyId: policy.id
+      }
+    };
+    
+    // Log the validation result
+    this.logValidationResult(result, tenantId, userId);
+    
+    return result;
+  }
+  
+  /**
+   * Create a validation result
+   */
+  private createValidationResult(
+    valid: boolean, 
+    modelId: string,
+    riskLevel: ContentRiskLevel
+  ): ValidationResult {
+    return {
+      valid,
+      requestId: crypto.randomUUID(),
+      timestamp: new Date(),
+      violations: [],
+      overallRiskLevel: riskLevel,
+      modelId,
+      action: valid ? 'allowed' : 'blocked',
+      metadata: {
+        validatedBy: 'governance-service',
+        policyId: 'default'
+      }
+    };
+  }
+  
+  /**
+   * Log a validation result
+   */
+  private logValidationResult(
+    result: ValidationResult,
+    tenantId: number,
+    userId: number
+  ): void {
+    // Log to audit trail
+    auditTrailService.recordEvent({
+      eventType: 'ai_request',
+      userId,
+      tenantId,
+      actionName: result.action === 'allowed' ? 'content_allowed' : 
+                  result.action === 'modified' ? 'content_modified' :
+                  result.action === 'blocked' ? 'content_blocked' :
+                  'content_flagged',
+      resourceType: 'ai_model',
+      resourceId: result.modelId,
+      success: result.valid,
+      details: {
+        requestId: result.requestId,
+        validationTimestamp: result.timestamp,
+        overallRiskLevel: result.overallRiskLevel,
+        violationCount: result.violations.length,
+        violations: result.violations,
+        policyId: result.metadata.policyId
+      }
+    });
+  }
+  
+  /**
+   * Simulate content detection for different filters
+   * In a real implementation, this would call a content moderation API
+   */
+  private simulateContentDetection(content: string, filter: ContentFilter): number {
+    // Very simple keyword-based simulation
+    // In a real implementation, this would use ML models for content detection
+    
+    // Convert to lowercase for case-insensitive matching
+    const lowerContent = content.toLowerCase();
+    
+    // Define keywords for each filter
+    const filterKeywords: Record<ContentFilter, string[]> = {
+      profanity: ['damn', 'hell', 'shit', 'fuck'],
+      hate_speech: ['hate', 'racist', 'bigot', 'discrimination'],
+      sexual_content: ['sex', 'explicit', 'nude', 'pornography'],
+      violence: ['kill', 'murder', 'blood', 'dead', 'violent'],
+      self_harm: ['suicide', 'self-harm', 'hurt myself', 'end my life'],
+      pii: ['ssn', 'social security', 'credit card', 'passport', 'address'],
+      copyright: ['copyrighted', 'intellectual property', 'license', 'patent'],
+      financial_info: ['bank account', 'routing number', 'investment', 'cryptocurrency'],
+      health_info: ['medical record', 'diagnosis', 'health condition', 'patient']
+    };
+    
+    // Check for keywords
+    const keywords = filterKeywords[filter];
+    let matchCount = 0;
+    
+    for (const keyword of keywords) {
+      if (lowerContent.includes(keyword)) {
+        matchCount++;
+      }
+    }
+    
+    // Calculate severity (0-1)
+    // More matches = higher severity
+    const severityBase = matchCount / keywords.length;
+    
+    // Add some randomness to simulate ML model variance
+    // But ensure the same content always gets the same score
+    const contentHash = crypto
+      .createHash('md5')
+      .update(content + filter)
+      .digest('hex');
+    
+    // Use the hash to generate a consistent random factor
+    const hashNum = parseInt(contentHash.slice(0, 8), 16);
+    const randomFactor = (hashNum % 100) / 500; // Random value between -0.1 and 0.1
+    
+    // Calculate final severity (clamped between 0 and 1)
+    let severity = Math.max(0, Math.min(1, severityBase + randomFactor));
+    
+    return severity;
+  }
+  
+  /**
+   * Check if a content flagged for review has been approved
+   */
+  public checkApprovalStatus(requestId: string): 
+    { status: 'pending' | 'approved' | 'rejected'; approvedBy?: string } {
+    // Check if the request exists
+    if (!this.pendingApprovals.has(requestId)) {
+      return { status: 'rejected' };
+    }
+    
+    // In a real implementation, this would check a database
+    // For now, we'll just assume it's still pending
+    return { status: 'pending' };
+  }
+  
+  /**
+   * Approve or reject a flagged content request
+   */
+  public resolveContentApproval(
+    requestId: string,
+    approved: boolean,
+    resolvedBy: string,
+    notes?: string
+  ): boolean {
+    // Check if the request exists
+    if (!this.pendingApprovals.has(requestId)) {
+      return false;
+    }
+    
+    // Get the original request
+    const pendingRequest = this.pendingApprovals.get(requestId)!;
+    
+    // Log the resolution
+    auditTrailService.recordEvent({
+      eventType: 'admin_action',
+      userId: 0, // System user ID
+      tenantId: pendingRequest.tenantId,
+      actionName: approved ? 'content_approved' : 'content_rejected',
+      resourceType: 'ai_request',
+      resourceId: requestId,
+      success: true,
+      details: {
+        resolvedBy,
+        notes,
+        originalRequest: pendingRequest.request
+      }
+    });
+    
+    // Remove from pending approvals
+    this.pendingApprovals.delete(requestId);
+    
     return true;
+  }
+  
+  /**
+   * Check if model governance features are enabled
+   */
+  private isModelGovernanceEnabled(): boolean {
+    return featureFlagService.isEnabled(FeatureFlags.MODEL_GOVERNANCE);
+  }
+  
+  /**
+   * Generate an explainability report for a model prediction
+   * This is a stub - in a real implementation, this would provide detailed insights
+   */
+  public generateExplainabilityReport(
+    modelId: string,
+    prompt: string,
+    completion: string,
+    parameters: Record<string, any>
+  ): Record<string, any> {
+    // Check if model governance features are enabled
+    if (!this.isModelGovernanceEnabled()) {
+      return { 
+        modelId,
+        explanation: "Explainability features not enabled",
+        generated: new Date()
+      };
+    }
+    
+    // In a real implementation, this would analyze the model's decision-making
+    // For now, we'll return a simple report
+    return {
+      modelId,
+      generated: new Date(),
+      promptTokens: Math.ceil(prompt.length / 4),
+      completionTokens: Math.ceil(completion.length / 4),
+      parameters,
+      contentAnalysis: {
+        topicProbabilities: {
+          "information": 0.75,
+          "question": 0.15,
+          "instruction": 0.10
+        },
+        sentimentScore: 0.2, // -1 to 1 scale
+        objectivity: 0.8,  // 0 to 1 scale
+        complexity: 0.5   // 0 to 1 scale
+      },
+      biasIndicators: {
+        gender: 0.05,
+        political: 0.02,
+        cultural: 0.03
+      },
+      confidenceScore: 0.87
+    };
   }
 }
 
-// Create singleton instance
+// Create and export a singleton instance
 export const modelGovernanceService = new ModelGovernanceService();
