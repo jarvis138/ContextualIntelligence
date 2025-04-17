@@ -129,6 +129,18 @@ export class TenantService {
   }
 
   /**
+   * Get all tenants
+   */
+  async getAllTenants() {
+    try {
+      return await db.select().from(tenants).orderBy(tenants.name);
+    } catch (error) {
+      console.error('Error getting all tenants:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get a tenant by custom domain
    */
   async getTenantByCustomDomain(customDomain: string) {

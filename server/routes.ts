@@ -29,6 +29,7 @@ import {
 import { NLPService } from "./services/nlp/NLPService";
 import * as searchController from "./controllers/searchController";
 import { registerAdminRoutes } from "./routes/admin-api";
+import { registerTenantRoutes } from "./routes/tenant-routes";
 import { fetchExternalProjectData } from "./services/integrations";
 import { authService, authenticateToken, authorizeRoles, hashPassword, setupAuth } from "./auth";
 import { TokenRefresh } from "./services/tokenRefresh";
@@ -2239,6 +2240,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register admin API routes
   registerAdminRoutes(app);
+  
+  // Register tenant management routes
+  registerTenantRoutes(app);
 
   return httpServer;
 }

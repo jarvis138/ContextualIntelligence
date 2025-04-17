@@ -10,7 +10,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Setup tenant middleware
+// Setup tenant middleware - currently commented out until migration is run
+// We need to run the migration script (scripts/migrate-to-multi-tenant.ts) first
+// to create the tenant tables before enabling the middleware
+
+/* UNCOMMENT AFTER RUNNING MIGRATION:
 // In development mode, use a default tenant ID to simplify local development
 const isDevelopment = app.get("env") === "development";
 app.use(tenantMiddleware({
@@ -37,6 +41,9 @@ app.use(tenantMiddleware({
     '/favicon.ico'
   ]
 }));
+*/
+
+// TODO: Uncomment the above middleware after running the migration script
 
 // Initialize feature flags
 if (featureFlagService.isEnabled('enhanced-logging')) {
