@@ -8,8 +8,9 @@
  * https://oauth.net/2/pkce/
  */
 
-import { generatePKCEChallenge } from 'pkce-challenge';
+import pkceChallenge from 'pkce-challenge';
 import crypto from 'crypto';
+import { AuditSeverity } from '../services/auditService';
 
 /**
  * PKCE verification data structure
@@ -36,7 +37,7 @@ const pkceStore = new Map<string, PKCEData>();
  */
 export function generatePKCE(expirationMinutes = 10): PKCEData {
   // Generate PKCE values
-  const pkce = generatePKCEChallenge();
+  const pkce = pkceChallenge();
   
   // Generate random state for CSRF protection
   const state = crypto.randomBytes(32).toString('hex');
@@ -80,20 +81,82 @@ export function verifyPKCE(state: string): PKCEData | null {
   
   // Verify the PKCE exchange is valid
   if (!pkceData) {
+    // Import dynamically to avoid circular dependencies
+    import('../utils/auth-audit-logger').then(({ AuthAuditLogger, AuthAuditType }) => {
+      AuthAuditLogger.logAuthEvent(
+        AuthAuditType.PKCE_CODE_VERIFY,
+        0, // No user ID available
+        'PKCE verification failed: State not found',
+        {
+          success: false,
+          reason: 'Invalid state parameter',
+          severity: AuditSeverity.WARNING,
+          metadata: { state }
+        }
+      ).catch(err => console.error('Failed to log PKCE verification failure:', err));
+    });
+    
     return null; // State not found
   }
   
   if (pkceData.used) {
+    // Import dynamically to avoid circular dependencies
+    import('../utils/auth-audit-logger').then(({ AuthAuditLogger, AuthAuditType }) => {
+      AuthAuditLogger.logAuthEvent(
+        AuthAuditType.PKCE_CODE_VERIFY,
+        0, // No user ID available
+        'PKCE verification failed: Code already used (potential replay attack)',
+        {
+          success: false,
+          reason: 'Code reuse attempt',
+          severity: AuditSeverity.ERROR,
+          metadata: { state }
+        }
+      ).catch(err => console.error('Failed to log PKCE verification failure:', err));
+    });
+    
     return null; // Already used (potential replay attack)
   }
   
   if (pkceData.expiresAt < new Date()) {
     pkceStore.delete(state);
+    
+    // Import dynamically to avoid circular dependencies
+    import('../utils/auth-audit-logger').then(({ AuthAuditLogger, AuthAuditType }) => {
+      AuthAuditLogger.logAuthEvent(
+        AuthAuditType.PKCE_CODE_VERIFY,
+        0, // No user ID available
+        'PKCE verification failed: Code expired',
+        {
+          success: false,
+          reason: 'Expired code',
+          severity: 'WARNING',
+          metadata: { 
+            state,
+            expiredAt: pkceData.expiresAt.toISOString(),
+            now: new Date().toISOString()
+          }
+        }
+      ).catch(err => console.error('Failed to log PKCE verification failure:', err));
+    });
+    
     return null; // Expired
   }
   
   // Mark as used to prevent replay attacks
   pkceData.used = true;
+  
+  // Log successful verification
+  import('../utils/auth-audit-logger').then(({ AuthAuditLogger, AuthAuditType }) => {
+    AuthAuditLogger.logAuthEvent(
+      AuthAuditType.PKCE_CODE_VERIFY,
+      0, // User ID will be associated later
+      'PKCE verification successful',
+      {
+        success: true
+      }
+    ).catch(err => console.error('Failed to log PKCE verification success:', err));
+  });
   
   return pkceData;
 }
@@ -205,19 +268,100 @@ export class PKCEOAuthProvider {
       headers['Authorization'] = `Basic ${authString}`;
     }
     
-    // Make the token request
-    const response = await fetch(tokenEndpoint, {
-      method: 'POST',
-      headers,
-      body: params.toString()
-    });
+    // Import dynamically to avoid circular dependencies
+    const { AuthAuditLogger, AuthAuditType } = await import('../utils/auth-audit-logger');
     
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${response.statusText} - ${errorData}`);
+    try {
+      // Log token exchange attempt
+      await AuthAuditLogger.logOAuthEvent(
+        AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+        { 
+          provider: clientId,
+          isPkceFlow: true
+        },
+        'Attempting OAuth token exchange with PKCE',
+        { 
+          success: true,
+          metadata: {
+            redirectUri,
+            tokenEndpoint: tokenEndpoint.replace(/\/[^\/]+$/, '/*****'), // Mask specific endpoint details
+          }
+        }
+      );
+      
+      // Make the token request
+      const response = await fetch(tokenEndpoint, {
+        method: 'POST',
+        headers,
+        body: params.toString()
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        const errorMessage = `Token exchange failed: ${response.status} ${response.statusText} - ${errorData}`;
+        
+        // Log token exchange failure
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+          { 
+            provider: clientId,
+            isPkceFlow: true
+          },
+          'OAuth token exchange failed',
+          { 
+            success: false,
+            reason: errorMessage,
+            severity: 'ERROR',
+            metadata: {
+              status: response.status,
+              redirectUri
+            }
+          }
+        );
+        
+        throw new Error(errorMessage);
+      }
+      
+      const tokenData = await response.json();
+      
+      // Log successful token exchange
+      await AuthAuditLogger.logOAuthEvent(
+        AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+        { 
+          provider: clientId,
+          isPkceFlow: true
+        },
+        'OAuth token exchange successful',
+        { 
+          success: true,
+          metadata: {
+            tokenTypesReceived: Object.keys(tokenData).join(','),
+            expiresIn: tokenData.expires_in
+          }
+        }
+      );
+      
+      return tokenData;
+    } catch (error) {
+      // If this is not already a logged error, log it
+      if (!(error instanceof Error && error.message.includes('Token exchange failed'))) {
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+          { 
+            provider: clientId,
+            isPkceFlow: true
+          },
+          'OAuth token exchange error',
+          { 
+            success: false,
+            reason: error instanceof Error ? error.message : String(error),
+            severity: 'ERROR'
+          }
+        );
+      }
+      
+      throw error;
     }
-    
-    return response.json();
   }
 }
 
