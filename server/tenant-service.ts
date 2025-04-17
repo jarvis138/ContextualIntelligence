@@ -1,275 +1,245 @@
-import { db } from './db';
+import { db } from "./db";
+import { eq, and, or, like, ilike } from "drizzle-orm";
 import { 
   tenants, 
   tenantFeatureFlags, 
-  insertTenantSchema, 
-  insertTenantFeatureFlagSchema,
-  Tenant,
-  TenantFeatureFlag
-} from '../shared/tenant-schema';
-import { eq, and, inArray } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+  tenantAdmins,
+  type InsertTenant, 
+  type Tenant, 
+  type UpdateTenant,
+  type TenantFeatureFlag,
+  type TenantAdmin
+} from "../shared/tenant-schema";
+import { v4 as uuidv4 } from "uuid";
 
-/**
- * Tenant Service
- * 
- * Provides methods for managing tenants in the multi-tenant CPI Hub system.
- */
-export const tenantService = {
-  /**
-   * Get all tenants
-   * 
-   * @returns Array of all tenant records
-   */
-  async getAllTenants(): Promise<Tenant[]> {
-    return await db.select().from(tenants);
-  },
-
-  /**
-   * Get active tenants (non-archived)
-   * 
-   * @returns Array of active tenant records
-   */
-  async getActiveTenants(): Promise<Tenant[]> {
-    return await db.select().from(tenants).where(
-      and(
-        eq(tenants.status, 'active')
-      )
-    );
-  },
-
-  /**
-   * Get a tenant by ID
-   * 
-   * @param id The tenant ID
-   * @returns The tenant record or null if not found
-   */
-  async getTenantById(id: number): Promise<Tenant | null> {
-    const result = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
-    return result[0] || null;
-  },
-
-  /**
-   * Get a tenant by subdomain
-   * 
-   * @param subdomain The tenant subdomain
-   * @returns The tenant record or null if not found
-   */
-  async getTenantBySubdomain(subdomain: string): Promise<Tenant | null> {
-    const result = await db.select().from(tenants).where(eq(tenants.subdomain, subdomain)).limit(1);
-    return result[0] || null;
-  },
-
-  /**
-   * Get a tenant by custom domain
-   * 
-   * @param domain The tenant custom domain
-   * @returns The tenant record or null if not found
-   */
-  async getTenantByCustomDomain(domain: string): Promise<Tenant | null> {
-    const result = await db.select().from(tenants).where(eq(tenants.customDomain, domain)).limit(1);
-    return result[0] || null;
-  },
-
+export class TenantService {
   /**
    * Create a new tenant
-   * 
-   * @param data The tenant data to insert
-   * @returns The created tenant record
    */
-  async createTenant(data: any): Promise<Tenant> {
-    // Parse and validate the input data
-    const validatedData = insertTenantSchema.parse(data);
-    
-    // Generate schema name if using schema_per_tenant strategy
-    let schemaName = null;
-    if (validatedData.schemaStrategy === 'schema_per_tenant') {
-      schemaName = `tenant_${validatedData.subdomain.replace(/-/g, '_')}_${Date.now().toString(36)}`;
-    }
-    
-    // Generate a UUID for RLS tenant ID
+  async createTenant(data: InsertTenant): Promise<Tenant> {
     const rlsTenantId = uuidv4();
     
-    // Insert the tenant record
     const result = await db.insert(tenants).values({
-      ...validatedData,
-      schemaName,
+      ...data,
       rlsTenantId,
+      schemaName: data.schemaStrategy === "schema_per_tenant" 
+        ? `tenant_${data.subdomain.replace(/[^a-z0-9]/g, '_')}` 
+        : null,
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
     
-    // Create a new schema if using schema_per_tenant
-    if (validatedData.schemaStrategy === 'schema_per_tenant' && schemaName) {
-      await db.execute(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
-      
-      // Create RLS function in this schema
-      await db.execute(`
-        CREATE OR REPLACE FUNCTION ${schemaName}.tenant_id() RETURNS INT AS $$
-        BEGIN
-          RETURN current_setting('app.current_tenant_id', true)::INT;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-    }
-    
     return result[0];
-  },
+  }
 
   /**
-   * Update an existing tenant
-   * 
-   * @param id The tenant ID
-   * @param data The tenant data to update
-   * @returns The updated tenant record
+   * Get a tenant by ID
    */
-  async updateTenant(id: number, data: any): Promise<Tenant | null> {
-    // Check if the tenant exists
+  async getTenantById(id: number): Promise<Tenant | null> {
+    const result = await db.query.tenants.findFirst({
+      where: eq(tenants.id, id),
+      with: {
+        featureFlags: true
+      }
+    });
+    
+    return result;
+  }
+
+  /**
+   * Get a tenant by subdomain
+   */
+  async getTenantBySubdomain(subdomain: string): Promise<Tenant | null> {
+    const result = await db.query.tenants.findFirst({
+      where: eq(tenants.subdomain, subdomain),
+      with: {
+        featureFlags: true
+      }
+    });
+    
+    return result;
+  }
+
+  /**
+   * Get a tenant by custom domain
+   */
+  async getTenantByCustomDomain(domain: string): Promise<Tenant | null> {
+    const result = await db.query.tenants.findFirst({
+      where: eq(tenants.customDomain, domain),
+      with: {
+        featureFlags: true
+      }
+    });
+    
+    return result;
+  }
+
+  /**
+   * Get a tenant by RLS tenant ID
+   */
+  async getTenantByRlsTenantId(rlsTenantId: string): Promise<Tenant | null> {
+    const result = await db.query.tenants.findFirst({
+      where: eq(tenants.rlsTenantId, rlsTenantId),
+      with: {
+        featureFlags: true
+      }
+    });
+    
+    return result;
+  }
+
+  /**
+   * List all tenants with optional pagination and filtering
+   */
+  async listTenants({
+    page = 1,
+    limit = 20,
+    search = "",
+    status = "",
+    tier = ""
+  }: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    tier?: string;
+  } = {}): Promise<{ data: Tenant[]; total: number; page: number; limit: number }> {
+    // Build the where conditions
+    let whereConditions = [];
+    
+    if (search) {
+      whereConditions.push(
+        or(
+          ilike(tenants.name, `%${search}%`),
+          ilike(tenants.displayName || "", `%${search}%`),
+          ilike(tenants.subdomain, `%${search}%`),
+          ilike(tenants.customDomain || "", `%${search}%`)
+        )
+      );
+    }
+    
+    if (status) {
+      whereConditions.push(eq(tenants.status, status));
+    }
+    
+    if (tier) {
+      whereConditions.push(eq(tenants.tier, tier));
+    }
+    
+    // Build the final where condition
+    const whereCondition = whereConditions.length > 0
+      ? and(...whereConditions)
+      : undefined;
+    
+    // Get the total count
+    const countResult = await db
+      .select({ count: tenants.id })
+      .from(tenants)
+      .where(whereCondition)
+      .count();
+    
+    const total = Number(countResult[0]?.count || 0);
+    
+    // Get the paginated results
+    const data = await db.query.tenants.findMany({
+      where: whereCondition,
+      limit,
+      offset: (page - 1) * limit,
+      orderBy: tenants.id,
+      with: {
+        featureFlags: true
+      }
+    });
+    
+    return {
+      data,
+      total,
+      page,
+      limit
+    };
+  }
+
+  /**
+   * Update a tenant
+   */
+  async updateTenant(id: number, data: UpdateTenant): Promise<Tenant | null> {
     const existingTenant = await this.getTenantById(id);
     if (!existingTenant) {
       return null;
     }
     
-    // Filter out fields that cannot be updated
-    const { subdomain, schemaStrategy, schemaName, ...updateData } = data;
+    // If changing the schema strategy from row_level_security to schema_per_tenant
+    // we need to generate a schema name
+    let schemaName = existingTenant.schemaName;
+    if (data.schemaStrategy === "schema_per_tenant" && existingTenant.schemaStrategy === "row_level_security") {
+      const subdomain = data.subdomain || existingTenant.subdomain;
+      schemaName = `tenant_${subdomain.replace(/[^a-z0-9]/g, '_')}`;
+    }
     
-    // Update the tenant
     const result = await db.update(tenants)
       .set({
-        ...updateData,
+        ...data,
+        schemaName,
         updatedAt: new Date()
       })
       .where(eq(tenants.id, id))
       .returning();
     
     return result[0];
-  },
+  }
 
   /**
-   * Archive a tenant
-   * 
-   * @param id The tenant ID
-   * @returns The archived tenant record or null if not found
-   */
-  async archiveTenant(id: number): Promise<Tenant | null> {
-    // Check if the tenant exists
-    const existingTenant = await this.getTenantById(id);
-    if (!existingTenant) {
-      return null;
-    }
-    
-    // Archive the tenant
-    const result = await db.update(tenants)
-      .set({
-        status: 'archived',
-        updatedAt: new Date()
-      })
-      .where(eq(tenants.id, id))
-      .returning();
-    
-    return result[0];
-  },
-
-  /**
-   * Delete a tenant (hard delete, use with caution)
-   * 
-   * @param id The tenant ID
-   * @returns Boolean indicating if the operation was successful
+   * Delete a tenant
    */
   async deleteTenant(id: number): Promise<boolean> {
-    // Check if the tenant exists
-    const existingTenant = await this.getTenantById(id);
-    if (!existingTenant) {
-      return false;
-    }
+    // This will cascade delete all related records
+    const result = await db.delete(tenants)
+      .where(eq(tenants.id, id))
+      .returning({ id: tenants.id });
     
-    // Delete the tenant feature flags
-    await db.delete(tenantFeatureFlags).where(eq(tenantFeatureFlags.tenantId, id));
-    
-    // Delete the tenant
-    await db.delete(tenants).where(eq(tenants.id, id));
-    
-    // Drop the schema if using schema_per_tenant
-    if (existingTenant.schemaStrategy === 'schema_per_tenant' && existingTenant.schemaName) {
-      await db.execute(`DROP SCHEMA IF EXISTS ${existingTenant.schemaName} CASCADE`);
-    }
-    
-    return true;
-  },
+    return result.length > 0;
+  }
 
   /**
-   * Get feature flags for a tenant
-   * 
-   * @param tenantId The tenant ID
-   * @returns Array of the tenant's feature flags
-   */
-  async getTenantFeatureFlags(tenantId: number): Promise<TenantFeatureFlag[]> {
-    return await db.select().from(tenantFeatureFlags).where(eq(tenantFeatureFlags.tenantId, tenantId));
-  },
-
-  /**
-   * Set a feature flag for a tenant
-   * 
-   * @param tenantId The tenant ID
-   * @param featureKey The feature key
-   * @param enabled Whether the feature is enabled
-   * @param configuration Optional configuration for the feature
-   * @returns The created or updated feature flag
+   * Set a tenant feature flag
    */
   async setTenantFeatureFlag(
     tenantId: number, 
-    featureKey: string, 
+    key: string, 
     enabled: boolean, 
-    configuration: any = null
-  ): Promise<TenantFeatureFlag | null> {
-    // Check if the tenant exists
-    const existingTenant = await this.getTenantById(tenantId);
-    if (!existingTenant) {
-      return null;
-    }
-    
+    settings: Record<string, any> = {}
+  ): Promise<TenantFeatureFlag> {
     // Check if the feature flag already exists
-    const existingFlag = await db.select()
-      .from(tenantFeatureFlags)
-      .where(
-        and(
-          eq(tenantFeatureFlags.tenantId, tenantId),
-          eq(tenantFeatureFlags.featureKey, featureKey)
-        )
+    const existingFlag = await db.query.tenantFeatureFlags.findFirst({
+      where: and(
+        eq(tenantFeatureFlags.tenantId, tenantId),
+        eq(tenantFeatureFlags.key, key)
       )
-      .limit(1);
+    });
     
-    if (existingFlag.length > 0) {
-      // Update existing flag
+    if (existingFlag) {
+      // Update the existing flag
       const result = await db.update(tenantFeatureFlags)
         .set({
           enabled,
-          configuration,
+          settings,
           updatedAt: new Date()
         })
-        .where(
-          and(
-            eq(tenantFeatureFlags.tenantId, tenantId),
-            eq(tenantFeatureFlags.featureKey, featureKey)
-          )
-        )
+        .where(and(
+          eq(tenantFeatureFlags.tenantId, tenantId),
+          eq(tenantFeatureFlags.key, key)
+        ))
         .returning();
       
       return result[0];
     } else {
-      // Create new flag
-      const flagData = {
-        tenantId,
-        featureKey,
-        enabled,
-        configuration
-      };
-      
-      const validatedData = insertTenantFeatureFlagSchema.parse(flagData);
-      
+      // Create a new flag
       const result = await db.insert(tenantFeatureFlags)
         .values({
-          ...validatedData,
+          tenantId,
+          key,
+          enabled,
+          settings,
           createdAt: new Date(),
           updatedAt: new Date()
         })
@@ -277,57 +247,88 @@ export const tenantService = {
       
       return result[0];
     }
-  },
-
-  /**
-   * Check if a feature is enabled for a tenant
-   * 
-   * @param tenantId The tenant ID
-   * @param featureKey The feature key
-   * @returns Boolean indicating if the feature is enabled
-   */
-  async isFeatureEnabled(tenantId: number, featureKey: string): Promise<boolean> {
-    const flag = await db.select()
-      .from(tenantFeatureFlags)
-      .where(
-        and(
-          eq(tenantFeatureFlags.tenantId, tenantId),
-          eq(tenantFeatureFlags.featureKey, featureKey)
-        )
-      )
-      .limit(1);
-    
-    return flag.length > 0 && flag[0].enabled;
-  },
-
-  /**
-   * Create schema for tenant (used for migration)
-   * 
-   * @param tenant The tenant object
-   * @returns Boolean indicating if the operation was successful
-   */
-  async createSchemaForTenant(tenant: Tenant): Promise<boolean> {
-    if (tenant.schemaStrategy !== 'schema_per_tenant' || !tenant.schemaName) {
-      return false;
-    }
-    
-    try {
-      // Create the schema
-      await db.execute(`CREATE SCHEMA IF NOT EXISTS ${tenant.schemaName}`);
-      
-      // Create RLS function in this schema
-      await db.execute(`
-        CREATE OR REPLACE FUNCTION ${tenant.schemaName}.tenant_id() RETURNS INT AS $$
-        BEGIN
-          RETURN current_setting('app.current_tenant_id', true)::INT;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-      
-      return true;
-    } catch (error) {
-      console.error(`Error creating schema for tenant ${tenant.id}:`, error);
-      return false;
-    }
   }
-};
+
+  /**
+   * Get a tenant feature flag
+   */
+  async getTenantFeatureFlag(tenantId: number, key: string): Promise<TenantFeatureFlag | null> {
+    const result = await db.query.tenantFeatureFlags.findFirst({
+      where: and(
+        eq(tenantFeatureFlags.tenantId, tenantId),
+        eq(tenantFeatureFlags.key, key)
+      )
+    });
+    
+    return result;
+  }
+
+  /**
+   * List tenant feature flags
+   */
+  async listTenantFeatureFlags(tenantId: number): Promise<TenantFeatureFlag[]> {
+    const result = await db.query.tenantFeatureFlags.findMany({
+      where: eq(tenantFeatureFlags.tenantId, tenantId)
+    });
+    
+    return result;
+  }
+
+  /**
+   * Add a tenant admin
+   */
+  async addTenantAdmin(tenantId: number, userId: number, role: string = "admin"): Promise<TenantAdmin> {
+    const result = await db.insert(tenantAdmins)
+      .values({
+        tenantId,
+        userId,
+        role,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+    
+    return result[0];
+  }
+
+  /**
+   * Remove a tenant admin
+   */
+  async removeTenantAdmin(tenantId: number, userId: number): Promise<boolean> {
+    const result = await db.delete(tenantAdmins)
+      .where(and(
+        eq(tenantAdmins.tenantId, tenantId),
+        eq(tenantAdmins.userId, userId)
+      ))
+      .returning({ id: tenantAdmins.id });
+    
+    return result.length > 0;
+  }
+
+  /**
+   * List tenant admins
+   */
+  async listTenantAdmins(tenantId: number): Promise<TenantAdmin[]> {
+    const result = await db.query.tenantAdmins.findMany({
+      where: eq(tenantAdmins.tenantId, tenantId)
+    });
+    
+    return result;
+  }
+
+  /**
+   * Check if a user is admin for a tenant
+   */
+  async isUserTenantAdmin(tenantId: number, userId: number): Promise<boolean> {
+    const result = await db.query.tenantAdmins.findFirst({
+      where: and(
+        eq(tenantAdmins.tenantId, tenantId),
+        eq(tenantAdmins.userId, userId)
+      )
+    });
+    
+    return !!result;
+  }
+}
+
+export const tenantService = new TenantService();

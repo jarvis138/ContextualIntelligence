@@ -1,283 +1,172 @@
 import { Request, Response, NextFunction } from 'express';
-import { db } from '../db';
-import { tenants } from '../../shared/tenant-schema';
-import { eq } from 'drizzle-orm';
+import { tenantService } from '../tenant-service';
 import jwt from 'jsonwebtoken';
 
-/**
- * Extends Express Request to include tenant information
- */
-export interface TenantRequest extends Request {
-  tenantId?: number;
-  tenantSubdomain?: string;
-  tenantCustomDomain?: string;
-  tenantName?: string;
-  tenant?: any; // Full tenant record
+declare global {
+  namespace Express {
+    interface Request {
+      tenantId?: number;
+      tenant?: any;
+    }
+  }
 }
 
-/**
- * Strategies for identifying tenants from requests
- */
+// Define the strategies for tenant identification
 export enum TenantIdentificationStrategy {
   SUBDOMAIN = 'subdomain',
   HEADER = 'header',
-  PATH_PREFIX = 'path-prefix',
-  JWT = 'jwt',
   DOMAIN = 'domain',
+  JWT = 'jwt',
+  QUERY = 'query'
 }
 
-/**
- * Configuration options for the tenant middleware
- */
-export interface TenantMiddlewareOptions {
+interface TenantMiddlewareOptions {
   strategies: TenantIdentificationStrategy[];
-  headerName?: string; // Used for HEADER strategy
-  pathPrefix?: string; // Used for PATH_PREFIX strategy
-  jwtField?: string;   // Used for JWT strategy
-  defaultTenantId?: number; // Used for fallback (typically in development)
-  ignorePaths?: string[]; // Paths that should bypass tenant identification
+  defaultTenantId?: number;
+  headerName?: string;
+  queryParamName?: string;
+  jwtTokenKey?: string;
+  ignorePaths?: string[];
 }
 
-/**
- * Middleware that identifies the current tenant based on configured strategies
- * 
- * @param options Configuration options for tenant identification
- * @returns Express middleware function
- */
-export function tenantMiddleware(options: TenantMiddlewareOptions) {
-  const defaultOptions: TenantMiddlewareOptions = {
-    strategies: [TenantIdentificationStrategy.SUBDOMAIN],
-    headerName: 'X-Tenant-ID',
-    pathPrefix: '/tenant',
-    jwtField: 'tenantId',
-    ignorePaths: [],
-  };
+// A middleware that identifies the tenant from various sources
+export const tenantMiddleware = (options: TenantMiddlewareOptions) => {
+  const {
+    strategies,
+    defaultTenantId,
+    headerName = 'X-Tenant-ID',
+    queryParamName = 'tenantId',
+    jwtTokenKey = 'tenantId',
+    ignorePaths = []
+  } = options;
 
-  // Merge options with defaults
-  const config = { ...defaultOptions, ...options };
-
-  return async (req: TenantRequest, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Skip tenant identification for ignored paths
-      if (config.ignorePaths && config.ignorePaths.some(path => req.path.startsWith(path))) {
+      if (ignorePaths.some(path => req.path.startsWith(path) || req.path === path)) {
         return next();
       }
 
-      let tenantIdentifier: string | undefined;
-      let strategy: TenantIdentificationStrategy | undefined;
+      // Try to identify the tenant using the provided strategies in order
+      let tenantId = null;
 
-      // Try each strategy in order until we find a tenant identifier
-      for (const s of config.strategies) {
-        switch (s) {
+      for (const strategy of strategies) {
+        switch (strategy) {
           case TenantIdentificationStrategy.SUBDOMAIN:
-            tenantIdentifier = extractTenantFromSubdomain(req);
+            tenantId = await identifyTenantFromSubdomain(req);
             break;
           case TenantIdentificationStrategy.HEADER:
-            tenantIdentifier = req.header(config.headerName!);
-            break;
-          case TenantIdentificationStrategy.PATH_PREFIX:
-            tenantIdentifier = extractTenantFromPath(req, config.pathPrefix!);
-            break;
-          case TenantIdentificationStrategy.JWT:
-            tenantIdentifier = extractTenantFromJwt(req, config.jwtField!);
+            tenantId = identifyTenantFromHeader(req, headerName);
             break;
           case TenantIdentificationStrategy.DOMAIN:
-            tenantIdentifier = req.hostname;
+            tenantId = await identifyTenantFromDomain(req);
+            break;
+          case TenantIdentificationStrategy.JWT:
+            tenantId = identifyTenantFromJWT(req, jwtTokenKey);
+            break;
+          case TenantIdentificationStrategy.QUERY:
+            tenantId = identifyTenantFromQuery(req, queryParamName);
             break;
         }
 
-        if (tenantIdentifier) {
-          strategy = s;
+        if (tenantId) {
           break;
         }
       }
 
-      // If we found a tenant identifier, try to find the tenant
-      if (tenantIdentifier && strategy) {
-        try {
-          const tenant = await findTenant(tenantIdentifier, strategy);
-          if (tenant) {
-            req.tenantId = tenant.id;
-            req.tenantSubdomain = tenant.subdomain;
-            req.tenantCustomDomain = tenant.customDomain || undefined;
-            req.tenantName = tenant.name;
-            req.tenant = tenant;
-            
-            // Set the tenant ID in the PostgreSQL session for RLS
-            if (tenant.rlsTenantId) {
-              await db.execute(`SELECT set_tenant_rls_id('${tenant.rlsTenantId}')`);
+      // If no tenant was identified, use the default if provided
+      if (!tenantId && defaultTenantId) {
+        tenantId = defaultTenantId;
+      }
+
+      // If we have a tenant ID, get the tenant details and set in request
+      if (tenantId) {
+        const tenant = await tenantService.getTenantById(tenantId);
+        if (tenant) {
+          req.tenantId = tenantId;
+          req.tenant = tenant;
+
+          // Set PostgreSQL session variables for RLS
+          // This will be used by the row level security policies
+          if (tenant.schemaStrategy === 'row_level_security') {
+            // Execute the SQL function to set the tenant context
+            const { pool } = await import('../db');
+            const client = await pool.connect();
+            try {
+              await client.query(`SELECT set_tenant_id($1)`, [tenantId]);
+              await client.query(`SELECT set_tenant_rls_id($1)`, [tenant.rlsTenantId]);
+            } finally {
+              client.release();
             }
-            await db.execute(`SELECT set_tenant_id(${tenant.id})`);
-            
-            return next();
           }
-        } catch (error) {
-          console.error(`Error finding tenant with identifier ${tenantIdentifier}:`, error);
         }
       }
 
-      // If we have a default tenant ID (typically used in development), use it
-      if (config.defaultTenantId) {
-        try {
-          const defaultTenant = await findTenantById(config.defaultTenantId);
-          if (defaultTenant) {
-            req.tenantId = defaultTenant.id;
-            req.tenantSubdomain = defaultTenant.subdomain;
-            req.tenantCustomDomain = defaultTenant.customDomain || undefined;
-            req.tenantName = defaultTenant.name;
-            req.tenant = defaultTenant;
-            
-            // Set the tenant ID in the PostgreSQL session for RLS
-            if (defaultTenant.rlsTenantId) {
-              await db.execute(`SELECT set_tenant_rls_id('${defaultTenant.rlsTenantId}')`);
-            }
-            await db.execute(`SELECT set_tenant_id(${defaultTenant.id})`);
-            
-            return next();
-          }
-        } catch (error) {
-          console.error(`Error finding default tenant ${config.defaultTenantId}:`, error);
-        }
-      }
-
-      // If the request is for an API and we couldn't identify a tenant,
-      // return a 401 Unauthorized response
-      if (req.path.startsWith('/api')) {
-        return res.status(401).json({ 
-          message: 'Tenant not identified', 
-          tenant: null 
-        });
-      }
-
-      // For non-API requests, let the application handle it
       next();
     } catch (error) {
       console.error('Error in tenant middleware:', error);
       next(error);
     }
   };
+};
+
+// Helper function to identify tenant from subdomain
+async function identifyTenantFromSubdomain(req: Request): Promise<number | null> {
+  const host = req.get('host');
+  if (!host) return null;
+
+  // Extract subdomain (assuming format: subdomain.domain.com)
+  const hostParts = host.split('.');
+  if (hostParts.length < 3) return null;
+
+  const subdomain = hostParts[0];
+  if (subdomain === 'www' || subdomain === 'api') return null;
+
+  const tenant = await tenantService.getTenantBySubdomain(subdomain);
+  return tenant?.id || null;
 }
 
-/**
- * Extract tenant identifier from the subdomain
- */
-function extractTenantFromSubdomain(req: Request): string | undefined {
-  const hostname = req.hostname;
-  if (!hostname) return undefined;
+// Helper function to identify tenant from custom domain
+async function identifyTenantFromDomain(req: Request): Promise<number | null> {
+  const host = req.get('host');
+  if (!host) return null;
 
-  // Handle localhost development
-  if (hostname === 'localhost') return undefined;
+  // Remove port if present
+  const domain = host.split(':')[0];
 
-  // Check if this is a replit domain
-  if (hostname.includes('.repl.co')) {
-    return undefined; // Replit domains don't have tenant subdomains
-  }
-
-  // Extract subdomain from hostname
-  const parts = hostname.split('.');
-  if (parts.length > 2) {
-    return parts[0]; // First part is the subdomain
-  }
-
-  return undefined;
+  const tenant = await tenantService.getTenantByCustomDomain(domain);
+  return tenant?.id || null;
 }
 
-/**
- * Extract tenant identifier from the URL path
- */
-function extractTenantFromPath(req: Request, prefix: string): string | undefined {
-  if (!req.path.startsWith(prefix)) return undefined;
+// Helper function to identify tenant from header
+function identifyTenantFromHeader(req: Request, headerName: string): number | null {
+  const tenantIdHeader = req.get(headerName);
+  if (!tenantIdHeader) return null;
 
-  const parts = req.path.split('/');
-  if (parts.length < 3) return undefined;
-
-  // The tenant identifier is the part after the prefix
-  // e.g., /tenant/acme/users -> acme
-  return parts[2];
+  const tenantId = parseInt(tenantIdHeader, 10);
+  return isNaN(tenantId) ? null : tenantId;
 }
 
-/**
- * Extract tenant identifier from the JWT token
- */
-function extractTenantFromJwt(req: Request, field: string): string | undefined {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return undefined;
-  }
+// Helper function to identify tenant from JWT token
+function identifyTenantFromJWT(req: Request, tokenKey: string): number | null {
+  const authHeader = req.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  const token = authHeader.substring(7);
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-default-secret');
-    if (typeof decoded === 'object' && decoded !== null && field in decoded) {
-      return String(decoded[field]);
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret') as any;
+    const tenantId = decoded[tokenKey];
+    return tenantId ? parseInt(tenantId.toString(), 10) : null;
   } catch (error) {
-    console.error('Error decoding JWT for tenant identification:', error);
-  }
-
-  return undefined;
-}
-
-/**
- * Find a tenant by identifier (ID, subdomain, or domain)
- */
-async function findTenant(identifier: string, strategy: TenantIdentificationStrategy) {
-  switch (strategy) {
-    case TenantIdentificationStrategy.SUBDOMAIN:
-      return await db.select().from(tenants).where(eq(tenants.subdomain, identifier)).limit(1).then(res => res[0] || null);
-    
-    case TenantIdentificationStrategy.DOMAIN:
-      return await db.select().from(tenants).where(eq(tenants.customDomain, identifier)).limit(1).then(res => res[0] || null);
-    
-    case TenantIdentificationStrategy.HEADER:
-    case TenantIdentificationStrategy.JWT:
-      // Try to parse as integer for ID lookup
-      const id = parseInt(identifier, 10);
-      if (!isNaN(id)) {
-        return await findTenantById(id);
-      }
-      // Fall back to subdomain lookup
-      return await db.select().from(tenants).where(eq(tenants.subdomain, identifier)).limit(1).then(res => res[0] || null);
-    
-    default:
-      return null;
+    return null;
   }
 }
 
-/**
- * Find a tenant by ID
- */
-async function findTenantById(id: number) {
-  return await db.select().from(tenants).where(eq(tenants.id, id)).limit(1).then(res => res[0] || null);
-}
+// Helper function to identify tenant from query parameter
+function identifyTenantFromQuery(req: Request, paramName: string): number | null {
+  const tenantIdParam = req.query[paramName];
+  if (!tenantIdParam) return null;
 
-/**
- * Create a database connection with the tenant's schema set
- * Used for schema-per-tenant isolation strategy
- */
-export async function getTenantConnection(tenantId: number) {
-  // Get the tenant record
-  const tenant = await findTenantById(tenantId);
-  if (!tenant) {
-    throw new Error(`Tenant with ID ${tenantId} not found`);
-  }
-  
-  // If this tenant uses schema isolation, set the search path
-  if (tenant.schemaStrategy === 'schema_per_tenant' && tenant.schemaName) {
-    // Create a connection with the schema search path set
-    await db.execute(`SET search_path TO ${tenant.schemaName}, public`);
-    return db;
-  }
-  
-  // For row-level security, we use the same connection but set the tenant ID
-  if (tenant.schemaStrategy === 'row_level_security') {
-    await db.execute(`SELECT set_tenant_id(${tenant.id})`);
-    if (tenant.rlsTenantId) {
-      await db.execute(`SELECT set_tenant_rls_id('${tenant.rlsTenantId}')`);
-    }
-    return db;
-  }
-  
-  // Default case - just return the regular db connection
-  return db;
+  const tenantId = parseInt(tenantIdParam.toString(), 10);
+  return isNaN(tenantId) ? null : tenantId;
 }

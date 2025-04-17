@@ -1,19 +1,7 @@
-import { QueryClient } from "@tanstack/react-query";
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { QueryClient } from '@tanstack/react-query';
 
-interface ApiRequestOptions {
-  headers?: Record<string, string>;
-  credentials?: RequestCredentials;
-  on401?: "throw" | "returnNull";
-}
-
-interface GetQueryFnOptions {
-  headers?: Record<string, string>;
-  credentials?: RequestCredentials;
-  on401?: "throw" | "returnNull";
-}
-
-// Create a query client instance - note that we also create one in App.tsx
-// This is used directly by our hooks while the one in App.tsx is used by the Provider
+// Create a query client
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -24,78 +12,70 @@ export const queryClient = new QueryClient({
   },
 });
 
-/**
- * Create a fetch function for use with react-query
- * @param options Options to customize the fetch behavior
- */
-export const getQueryFn = (options: GetQueryFnOptions = {}) => {
-  return async ({ queryKey }: { queryKey: string[] }) => {
-    const [endpoint] = queryKey;
-    
-    const response = await fetch(endpoint, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      credentials: options.credentials || "include",
-    });
+interface ApiRequestConfig extends AxiosRequestConfig {
+  skipAuthHeader?: boolean;
+}
 
-    if (response.status === 401) {
-      if (options.on401 === "returnNull") {
-        return null;
+/**
+ * Make an API request with proper token handling
+ */
+export async function apiRequest(config: ApiRequestConfig): Promise<AxiosResponse> {
+  const { skipAuthHeader = false, ...axiosConfig } = config;
+  
+  // Add authorization header if not skipped
+  if (!skipAuthHeader) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axiosConfig.headers = {
+        ...axiosConfig.headers,
+        Authorization: `Bearer ${token}`
+      };
+    }
+  }
+
+  try {
+    return await axios(axiosConfig);
+  } catch (error) {
+    // Handle 401 Unauthorized errors by trying to refresh the token
+    if (error.response?.status === 401 && !config.url?.includes('/auth/refresh')) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (refreshToken) {
+        try {
+          // Attempt to refresh the token
+          const refreshResponse = await axios({
+            url: '/api/v1/auth/refresh',
+            method: 'POST',
+            data: { refreshToken }
+          });
+          
+          // If successful, update the token in localStorage
+          if (refreshResponse.data.token) {
+            localStorage.setItem('token', refreshResponse.data.token);
+            
+            // Update authorization header with new token
+            axiosConfig.headers = {
+              ...axiosConfig.headers,
+              Authorization: `Bearer ${refreshResponse.data.token}`
+            };
+            
+            // Retry the original request with the new token
+            return await axios(axiosConfig);
+          }
+        } catch (refreshError) {
+          // If token refresh fails, clear tokens and let the original error propagate
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('admin_authenticated');
+        }
+      } else {
+        // If no refresh token is available, clear any existing tokens
+        localStorage.removeItem('token');
+        localStorage.removeItem('admin_authenticated');
       }
-      throw new Error("Unauthorized");
     }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.message || errorData.error || response.statusText;
-      throw new Error(errorMessage);
-    }
-
-    if (response.status === 204) {
-      return null;
-    }
-
-    return response.json();
-  };
-};
-
-/**
- * Make an API request with JSON body
- * @param method HTTP method
- * @param endpoint API endpoint
- * @param data Request body
- * @param options Request options
- */
-export const apiRequest = async (
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-  endpoint: string,
-  data?: any,
-  options: ApiRequestOptions = {}
-) => {
-  const response = await fetch(endpoint, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    credentials: options.credentials || "include",
-    body: data ? JSON.stringify(data) : undefined,
-  });
-
-  if (response.status === 401) {
-    if (options.on401 === "returnNull") {
-      return { json: () => null };
-    }
-    throw new Error("Unauthorized");
+    
+    // Re-throw the original error
+    throw error;
   }
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.message || errorData.error || response.statusText;
-    throw new Error(errorMessage);
-  }
-
-  return response;
-};
+}
