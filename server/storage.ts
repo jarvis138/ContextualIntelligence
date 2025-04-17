@@ -190,6 +190,7 @@ export class MemStorage implements IStorage {
   private refreshTokens: Map<number, RefreshToken>;
   private pkceCodeVerifiers: Map<number, PkceCodeVerifier>;
   private oauthProviderSettings: Map<number, OAuthProviderSetting>;
+  private samlProviders: Map<number, SamlProvider>;
   private graphNodes: Map<number, GraphNode>;
   private graphEdges: Map<number, GraphEdge>;
 
@@ -208,6 +209,7 @@ export class MemStorage implements IStorage {
     refreshTokens: number;
     pkceCodeVerifiers: number;
     oauthProviderSettings: number;
+    samlProviders: number;
     graphNodes: number;
     graphEdges: number;
   };
@@ -233,6 +235,7 @@ export class MemStorage implements IStorage {
     this.refreshTokens = new Map();
     this.pkceCodeVerifiers = new Map();
     this.oauthProviderSettings = new Map();
+    this.samlProviders = new Map();
     this.graphNodes = new Map();
     this.graphEdges = new Map();
 
@@ -251,6 +254,7 @@ export class MemStorage implements IStorage {
       refreshTokens: 1,
       pkceCodeVerifiers: 1,
       oauthProviderSettings: 1,
+      samlProviders: 1,
       graphNodes: 1,
       graphEdges: 1
     };
@@ -1283,6 +1287,111 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return newSetting;
     }
+  }
+  
+  // SAML Provider methods
+  async getSamlProviders(): Promise<SamlProvider[]> {
+    return await db.select().from(samlProviders);
+  }
+  
+  async getSamlProvider(id: number): Promise<SamlProvider | undefined> {
+    const [provider] = await db.select()
+      .from(samlProviders)
+      .where(eq(samlProviders.id, id));
+    return provider || undefined;
+  }
+  
+  async getSamlProviderByProviderId(providerId: string): Promise<SamlProvider | undefined> {
+    const [provider] = await db.select()
+      .from(samlProviders)
+      .where(eq(samlProviders.providerId, providerId));
+    return provider || undefined;
+  }
+  
+  async saveSamlProvider(provider: InsertSamlProvider): Promise<SamlProvider> {
+    // Check if provider already exists
+    const [existingProvider] = await db.select()
+      .from(samlProviders)
+      .where(eq(samlProviders.providerId, provider.providerId));
+    
+    if (existingProvider) {
+      // Update existing provider
+      const [updatedProvider] = await db.update(samlProviders)
+        .set({
+          name: provider.name,
+          enabled: provider.enabled,
+          tenantId: provider.tenantId,
+          entryPoint: provider.entryPoint,
+          issuer: provider.issuer,
+          cert: provider.cert,
+          privateKey: provider.privateKey,
+          callbackUrl: provider.callbackUrl,
+          signatureAlgorithm: provider.signatureAlgorithm,
+          digestAlgorithm: provider.digestAlgorithm,
+          wantAssertionsSigned: provider.wantAssertionsSigned,
+          disableRequestedAuthnContext: provider.disableRequestedAuthnContext,
+          forceAuthn: provider.forceAuthn,
+          additionalConfig: provider.additionalConfig,
+          updatedAt: new Date(),
+          updatedBy: provider.updatedBy
+        })
+        .where(eq(samlProviders.providerId, provider.providerId))
+        .returning();
+      return updatedProvider;
+    } else {
+      // Insert new provider
+      const [newProvider] = await db.insert(samlProviders)
+        .values({
+          providerId: provider.providerId,
+          name: provider.name,
+          enabled: provider.enabled,
+          tenantId: provider.tenantId,
+          entryPoint: provider.entryPoint,
+          issuer: provider.issuer,
+          cert: provider.cert,
+          privateKey: provider.privateKey,
+          callbackUrl: provider.callbackUrl,
+          signatureAlgorithm: provider.signatureAlgorithm,
+          digestAlgorithm: provider.digestAlgorithm,
+          wantAssertionsSigned: provider.wantAssertionsSigned,
+          disableRequestedAuthnContext: provider.disableRequestedAuthnContext,
+          forceAuthn: provider.forceAuthn,
+          additionalConfig: provider.additionalConfig,
+          updatedAt: new Date(),
+          updatedBy: provider.updatedBy
+        })
+        .returning();
+      return newProvider;
+    }
+  }
+  
+  async updateSamlProvider(id: number, provider: Partial<InsertSamlProvider>): Promise<SamlProvider | undefined> {
+    const [updatedProvider] = await db.update(samlProviders)
+      .set({
+        ...provider,
+        updatedAt: new Date()
+      })
+      .where(eq(samlProviders.id, id))
+      .returning();
+    return updatedProvider || undefined;
+  }
+  
+  async deleteSamlProvider(id: number): Promise<boolean> {
+    const result = await db.delete(samlProviders)
+      .where(eq(samlProviders.id, id));
+    return result.rowCount > 0;
+  }
+  
+  async getSamlProvidersByTenant(tenantId: number): Promise<SamlProvider[]> {
+    return await db.select()
+      .from(samlProviders)
+      .where(eq(samlProviders.tenantId, tenantId));
+  }
+  
+  async getEnabledSamlProviders(): Promise<SamlProvider[]> {
+    return await db.select()
+      .from(samlProviders)
+      .where(eq(samlProviders.enabled, true));
   }
 
   // Users
