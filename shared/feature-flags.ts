@@ -71,6 +71,13 @@ export const defaultFlags: Record<string, FeatureFlag> = {
     name: FeatureFlags.AI_INSIGHTS,
     description: 'Enable AI-generated insights about projects and documents',
     enabled: false,
+    settings: {
+      level: 'standard', // Can be 'basic', 'standard', or 'enterprise'
+      maxTokens: 2000,
+      temperature: 0.2,
+      allowedModels: ['gpt-4o'],
+      enabledFeatures: ['insights', 'summarization', 'entity-extraction']
+    }
   },
   [FeatureFlags.REAL_TIME_COLLABORATION]: {
     name: FeatureFlags.REAL_TIME_COLLABORATION,
@@ -111,21 +118,51 @@ export const defaultFlags: Record<string, FeatureFlag> = {
     name: FeatureFlags.DOCUMENT_SUMMARIZATION,
     description: 'Enable AI-based document summarization',
     enabled: false,
+    settings: {
+      level: 'standard', // Can be 'basic', 'standard', or 'enterprise'
+      maxTokens: 1000,
+      temperature: 0.1,
+      summaryLength: 'medium', // Can be 'short', 'medium', or 'long'
+      includeKeyPoints: true
+    }
   },
   [FeatureFlags.ENTITY_RECOGNITION]: {
     name: FeatureFlags.ENTITY_RECOGNITION,
     description: 'Enable entity recognition in documents',
     enabled: false,
+    settings: {
+      level: 'standard', // Can be 'basic', 'standard', or 'enterprise'
+      entityTypes: ['PERSON', 'ORGANIZATION', 'LOCATION', 'DATE', 'PRODUCT', 'EVENT'],
+      confidence: 0.75,
+      useLargeContext: true,
+      maxEntitiesPerDocument: 50
+    }
   },
   [FeatureFlags.SENTIMENT_ANALYSIS]: {
     name: FeatureFlags.SENTIMENT_ANALYSIS,
     description: 'Enable sentiment analysis of text',
     enabled: false,
+    settings: {
+      level: 'standard', // Can be 'basic', 'standard', or 'enterprise'
+      includeEmotions: true,
+      detailLevel: 'detailed', // Can be 'basic', 'standard', or 'detailed'
+      confidenceThreshold: 0.6, 
+      aggregationMethod: 'weighted' // Can be 'simple', 'weighted', or 'contextual'
+    }
   },
   [FeatureFlags.TOPIC_MODELING]: {
     name: FeatureFlags.TOPIC_MODELING,
     description: 'Enable topic modeling of document collections',
     enabled: false,
+    settings: {
+      level: 'standard', // Can be 'basic', 'standard', or 'enterprise'
+      maxTopics: 10,
+      minDocumentsPerTopic: 3,
+      enableClustering: true,
+      similarityThreshold: 0.7,
+      useHierarchicalTopics: false,
+      includeMetadata: true
+    }
   },
   [FeatureFlags.SLACK_INTEGRATION]: {
     name: FeatureFlags.SLACK_INTEGRATION,

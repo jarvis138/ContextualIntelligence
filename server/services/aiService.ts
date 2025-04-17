@@ -3,7 +3,7 @@ import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { tenantService } from "../tenant-service";
 import { logger } from "../services/observability";
-import { FeatureFlagService } from "../services/feature-flag";
+import { featureFlagService } from "./feature-flag";
 
 // Create child logger for AI service
 const aiLogger = logger.createChildLogger({ component: 'AIService' });
@@ -17,9 +17,6 @@ if (!process.env.OPENAI_API_KEY) {
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || '' // Provide empty string as fallback to avoid null
 });
-
-// Feature flag service for AI features
-const featureFlagService = new FeatureFlagService();
 
 // Utility to check if the OpenAI client is properly configured
 function isOpenAIConfigured(): boolean {
