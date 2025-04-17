@@ -3,9 +3,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { 
+  Upload, 
+  FolderUp, 
+  Download, 
+  Share,
+  Trash2, 
+  Search,
+  Plus,
+  FileText,
+  File,
+  MoreHorizontal
+} from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DocumentsPage() {
+  const { toast } = useToast();
   const [activeDocument, setActiveDocument] = useState<string | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [batchProcessDialogOpen, setBatchProcessDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Document data structure
   const documents = {
@@ -235,13 +266,123 @@ Strategic direction and organizational coordination.
   };
   
   const activeDoc = findActiveDocument();
+  
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+  
+  // Handle document upload
+  const handleUpload = () => {
+    if (!selectedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Start uploading process
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsUploading(false);
+          
+          // Complete the upload
+          toast({
+            title: "Upload successful",
+            description: `${selectedFile.name} has been uploaded successfully.`
+          });
+          
+          // Reset state
+          setSelectedFile(null);
+          setUploadDialogOpen(false);
+          return 0;
+        }
+        return prev + 10;
+      });
+    }, 500);
+  };
+  
+  // Handle document download
+  const handleDownload = () => {
+    if (!activeDoc) return;
+    
+    toast({
+      title: "Download started",
+      description: `${activeDoc.title} is being downloaded.`
+    });
+  };
+  
+  // Handle document sharing
+  const handleShare = () => {
+    if (!activeDoc) return;
+    
+    setShareDialogOpen(true);
+  };
+  
+  // Handle document deletion
+  const handleDelete = () => {
+    if (!activeDoc) return;
+    
+    toast({
+      title: "Document deleted",
+      description: `${activeDoc.title} has been moved to trash.`,
+      variant: "destructive"
+    });
+  };
+  
+  // Handle batch processing
+  const handleBatchProcess = () => {
+    setBatchProcessDialogOpen(true);
+  };
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Documentation Center</h1>
-      <p className="text-muted-foreground mb-6">
-        Access technical documentation, governance guidelines, and team resources.
-      </p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Documentation Center</h1>
+          <p className="text-muted-foreground mt-1">
+            Access technical documentation, governance guidelines, and team resources.
+          </p>
+        </div>
+        
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleBatchProcess}>
+            <FolderUp className="mr-2 h-4 w-4" />
+            Batch Process
+          </Button>
+          <Button onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Document
+          </Button>
+        </div>
+      </div>
+      
+      {activeDoc && (
+        <div className="mb-6 flex justify-end space-x-2">
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleShare}>
+            <Share className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDelete}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="md:col-span-1">
@@ -293,6 +434,293 @@ Strategic direction and organizational coordination.
           )}
         </div>
       </div>
+      
+      {/* Upload Document Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              Upload a new document to the documentation center.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="document-type">Document Type</Label>
+              <Select defaultValue="infrastructure">
+                <SelectTrigger id="document-type">
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="title">Document Title</Label>
+              <Input id="title" placeholder="Enter document title" />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input id="description" placeholder="Enter a short description" />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="file">Select File</Label>
+              <div className="grid w-full items-center gap-1.5">
+                <Input
+                  id="file"
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="cursor-pointer"
+                />
+                {selectedFile && (
+                  <p className="text-xs text-muted-foreground">
+                    Selected file: {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {isUploading && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSelectedFile(null);
+                setUploadDialogOpen(false);
+              }}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpload}
+              disabled={!selectedFile || isUploading}
+            >
+              {isUploading ? "Uploading..." : "Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Batch Process Dialog */}
+      <Dialog open={batchProcessDialogOpen} onOpenChange={setBatchProcessDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Batch Process Documents</DialogTitle>
+            <DialogDescription>
+              Upload and process multiple documents at once.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="batch-type">Process Type</Label>
+              <Select defaultValue="upload">
+                <SelectTrigger id="batch-type">
+                  <SelectValue placeholder="Select process type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upload">Batch Upload</SelectItem>
+                  <SelectItem value="extract">Information Extraction</SelectItem>
+                  <SelectItem value="convert">Format Conversion</SelectItem>
+                  <SelectItem value="analyze">Text Analysis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="target-category">Target Category</Label>
+              <Select defaultValue="infrastructure">
+                <SelectTrigger id="target-category">
+                  <SelectValue placeholder="Select target category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="batch-files">Select Files</Label>
+              <Input
+                id="batch-files"
+                type="file"
+                multiple
+                className="cursor-pointer"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                You can select multiple files to process together.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Processing Options</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="extract-metadata" className="rounded" />
+                  <label htmlFor="extract-metadata" className="text-sm">Extract Metadata</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="auto-tag" className="rounded" />
+                  <label htmlFor="auto-tag" className="text-sm">Auto-Tag</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="analyze-text" className="rounded" />
+                  <label htmlFor="analyze-text" className="text-sm">Analyze Text</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="ocr-scan" className="rounded" />
+                  <label htmlFor="ocr-scan" className="text-sm">OCR Scan</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchProcessDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              toast({
+                title: "Batch process started",
+                description: "Your documents are being processed. You will be notified when complete."
+              });
+              setBatchProcessDialogOpen(false);
+            }}>
+              Start Processing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Share Document Dialog */}
+      {activeDoc && (
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Share Document</DialogTitle>
+              <DialogDescription>
+                Share "{activeDoc.title}" with team members or external collaborators.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>People with access</Label>
+                <div className="space-y-3">
+                  {[
+                    { name: 'Sarah Chen', email: 'sarah.c@example.com', role: 'Editor' },
+                    { name: 'Mark Johnson', email: 'mark.j@example.com', role: 'Viewer' },
+                  ].map((person, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 mr-3 flex items-center justify-center text-xs font-medium">
+                          {person.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-medium">{person.name}</div>
+                          <div className="text-xs text-muted-foreground">{person.email}</div>
+                        </div>
+                      </div>
+                      <Select defaultValue={person.role.toLowerCase()}>
+                        <SelectTrigger className="w-[100px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="editor">Editor</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Add people</Label>
+                <div className="flex space-x-2">
+                  <Input placeholder="Add email or name" className="flex-1" />
+                  <Select defaultValue="viewer">
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Share link</Label>
+                <div className="flex space-x-2">
+                  <Input 
+                    value={`https://cpihub.com/documents/${activeDoc.id}`} 
+                    readOnly 
+                    className="flex-1" 
+                  />
+                  <Button variant="outline" size="sm" onClick={() => {
+                    toast({
+                      title: "Link copied",
+                      description: "Document link has been copied to clipboard"
+                    });
+                  }}>
+                    Copy
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <input type="checkbox" id="anyone-with-link" className="rounded" />
+                  <label htmlFor="anyone-with-link" className="text-sm">Anyone with the link can view</label>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                toast({
+                  title: "Sharing settings updated",
+                  description: "Your document sharing preferences have been saved."
+                });
+                setShareDialogOpen(false);
+              }}>
+                Save Settings
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
