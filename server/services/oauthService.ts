@@ -566,32 +566,49 @@ export class OAuthService {
       // Additional fields as required
     };
     
-    // Create the user using the schema field names (not DB column names)
-    const [createdUser] = await db.insert(users)
-      .values({
-        username: userData.username,
-        email: userData.email,
-        fullName: userData.fullName,
-        avatar: userData.profilePicture,
-        role: userData.role,
-        authMethod: userData.authMethod,
-        externalId: externalId
-      })
-      .returning();
+    // Create the user with raw SQL to avoid schema issues - use pool directly
+    const result = await pool.query(
+      `INSERT INTO users (username, email, full_name, avatar, role, auth_method, external_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        userData.username,
+        userData.email,
+        userData.fullName,
+        userData.profilePicture,
+        userData.role,
+        userData.authMethod,
+        externalId
+      ]
+    );
     
-    // Store OAuth credentials
-    await db.insert(oauthCredentials)
-      .values({
-        userId: createdUser.id,
+    const createdUser = result.rows[0];
+    
+    // Store OAuth token with raw SQL to match table structure - use pool directly
+    await pool.query(
+      `INSERT INTO oauth_tokens (
+        user_id, 
+        provider, 
+        access_token, 
+        refresh_token, 
+        expires_at,
+        token_data,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+      [
+        createdUser.id,
         providerId,
-        providerUserId: externalId,
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token,
-        tokenType: tokenResponse.token_type,
-        scope: tokenResponse.scope,
-        idToken: tokenResponse.id_token,
-        expiresAt: tokenResponse.expires_in ? new Date(Date.now() + tokenResponse.expires_in * 1000) : null
-      });
+        tokenResponse.access_token,
+        tokenResponse.refresh_token || null,
+        tokenResponse.expires_in ? new Date(Date.now() + tokenResponse.expires_in * 1000) : null,
+        JSON.stringify({
+          token_type: tokenResponse.token_type,
+          scope: tokenResponse.scope,
+          id_token: tokenResponse.id_token,
+          provider_user_id: externalId
+        })
+      ]
+    );
     
     return createdUser;
   }
