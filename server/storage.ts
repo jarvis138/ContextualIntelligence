@@ -208,6 +208,7 @@ export class MemStorage implements IStorage {
     relationships: number;
     refreshTokens: number;
     pkceCodeVerifiers: number;
+    oauthCredentials: number;
     oauthProviderSettings: number;
     samlProviders: number;
     graphNodes: number;
@@ -253,6 +254,7 @@ export class MemStorage implements IStorage {
       relationships: 1,
       refreshTokens: 1,
       pkceCodeVerifiers: 1,
+      oauthCredentials: 1,
       oauthProviderSettings: 1,
       samlProviders: 1,
       graphNodes: 1,
@@ -601,29 +603,52 @@ export class MemStorage implements IStorage {
   }
 
   // OAuth Credentials
-  private oauthCredentials: Map<string, OAuthCredential> = new Map();
+  private oauthCredentials: Map<number, OAuthCredential> = new Map();
   
   async saveOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
-    const key = `${credential.userId}:${credential.providerId}`;
-    const id = credential.id || Date.now(); // Generate an ID if not provided
-    const oauthCredential: OAuthCredential = { 
-      ...credential, 
+    // Check if a credential with this userId + providerId combination already exists
+    const existingCredential = Array.from(this.oauthCredentials.values()).find(
+      cred => cred.userId === credential.userId && cred.providerId === credential.providerId
+    );
+    
+    if (existingCredential) {
+      // Update existing credential
+      const updatedCredential: OAuthCredential = {
+        ...existingCredential,
+        ...credential,
+        updatedAt: new Date()
+      };
+      
+      this.oauthCredentials.set(existingCredential.id, updatedCredential);
+      return updatedCredential;
+    }
+    
+    // Create new credential
+    const id = this.currentIds.oauthCredentials++;
+    const newCredential: OAuthCredential = {
+      ...credential,
       id,
-      createdAt: credential.createdAt || new Date(),
-      updatedAt: credential.updatedAt || new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.oauthCredentials.set(key, oauthCredential);
-    return oauthCredential;
+    
+    this.oauthCredentials.set(id, newCredential);
+    return newCredential;
   }
   
   async getOAuthCredential(userId: number, providerId: string): Promise<OAuthCredential | undefined> {
-    const key = `${userId}:${providerId}`;
-    return this.oauthCredentials.get(key);
+    return Array.from(this.oauthCredentials.values()).find(
+      credential => credential.userId === userId && credential.providerId === providerId
+    );
   }
   
   async deleteOAuthCredential(userId: number, providerId: string): Promise<boolean> {
-    const key = `${userId}:${providerId}`;
-    return this.oauthCredentials.delete(key);
+    const credential = await this.getOAuthCredential(userId, providerId);
+    if (!credential) {
+      return false;
+    }
+    
+    return this.oauthCredentials.delete(credential.id);
   }
 
   // Projects
@@ -1176,6 +1201,56 @@ export class MemStorage implements IStorage {
     return Array.from(this.samlProviders.values()).filter(
       provider => provider.enabled === true
     );
+  }
+  
+  // OAuth Credentials
+  async saveOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
+    // Create a unique key for userId + providerId combination
+    const key = `${credential.userId}-${credential.providerId}`;
+    
+    // Check if a credential with this key already exists
+    const existingCredential = Array.from(this.oauthCredentials.values()).find(
+      cred => `${cred.userId}-${cred.providerId}` === key
+    );
+    
+    if (existingCredential) {
+      // Update existing credential
+      const updatedCredential: OAuthCredential = {
+        ...existingCredential,
+        ...credential,
+        updatedAt: new Date()
+      };
+      
+      this.oauthCredentials.set(existingCredential.id, updatedCredential);
+      return updatedCredential;
+    }
+    
+    // Create new credential
+    const id = this.currentIds.oauthCredentials++;
+    const newCredential: OAuthCredential = {
+      ...credential,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.oauthCredentials.set(id, newCredential);
+    return newCredential;
+  }
+  
+  async getOAuthCredential(userId: number, providerId: string): Promise<OAuthCredential | undefined> {
+    return Array.from(this.oauthCredentials.values()).find(
+      credential => credential.userId === userId && credential.providerId === providerId
+    );
+  }
+  
+  async deleteOAuthCredential(userId: number, providerId: string): Promise<boolean> {
+    const credential = await this.getOAuthCredential(userId, providerId);
+    if (!credential) {
+      return false;
+    }
+    
+    return this.oauthCredentials.delete(credential.id);
   }
 }
 
