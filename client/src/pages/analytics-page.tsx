@@ -9,6 +9,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { RelationshipGraph } from "@/components/visualizations/RelationshipGraph";
 import { TeamProgressChart } from "@/components/dashboard/TeamProgressChart";
 import { ProjectProgressChart } from "@/components/dashboard/ProjectProgressChart";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Activity, 
   Calendar,
@@ -26,7 +34,8 @@ import {
   Users,
   BarChart,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Search
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
