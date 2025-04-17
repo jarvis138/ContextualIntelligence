@@ -7,7 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import PKCEOAuthProvider from '../utils/oauth-pkce';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { users, oauthCredentials } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { AuditService, AuditCategory, AuditSeverity, AuditActions } from './auditService';
@@ -541,6 +541,20 @@ export class OAuthService {
             updatedAt: new Date()
           })
           .where(eq(oauthCredentials.id, credential.id));
+          
+        // Log token update
+        await AuthAuditLogger.logOAuthEvent(
+          AuthAuditType.OAUTH_TOKEN_REFRESH,
+          {
+            provider: providerId,
+            userId: user.id,
+            providerUserId: externalId
+          },
+          `Updated OAuth tokens for existing user ${user.username}`,
+          {
+            success: true
+          }
+        );
         
         return user;
       }
@@ -583,6 +597,22 @@ export class OAuthService {
     
     const createdUser = result.rows[0];
     
+    // Audit log new user creation
+    await AuthAuditLogger.logAuthEvent(
+      AuthAuditType.REGISTER,
+      createdUser.id,
+      `New user registered via OAuth (${providerId})`,
+      {
+        success: true,
+        metadata: {
+          provider: providerId,
+          providerUserId: externalId,
+          authMethod: 'oauth',
+          email: userData.email
+        }
+      }
+    );
+
     // Store OAuth token with raw SQL to match table structure - use pool directly
     await pool.query(
       `INSERT INTO oauth_tokens (
@@ -608,6 +638,20 @@ export class OAuthService {
           provider_user_id: externalId
         })
       ]
+    );
+    
+    // Log token storage
+    await AuthAuditLogger.logOAuthEvent(
+      AuthAuditType.OAUTH_TOKEN_EXCHANGE,
+      {
+        provider: providerId,
+        userId: createdUser.id,
+        providerUserId: externalId
+      },
+      `Stored OAuth tokens for new user ${createdUser.username}`,
+      {
+        success: true
+      }
     );
     
     return createdUser;
