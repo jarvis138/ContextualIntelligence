@@ -167,6 +167,23 @@ router.post('/summarize', authenticateToken, async (req, res) => {
   }
 });
 
+// AI service status endpoint
+router.get('/status', async (req, res) => {
+  try {
+    const status = {
+      openai: openaiService.isAvailable(),
+      perplexity: false // Phase 3 only includes OpenAI, Perplexity may be added in Phase 4
+    };
+    
+    aiLogger.debug('AI service status checked', { status });
+    
+    res.json(status);
+  } catch (error: any) {
+    aiLogger.error('AI service status check failed', { error: error.message });
+    res.status(500).json({ error: error.message || 'Failed to check AI service status' });
+  }
+});
+
 aiLogger.info('AI API routes initialized');
 
 export default router;
