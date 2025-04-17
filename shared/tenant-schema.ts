@@ -1,180 +1,181 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, index, foreignKey, uniqueIndex, varchar, pgEnum } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import {
+  pgTable,
+  serial,
+  varchar,
+  timestamp,
+  jsonb,
+  boolean,
+  integer,
+  uuid,
+  unique,
+  pgEnum
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
+import { createInsertSchema } from 'drizzle-zod';
+import { z } from 'zod';
+import { type InferSelectModel } from 'drizzle-orm';
 
-// Tenant status enum for tracking tenant lifecycle
-export const tenantStatusEnum = pgEnum("tenant_status", [
-  "active", 
-  "suspended", 
-  "pending", 
-  "archived"
+/**
+ * Define enum for tenant status values
+ */
+export const tenantStatusEnum = pgEnum('tenant_status', [
+  'active',
+  'suspended',
+  'archived',
+  'pending'
 ]);
 
-// Tenant tier enum for different service levels
-export const tenantTierEnum = pgEnum("tenant_tier", [
-  "free", 
-  "standard", 
-  "professional", 
-  "enterprise", 
-  "custom"
+/**
+ * Define enum for tenant tier values
+ */
+export const tenantTierEnum = pgEnum('tenant_tier', [
+  'free',
+  'standard',
+  'professional',
+  'enterprise'
 ]);
 
-// Schema separation strategy enum
-export const schemaSeparationStrategyEnum = pgEnum("schema_separation_strategy", [
-  "schema_per_tenant", 
-  "row_level_security", 
-  "combined"
+/**
+ * Define enum for tenant schema strategy values
+ */
+export const tenantSchemaStrategyEnum = pgEnum('tenant_schema_strategy', [
+  'row_level_security',
+  'schema_per_tenant'
 ]);
 
-// Tenant schema - core tenant configuration
-export const tenants = pgTable("tenants", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  displayName: varchar("display_name", { length: 200 }).notNull(),
-  subdomain: varchar("subdomain", { length: 100 }).notNull().unique(),
-  // Optional custom domain
-  customDomain: varchar("custom_domain", { length: 255 }),
-  status: tenantStatusEnum("status").notNull().default("active"),
-  tier: tenantTierEnum("tier").notNull().default("standard"),
-  // Schema separation strategy
-  schemaStrategy: schemaSeparationStrategyEnum("schema_strategy").notNull().default("row_level_security"),
-  // For schema_per_tenant, this is the PostgreSQL schema name
-  schemaName: varchar("schema_name", { length: 50 }),
-  // For row_level_security, we'll use this ID in RLS policies
-  rlsTenantId: varchar("rls_tenant_id", { length: 36 }).notNull().unique(),
-  // Tenant settings/configuration as JSON
-  settings: jsonb("settings"),
-  // Tenant metadata for custom fields
-  metadata: jsonb("metadata"),
-  // Tenant branding information
-  branding: jsonb("branding"),
-  // Billing information
-  billingEmail: varchar("billing_email", { length: 255 }),
-  billingName: varchar("billing_name", { length: 255 }),
-  billingAddress: jsonb("billing_address"),
-  // Timestamps
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+/**
+ * Define the tenants table schema
+ */
+export const tenants = pgTable('tenants', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  displayName: varchar('display_name', { length: 255 }).notNull(),
+  subdomain: varchar('subdomain', { length: 255 }).notNull().unique(),
+  customDomain: varchar('custom_domain', { length: 255 }).unique(),
+  status: tenantStatusEnum('status').notNull().default('active'),
+  tier: tenantTierEnum('tier').notNull().default('standard'),
+  schemaStrategy: tenantSchemaStrategyEnum('schema_strategy').notNull().default('row_level_security'),
+  schemaName: varchar('schema_name', { length: 255 }),
+  rlsTenantId: uuid('rls_tenant_id').notNull().defaultRandom(),
+  settings: jsonb('settings').notNull().default({}),
+  metadata: jsonb('metadata').notNull().default({}),
+  branding: jsonb('branding').notNull().default({}),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow()
+});
+
+/**
+ * Define the tenant_feature_flags table schema
+ */
+export const tenantFeatureFlags = pgTable('tenant_feature_flags', {
+  id: serial('id').primaryKey(),
+  tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  featureKey: varchar('feature_key', { length: 255 }).notNull(),
+  enabled: boolean('enabled').notNull().default(false),
+  configuration: jsonb('configuration'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow()
 }, (table) => {
   return {
-    subdomainIdx: uniqueIndex("tenant_subdomain_idx").on(table.subdomain),
-    customDomainIdx: index("tenant_custom_domain_idx").on(table.customDomain),
-    statusIdx: index("tenant_status_idx").on(table.status),
-    tierIdx: index("tenant_tier_idx").on(table.tier),
+    // Add a unique constraint for tenantId + featureKey
+    unq: unique().on(table.tenantId, table.featureKey)
   };
 });
 
-// Tenant Type
-export type Tenant = typeof tenants.$inferSelect;
-export type InsertTenant = typeof tenants.$inferInsert;
-
-// Create a Zod schema for tenant insertion
-export const insertTenantSchema = createInsertSchema(tenants)
-  .omit({ id: true, createdAt: true, updatedAt: true })
-  .extend({
-    subdomain: z.string().min(3).max(63).regex(/^[a-z0-9-]+$/, {
-      message: "Subdomain can only contain lowercase letters, numbers, and hyphens"
-    }),
-    customDomain: z.string().url().optional(),
-    settings: z.record(z.unknown()).optional(),
-    metadata: z.record(z.unknown()).optional(),
-    branding: z.record(z.unknown()).optional(),
-  });
-
-// Tenant feature flags table
-export const tenantFeatureFlags = pgTable("tenant_feature_flags", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  featureKey: varchar("feature_key", { length: 100 }).notNull(),
-  enabled: boolean("enabled").notNull().default(false),
-  configuration: jsonb("configuration"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+/**
+ * Define the tenant_admins table schema
+ */
+export const tenantAdmins = pgTable('tenant_admins', {
+  id: serial('id').primaryKey(),
+  tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull(),
+  role: varchar('role', { length: 50 }).notNull().default('admin'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow()
 }, (table) => {
   return {
-    tenantFeatureIdx: uniqueIndex("tenant_feature_idx").on(table.tenantId, table.featureKey),
+    // Add a unique constraint for tenantId + userId
+    unq: unique().on(table.tenantId, table.userId)
   };
 });
 
-// Tenant Feature Flag Type
-export type TenantFeatureFlag = typeof tenantFeatureFlags.$inferSelect;
-export type InsertTenantFeatureFlag = typeof tenantFeatureFlags.$inferInsert;
-
-// Feature Flag Zod Schema
-export const insertTenantFeatureFlagSchema = createInsertSchema(tenantFeatureFlags)
-  .omit({ id: true, createdAt: true, updatedAt: true });
-
-// Tenant relations
+/**
+ * Define relationships between tables
+ */
 export const tenantsRelations = relations(tenants, ({ many }) => ({
-  tenantFeatureFlags: many(tenantFeatureFlags),
-  tenantApiKeys: many(tenantApiKeys),
-  tenantAdmins: many(tenantAdmins),
+  featureFlags: many(tenantFeatureFlags),
+  tenantAdmins: many(tenantAdmins)
 }));
 
-// Tenant feature flags relations
 export const tenantFeatureFlagsRelations = relations(tenantFeatureFlags, ({ one }) => ({
   tenant: one(tenants, {
     fields: [tenantFeatureFlags.tenantId],
     references: [tenants.id],
-  }),
+  })
 }));
 
-// Tenant API keys for programmatic access
-export const tenantApiKeys = pgTable("tenant_api_keys", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 100 }).notNull(),
-  prefix: varchar("prefix", { length: 10 }).notNull(),
-  hashedKey: text("hashed_key").notNull(),
-  scopes: jsonb("scopes").notNull(),
-  expiresAt: timestamp("expires_at"),
-  lastUsedAt: timestamp("last_used_at"),
-  createdBy: integer("created_by").notNull(),
-  revoked: boolean("revoked").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (table) => {
-  return {
-    prefixIdx: index("api_key_prefix_idx").on(table.prefix),
-    tenantIdIdx: index("api_key_tenant_idx").on(table.tenantId),
-  };
-});
-
-// Tenant API Key Type
-export type TenantApiKey = typeof tenantApiKeys.$inferSelect;
-export type InsertTenantApiKey = typeof tenantApiKeys.$inferInsert;
-
-// Tenant API keys relations
-export const tenantApiKeysRelations = relations(tenantApiKeys, ({ one }) => ({
-  tenant: one(tenants, {
-    fields: [tenantApiKeys.tenantId],
-    references: [tenants.id],
-  }),
-}));
-
-// Tenant admins (users who can manage tenant settings)
-export const tenantAdmins = pgTable("tenant_admins", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull(),
-  role: varchar("role", { length: 50 }).notNull().default("admin"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => {
-  return {
-    tenantUserIdx: uniqueIndex("tenant_user_idx").on(table.tenantId, table.userId),
-  };
-});
-
-// Tenant Admin Type
-export type TenantAdmin = typeof tenantAdmins.$inferSelect;
-export type InsertTenantAdmin = typeof tenantAdmins.$inferInsert;
-
-// Tenant admins relations
 export const tenantAdminsRelations = relations(tenantAdmins, ({ one }) => ({
   tenant: one(tenants, {
     fields: [tenantAdmins.tenantId],
     references: [tenants.id],
-  }),
+  })
 }));
+
+/**
+ * Define TypeScript types from the schemas
+ */
+export type Tenant = InferSelectModel<typeof tenants>;
+export type TenantFeatureFlag = InferSelectModel<typeof tenantFeatureFlags>;
+export type TenantAdmin = InferSelectModel<typeof tenantAdmins>;
+
+/**
+ * Define Zod validation schemas for insertions
+ */
+export const insertTenantSchema = createInsertSchema(tenants, {
+  // Custom validations
+  name: z.string().min(2).max(255),
+  displayName: z.string().min(2).max(255),
+  subdomain: z.string().min(2).max(63).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, {
+    message: "Subdomain must consist of lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen"
+  }),
+  customDomain: z.string().max(255).nullable().optional(),
+  status: z.enum(['active', 'suspended', 'archived', 'pending']).optional(),
+  tier: z.enum(['free', 'standard', 'professional', 'enterprise']).optional(),
+  schemaStrategy: z.enum(['row_level_security', 'schema_per_tenant']).optional(),
+  schemaName: z.string().max(255).nullable().optional(),
+  settings: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
+  branding: z.record(z.any()).optional(),
+}).omit({ 
+  id: true, 
+  rlsTenantId: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export const insertTenantFeatureFlagSchema = createInsertSchema(tenantFeatureFlags, {
+  // Custom validations
+  featureKey: z.string().min(1).max(255),
+  enabled: z.boolean(),
+  configuration: z.record(z.any()).nullable().optional(),
+}).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export const insertTenantAdminSchema = createInsertSchema(tenantAdmins, {
+  // Custom validations
+  role: z.string().min(1).max(50),
+}).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+/**
+ * Define TypeScript types for insertions
+ */
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type InsertTenantFeatureFlag = z.infer<typeof insertTenantFeatureFlagSchema>;
+export type InsertTenantAdmin = z.infer<typeof insertTenantAdminSchema>;
