@@ -7,21 +7,22 @@ interface NovexaLogoProps {
 export function NovexaLogo({ className = "h-10 w-auto" }: NovexaLogoProps) {
   return (
     <svg 
-      width="200" 
+      width="140" 
       height="40" 
-      viewBox="0 0 200 40" 
+      viewBox="0 0 140 40" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg" 
       className={className}
     >
-      <rect x="0" y="0" width="40" height="40" rx="8" fill="#001F3F"/>
-      <path d="M8 8L22 8L22 32L8 32L8 8Z" fill="#001F3F"/>
-      <path d="M10 10L20 20L10 30L10 10Z" fill="#00CED1"/>
-      <path d="M50 10 H58 L70 30 H62 L50 10Z" fill="#001F3F"/>
-      <path d="M80 10 C87 10 94 10 94 20 C94 30 87 30 80 30 C73 30 66 30 66 20 C66 10 73 10 80 10Z M80 15 C75 15 74 18 74 20 C74 22 75 25 80 25 C85 25 86 22 86 20 C86 18 85 15 80 15Z" fill="#001F3F"/>
-      <path d="M96 10 H104 L104 20 L114 10 H124 L110 22 L124 30 H114 L104 22 L104 30 H96 V10Z" fill="#001F3F"/>
-      <path d="M126 10 H134 L144 22 L154 10 H162 L147 30 L126 10Z" fill="#001F3F"/>
-      <path d="M164 10 H188 L188 16 H172 V17 H188 V23 H172 V24 H188 V30 H164 V10Z" fill="#001F3F"/>
+      {/* Icon/logo mark */}
+      <rect x="0" y="0" width="40" height="40" rx="6" fill="#001F3F"/>
+      <path d="M12 12L24 20L12 28V12Z" fill="#00CED1" />
+      
+      {/* NOVEXA text */}
+      <path d="M48 10H54L54 30H48V10ZM54 10L65 20L54 30" stroke="#001F3F" strokeWidth="3" strokeLinejoin="round"/>
+      <path d="M67 10H73C81 10 81 30 73 30H67V10Z" stroke="#001F3F" strokeWidth="3" strokeLinejoin="round"/>
+      <path d="M85 10H91L91 21L102 10H109L96 22L109 30H102L91 21V30H85V10Z" stroke="#001F3F" strokeWidth="3" strokeLinejoin="round"/>
+      <path d="M111 10H118L125 20L132 10H139L128 26V30H122V26L111 10Z" stroke="#001F3F" strokeWidth="3" strokeLinejoin="round"/>
     </svg>
   );
 }
