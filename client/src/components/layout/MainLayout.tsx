@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, KeyboardEvent } from 'react';
 import { Link, useLocation } from 'wouter';
 import { 
   Bell, 
@@ -21,7 +21,11 @@ import {
   Layers,
   FileBarChart,
   AlertCircle,
-  Network
+  Network,
+  HelpCircle,
+  LogOut,
+  X,
+  PlusCircle
 } from 'lucide-react';
 import { NovexaLogo } from '@/components/ui/novexa-logo';
 import { cn } from '@/lib/utils';
@@ -38,6 +42,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { HelpMenu } from '@/components/tour/HelpMenu';
+
+// Import the theme constants
+import colors from '@/styles/colors';
+import { typography } from '@/styles/typography';
 
 type MainLayoutProps = {
   children: React.ReactNode;

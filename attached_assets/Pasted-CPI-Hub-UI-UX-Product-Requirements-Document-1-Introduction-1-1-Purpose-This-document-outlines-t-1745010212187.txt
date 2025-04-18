@@ -1,0 +1,1124 @@
+CPI Hub: UI/UX Product Requirements Document
+1. Introduction
+1.1 Purpose
+This document outlines the detailed user interface and user experience requirements for the CPI Hub platform, an intelligent collaboration system that aggregates data from multiple sources, provides AI-powered contextual analysis, and enables collaborative workspaces.
+1.2 Scope
+This UI/UX PRD covers all user-facing aspects of the CPI Hub platform, including navigation, workspace interaction, document management, search, and system administration. It provides comprehensive guidelines for designers and developers implementing the interface.
+1.3 Target Audience
+Business users who need to collaborate on documents and data
+Knowledge workers managing information across multiple sources
+Project teams requiring contextual information discovery
+System administrators managing platform configuration
+2. User Interface Architecture
+2.1 Design System
+2.1.1 Visual Language
+Color Palette
+
+
+Primary: #2563EB (Brand Blue)
+Secondary: #10B981 (Success Green)
+Accent: #8B5CF6 (Purple)
+Error: #EF4444 (Red)
+Warning: #F59E0B (Orange)
+Info: #3B82F6 (Light Blue)
+Neutrals: #0F172A (Dark), #94A3B8 (Medium), #F1F5F9 (Light)
+Typography
+
+
+Primary Font: Inter (Sans-serif)
+Header Sizes:
+H1: 30px/38px, 700 weight
+H2: 24px/32px, 600 weight
+H3: 20px/28px, 600 weight
+H4: 18px/26px, 500 weight
+H5: 16px/24px, 500 weight
+Body Text:
+Regular: 16px/24px, 400 weight
+Small: 14px/20px, 400 weight
+Caption: 12px/16px, 400 weight
+Monospace: JetBrains Mono (for code blocks)
+Iconography
+
+
+Primary icon set: Lucide icons
+Consistent 24px grid for standard icons
+Filled variants for selected/active states
+Outlined variants for default states
+Border Radius
+
+
+Small: 4px (buttons, input fields)
+Medium: 8px (cards, panels)
+Large: 12px (modals, drawers)
+Elevation/Shadows
+
+
+Level 1: 0px 1px 3px rgba(0,0,0,0.1)
+Level 2: 0px 4px 6px rgba(0,0,0,0.1)
+Level 3: 0px 10px 15px rgba(0,0,0,0.1)
+Level 4: 0px 20px 25px rgba(0,0,0,0.1)
+2.1.2 Component Library
+Navigation Components
+
+
+Top Navigation Bar
+Sidebar Navigation
+Breadcrumb Navigation
+Tabs
+Pagination Controls
+Input Components
+
+
+Text Fields (single line, multi-line)
+Dropdown Selects
+Checkboxes and Radio Buttons
+Toggle Switches
+Date/Time Pickers
+Sliders
+File Upload
+Content Components
+
+
+Cards
+Lists (simple, nested, sortable)
+Tables (sortable, filterable)
+Accordions
+Tabs
+Document Viewer
+Rich Text Editor
+Feedback Components
+
+
+Alerts
+Toasts
+Progress Indicators
+Badges
+Tooltips
+Popovers
+Action Components
+
+
+Buttons (primary, secondary, tertiary)
+Button Groups
+Dropdown Menus
+Split Buttons
+Action Menus
+Floating Action Buttons
+Overlay Components
+
+
+Modals
+Dialogs
+Drawers (side, bottom)
+Popovers
+Tooltips
+Data Visualization
+
+
+Charts (line, bar, pie)
+Graphs (relationship, network)
+Heatmaps
+Progress Trackers
+KPI Indicators
+2.2 Layout Framework
+2.2.1 Responsive Grid System
+12-column grid system
+Four standard breakpoints:
+Mobile: <640px
+Tablet: 641px-1024px
+Desktop: 1025px-1440px
+Large Desktop: >1440px
+Consistent gutters (16px on mobile, 24px on desktop)
+Fluid container widths with max-width constraints
+2.2.2 Page Templates
+Dashboard Template
+
+
+Top navigation bar
+Left sidebar (collapsible)
+Main content area with widget grid
+Optional right sidebar for details/filters
+Workspace Template
+
+
+Top navigation with workspace context
+Left navigation for workspace structure
+Main content area (configurable)
+Right panel for context/details
+Document Template
+
+
+Document header with breadcrumbs
+Main content area with document
+Right sidebar for metadata/activity
+Bottom panel for comments/discussion
+Search Template
+
+
+Search input bar
+Filters panel (left)
+Results area (center)
+Preview panel (right)
+Settings Template
+
+
+Left navigation for settings categories
+Main content area for configuration
+Consistent form layouts
+3. Interface Flows
+3.1 Onboarding Experience
+3.1.1 User Registration
+Welcome Screen
+
+
+Clear value proposition
+Registration form (Name, Email, Password)
+Single Sign-On options (Google, Microsoft)
+Terms of Service and Privacy Policy links
+Account Verification
+
+
+Email verification instruction screen
+Resend verification option
+Return to login option
+Profile Completion
+
+
+Optional profile information
+Role selection
+Department/Team information
+Profile picture upload
+Data Source Connection
+
+
+Google Drive connection option
+Slack connection option
+Email connection option
+Skip for now option
+Welcome Tour
+
+
+Guided walkthrough of key features
+Interactive tooltips
+Progress indicator
+Option to skip
+3.1.2 Workspace Setup
+Create First Workspace
+
+
+Workspace name and description
+Privacy setting selection
+Template selection (blank, project, knowledge base)
+Invite Team Members
+
+
+Email invitation interface
+Role assignment
+Bulk invite option (CSV upload)
+Personalized message option
+Initial Content
+
+
+Import from connected sources
+Create new document option
+Template gallery
+Quick start guides
+3.2 Navigation System
+3.2.1 Global Navigation
+Top Navigation Bar
+
+
+CPI Hub logo/home link
+Workspace selector dropdown
+Global search bar
+Create new content button
+Notifications bell
+Help/support access
+User profile menu
+Sidebar Navigation
+
+
+Workspaces list
+Recent items
+Starred/Favorites
+Personal space
+Team spaces
+Settings access
+Collapse/expand toggle
+3.2.2 Workspace Navigation
+Workspace Sidebar
+
+
+Workspace name and icon
+Navigation tree with folders/documents
+Recent documents in workspace
+Add content button
+Workspace settings access
+Workspace Header
+
+
+Breadcrumb navigation
+Workspace title
+View options
+Share button
+Actions menu
+3.2.3 Contextual Navigation
+Document Breadcrumbs
+
+
+Path from workspace root to current document
+Interactive breadcrumb items for navigation
+Dropdown for ancestor selection
+Related Content Panel
+
+
+AI-suggested related documents
+Recently viewed related content
+Content from same author/source
+Similar topics section
+3.3 Workspace Interaction
+3.3.1 Workspace Dashboard
+Overview Section
+
+
+Workspace description
+Key metrics (members, documents, activity)
+Pinned content
+Announcements
+Activity Feed
+
+
+Recent updates to workspace content
+Member actions
+Comment activity
+Timeline visualization
+Content Browser
+
+
+Hierarchical view of workspace content
+List/Grid/Table view options
+Sorting and filtering controls
+Bulk action capabilities
+3.3.2 Document Interaction
+Document Viewer
+
+
+Format-specific rendering
+Zoom controls
+Full-screen mode
+Print/Export options
+Sharing controls
+Document Editor
+
+
+Rich text editing capabilities
+Change tracking
+Commenting
+Version history access
+AI assistance integration
+Metadata Panel
+
+
+File information
+Version history
+Tags/Labels
+Permissions
+Related documents
+3.3.3 Collaborative Features
+Comments System
+
+
+Inline comments
+Comment threads
+@mentions
+Emoji reactions
+Resolution status
+Presence Indication
+
+
+Currently viewing users
+Real-time cursor positions
+User activity status
+Last viewed timestamp
+Version Comparison
+
+
+Side-by-side diff view
+Change highlighting
+Version metadata
+Restore version option
+3.4 Search Experience
+3.4.1 Search Interface
+Search Input
+
+
+Auto-suggest dropdown
+Recent searches
+Search syntax help
+Voice search option
+Advanced search toggle
+Filters Panel
+
+
+Content type filters
+Date range selector
+Source filters
+Author filters
+Tag/label filters
+Clear filters button
+Results Display
+
+
+Relevance sorting (default)
+Alternative sort options (date, activity)
+List/Grid view toggle
+Snippet preview with highlighted terms
+Result grouping by type
+3.4.2 Advanced Search
+Query Builder
+
+
+Visual query construction
+Boolean operator selection
+Field-specific search options
+Save search option
+Semantic Search
+
+
+Natural language query interface
+"More like this" functionality
+Topic-based exploration
+Entity-focused filtering
+Search Analytics
+
+
+Popular searches
+Zero-result queries
+Search effectiveness metrics
+Search pattern visualizations
+3.5 AI Features Interface
+3.5.1 Content Analysis
+Auto-generated Metadata
+
+
+Key topics identified
+Entities extracted
+Sentiment analysis
+Importance score
+Content Insights
+
+
+Executive summary
+Key points extraction
+Action items identified
+Question & answer generation
+3.5.2 Relationship Visualization
+Graph View
+
+
+Interactive node-link diagram
+Filtering controls
+Zoom and pan navigation
+Focus+context visualization
+Node details on demand
+Connection Explorer
+
+
+Direct connections list
+Second-degree connections
+Connection strength indicators
+Path finding between entities
+3.5.3 AI Assistant
+Query Interface
+
+
+Natural language input
+Context-aware suggestions
+Query history
+Feedback mechanisms
+Response Display
+
+
+Structured answer formats
+Source citations
+Confidence indicators
+Follow-up question suggestions
+3.6 Administration Interface
+3.6.1 User Management
+User Directory
+
+
+User list with search/filter
+Bulk actions
+Status indicators
+Activity metrics
+Role Management
+
+
+Role definitions
+Permission assignment
+Custom role creation
+Role assignment interface
+3.6.2 System Configuration
+Integration Management
+
+
+Connected services status
+Authentication configuration
+Sync scheduling
+Usage monitoring
+Security Settings
+
+
+Authentication policies
+Password requirements
+Session management
+Access restrictions
+3.6.3 Analytics Dashboard
+Usage Metrics
+
+
+Active users
+Content creation/consumption
+Search analytics
+Integration usage
+System Health
+
+
+Storage utilization
+API usage
+Error rates
+Performance metrics
+4. Component Specifications
+4.1 Navigation Components
+4.1.1 Global Search Bar
+Functionality
+
+
+Instant search as you type
+Results categorized by type
+Keyboard navigation (arrow keys, enter)
+Search history access
+Advanced search link
+States
+
+
+Default (empty)
+Focus
+Active (with results)
+Loading
+No results
+Error
+Interactions
+
+
+Click to focus
+Type to search
+Clear button (x)
+Keyboard shortcuts (Ctrl+K/Cmd+K)
+4.1.2 Workspace Selector
+Functionality
+
+
+Shows current workspace
+Dropdown with recent/favorite workspaces
+Create new workspace option
+Search workspaces functionality
+States
+
+
+Collapsed
+Expanded
+Hover
+Active workspace indicator
+Interactions
+
+
+Click to expand
+Hover for tooltip
+Quick navigation via keyboard
+4.1.3 Navigation Tree
+Functionality
+
+
+Hierarchical display of content
+Expand/collapse folders
+Drag-and-drop organization
+Context menus for actions
+States
+
+
+Collapsed folder
+Expanded folder
+Selected item
+Drag target highlight
+Loading indicator
+Interactions
+
+
+Click to select
+Double-click to open
+Right-click for context menu
+Drag items to reorder/organize
+4.2 Content Components
+4.2.1 Document Card
+Information Display
+
+
+Document title
+Document type icon
+Preview thumbnail
+Last modified date
+Author information
+Key metadata (tags, status)
+Actions
+
+
+Quick actions menu (3-dot menu)
+Favorite/pin toggle
+Share button
+Comment count indicator
+States
+
+
+Default
+Hover
+Selected
+Focused
+Dragging
+Variations
+
+
+Compact (list view)
+Standard (grid view)
+Detailed (with preview)
+4.2.2 Document Viewer
+Functionality
+
+
+Format-specific rendering
+Pagination controls
+Zoom controls
+Search within document
+Full-screen toggle
+Document Types Support
+
+
+Text documents (with formatting)
+Spreadsheets (tabular view)
+Presentations (slide view)
+PDFs (with text layer)
+Images
+Code files (with syntax highlighting)
+Sidebar Controls
+
+
+Toggle comments panel
+Toggle metadata panel
+Toggle related content
+Version history access
+4.2.3 Rich Text Editor
+Formatting Controls
+
+
+Text styling (bold, italic, underline)
+Paragraph formatting (alignment, lists)
+Table insertion and editing
+Link creation
+Image insertion
+Advanced Features
+
+
+@mentions for users
+Document references via {{document}}
+Markdown shortcuts
+Paste handling (clean/rich format)
+AI assistance integration
+Collaboration Features
+
+
+Comment insertion
+Change tracking
+Collaborative editing indicators
+Version history access
+4.3 Search Components
+4.3.1 Search Results
+Result Item
+
+
+Title with highlighted terms
+Source/location information
+Last modified date
+Author information
+Content snippet with highlighted terms
+Relevance indicator
+Results Organization
+
+
+Categorization by type
+Sorting controls
+Pagination
+Results count
+Export results option
+Preview Panel
+
+
+Quick preview of selected result
+Key metadata
+Action buttons
+Related items
+4.3.2 Filter Controls
+Filter Categories
+
+
+Content type filters (checkboxes)
+Date range (calendar picker)
+Source filters (checkboxes)
+Author filters (multiselect)
+Tag filters (multiselect with search)
+Applied Filters
+
+
+Filter pill display
+Individual clear buttons
+Clear all button
+Save filter set option
+Filter Behavior
+
+
+Instant application
+Count indicators
+Mutually exclusive vs. additive
+Persistent across sessions
+4.4 Visualization Components
+4.4.1 Context Graph
+Visual Elements
+
+
+Nodes (documents, entities, topics)
+Edges (relationships)
+Node labels
+Node icons by type
+Edge styling by relationship type
+Interactive Features
+
+
+Zoom and pan
+Node selection
+Edge highlighting
+Node expansion/collapse
+Focus+context view
+Controls
+
+
+Zoom controls
+Filter by node type
+Layout options
+Export/share
+4.4.2 Activity Timeline
+Visual Elements
+
+
+Chronological axis
+Event markers
+User avatars
+Activity type icons
+Content thumbnails
+Interactive Features
+
+
+Scroll/zoom timeline
+Filter by activity type
+Filter by user
+Jump to date
+Activity details on click
+Display Options
+
+
+Compact view
+Detailed view
+Group by day/week/month
+Focus on content item
+4.5 Collaborative Components
+4.5.1 Comment System
+Comment Creation
+
+
+Comment input field
+Rich text formatting
+@mention functionality
+Attachment support
+Submit/cancel controls
+Comment Display
+
+
+Threaded view
+Author information
+Timestamp
+Formatted content
+Attachment previews
+Comment Actions
+
+
+Reply
+Edit (own comments)
+Delete (own comments)
+Resolve/reopen
+Emoji reactions
+4.5.2 Presence Indicators
+User Presence
+
+
+Avatar display
+Status indicator (online, away, offline)
+Current location in document
+Activity indicator (viewing, editing)
+Collaboration Awareness
+
+
+Multiple cursor visualization
+Current selections indication
+Edit indicators
+Conflict prevention alerts
+5. Responsive Design Specifications
+5.1 Device Support
+Desktop (1024px and above)
+
+
+Full feature set
+Optimized for productivity
+Multi-panel layouts
+Keyboard shortcuts
+Tablet (768px - 1023px)
+
+
+Adapted layouts
+Touch-friendly controls
+Collapsible panels
+Essential features prioritized
+Mobile (320px - 767px)
+
+
+Simplified navigation
+Single panel focus
+Bottom navigation bar
+Reduced feature set focusing on viewing and basic editing
+5.2 Adaptation Strategies
+Progressive Enhancement
+
+
+Core functionality works on all devices
+Enhanced features on more capable devices
+Performance optimizations for mobile
+Responsive Patterns
+
+
+Stack patterns for smaller screens
+Side navigation becomes bottom/modal navigation
+Tables adapt to cards
+Multi-column becomes single column
+Touch Optimization
+
+
+Larger touch targets (min 44x44px)
+Swipe gestures where appropriate
+Context menus adapted for touch
+Reduced hover dependence
+5.3 Component Adaptations
+5.3.1 Navigation Adaptation
+Desktop: Full sidebar with expanded labels
+Tablet: Collapsible sidebar with icons
+Mobile: Bottom bar for primary navigation + hamburger menu
+5.3.2 Document List Adaptation
+Desktop: Grid or list view with multiple columns of information
+Tablet: Simplified grid with fewer visible metadata fields
+Mobile: Full-width list with minimal metadata
+5.3.3 Document Viewer Adaptation
+Desktop: Document with side panels for comments/metadata
+Tablet: Document with collapsible side panels
+Mobile: Document focus with panels in bottom sheet
+6. Accessibility Requirements
+6.1 Standards Compliance
+WCAG 2.1 AA compliance required for all components
+Section 508 compliance for US government compatibility
+WAI-ARIA implementation for interactive components
+Regular accessibility audits in development process
+6.2 Specific Requirements
+Keyboard Navigation
+
+
+Full keyboard accessibility
+Logical tab order
+Focus indicators
+Keyboard shortcuts with documentation
+Screen Reader Support
+
+
+Proper ARIA roles and labels
+Meaningful alt text for images
+Descriptive link text
+Form labels and instructions
+Status announcements for dynamic content
+Visual Accessibility
+
+
+Minimum contrast ratios (4.5:1 for normal text, 3:1 for large text)
+Text resizing support up to 200%
+No reliance on color alone for information
+Focus indicators with sufficient contrast
+Dark mode support
+Cognitive Accessibility
+
+
+Clear, consistent navigation
+Error prevention and clear error messages
+Sufficient time for tasks
+Reduced motion option
+Clear language and instructions
+7. Interaction Design Specifications
+7.1 Input Methods
+7.1.1 Mouse Interaction
+Hover States
+
+
+Clear hover feedback
+Tooltips for complex functions
+Preview information where relevant
+Click Actions
+
+
+Primary click for standard actions
+Double-click for open/edit actions
+Right-click for context menus
+Drag and drop for organization
+7.1.2 Keyboard Interaction
+Focus Management
+
+
+Visible focus indicators
+Logical tab order
+Focus trapping in modals
+Return focus after modal close
+Keyboard Shortcuts
+
+
+Navigation shortcuts
+Action shortcuts
+Editor shortcuts
+Shortcut reference (? key)
+Customizable shortcuts (advanced)
+7.1.3 Touch Interaction
+Gesture Support
+
+
+Tap for selection
+Long press for context actions
+Swipe for navigation/actions
+Pinch to zoom
+Two-finger scroll
+Touch Targets
+
+
+Minimum 44x44px for interactive elements
+Sufficient spacing between actions
+Forgiving touch areas
+Touch feedback (visual + haptic where supported)
+7.2 Feedback Systems
+7.2.1 Visual Feedback
+State Changes
+
+
+Clear active/selected states
+Loading indicators for all operations >300ms
+Success/error states
+Progress indicators for longer operations
+Animations
+
+
+Subtle transitions between states (200-300ms)
+Movement to show relationship
+Purpose-driven animation (not decorative)
+Respects reduced motion preferences
+7.2.2 System Messages
+Toast Notifications
+
+
+Brief, non-blocking messages
+Auto-dismiss after 5 seconds
+Action buttons where relevant
+Stacking behavior for multiple messages
+Alert Dialogs
+
+
+Used for important information requiring acknowledgment
+Clear actions
+Descriptive but concise content
+Appropriate warning levels
+Inline Validation
+
+
+Real-time feedback during input
+Error indicators with helpful messages
+Success confirmation
+Field-specific guidance
+7.3 Motion Design
+7.3.1 Transition Principles
+Purposeful Motion
+
+
+Conveys spatial relationships
+Maintains continuity
+Provides feedback
+Directs attention
+Timing Specifications
+
+
+Fast actions: 100-200ms
+Standard transitions: 200-300ms
+Complex transitions: 300-500ms
+Easing: Ease-out for entering, ease-in for exiting
+7.3.2 Animation Types
+Micro-interactions
+
+
+Button state changes
+Form interactions
+Toggle states
+Focus changes
+Component Animations
+
+
+Panel expansion/collapse
+Modal entry/exit
+List item changes
+Content loading
+Page Transitions
+
+
+Page entry/exit
+Content area changes
+Navigation changes
+Context switches
+8. Content Strategy
+8.1 Information Architecture
+8.1.1 Content Organization
+Hierarchical Structure
+
+
+Workspaces > Folders > Documents
+Projects > Tasks > Documents
+Teams > Channels > Conversations
+Relationship-Based Organization
+
+
+Related documents grouping
+Topic clusters
+Entity-based relationships
+Timeline organization
+8.1.2 Navigation Paradigms
+Hierarchical Navigation
+
+
+Breadcrumbs
+Folder trees
+Parent-child relationships
+Faceted Navigation
+
+
+Tag-based filtering
+Multi-dimensional classification
+Attribute filtering
+Search-Based Navigation
+
+
+Global search
+Contextual search
+Natural language queries
+Saved searches
+8.2 Content Display Principles
+8.2.1 Progressive Disclosure
+Implementation Strategy
+
+
+Overview first, details on demand
+Preview then full content
+Collapsed sections for complex information
+"Show more" patterns
+Information Density Levels
+
+
+Compact: High density for expert users
+Standard: Balanced for general use
+Comfortable: Lower density for new users
+User-configurable density settings
+8.2.2 Content Prioritization
+Visual Hierarchy
+
+
+Primary information (large, bold)
+Secondary information (regular weight, medium size)
+Tertiary information (smaller, lighter weight)
+Supportive information (smallest, lightest)
+Context-Aware Prioritization
+
+
+Task-relevant information prominence
+User preference adaptation
+Role-based information emphasis
+Activity-based content highlighting
+9. Implementation Guidelines
+9.1 Component Implementation
+9.1.1 Development Approach
+Component-based architecture using React
+Typescript for type safety
+Styled components for styling
+Storybook for component development and documentation
+Automated accessibility testing integration
+9.1.2 Performance Considerations
+Lazy loading for non-critical components
+Virtual scrolling for long lists
+Image optimization and lazy loading
+Code splitting for route-based loading
+Performance budgets for component loading
+9.2 UI Testing Requirements
+9.2.1 User Testing
+Usability testing requirements
+A/B testing framework
+Analytics integration
+Session recording capabilities
+Feedback collection mechanisms
+9.2.2 Automated Testing
+Unit tests for component logic
+Visual regression testing
+Accessibility automated testing
+Cross-browser compatibility testing
+Performance testing benchmarks
+10. Future Considerations
+10.1 Extensibility
+Plugin architecture for custom components
+Theming support for white-labeling
+API for custom integrations
+Customization options for different user roles
+10.2 Emerging Technologies
+Voice interface integration plans
+AR/VR visualization considerations
+AI-driven personalization roadmap
+Advanced biometric authentication options
+Appendices
+Appendix A: User Personas
+Knowledge Worker (Primary)
+Project Manager
+Executive User
+Administrator
+External Collaborator
+Appendix B: User Flows
+Document discovery journey
+Collaboration workflow
+Information synthesis process
+Administrative tasks flow
+Appendix C: Wireframes
+Key screen wireframes
+Component placement guidelines
+Content organization examples
+Responsive layout examples
+
