@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { NovexaLogo } from "@/components/ui/novexa-logo";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -72,11 +73,7 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <img 
-              src="/assets/novexa-logo.svg" 
-              alt="Novexa Logo" 
-              className="h-20 w-auto" 
-            />
+            <NovexaLogo className="h-20 w-auto" />
           </div>
           <CardTitle className="text-2xl text-center">Admin Portal</CardTitle>
           <CardDescription className="text-center">
