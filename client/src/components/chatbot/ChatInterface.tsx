@@ -58,7 +58,7 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: `Hello! I'm your Novexa Project Intelligence Assistant. I can help you manage your projects, detect blockers, and suggest next steps.${currentUserContext ? ` I see you're currently ${currentUserContext.action} ${currentUserContext.document} in ${currentUserContext.tool}.` : ''} How can I assist you today?`,
+      text: `Hello! I'm your Novexa AI. I can help you manage your projects, detect blockers, and suggest next steps.${currentUserContext ? ` I see you're currently ${currentUserContext.action} ${currentUserContext.document} in ${currentUserContext.tool}.` : ''} How can I assist you today?`,
       sender: 'bot',
       timestamp: new Date(),
       type: 'text'
@@ -872,7 +872,7 @@ export function ChatInterface() {
         <Button
           onClick={toggleAssistant}
           className="fixed bottom-4 right-4 rounded-full h-14 w-14 p-0 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary text-primary-foreground flex items-center justify-center"
-          aria-label="Open Novexa Assistant"
+          aria-label="Open Novexa AI"
         >
           <div className="relative">
             <BrainCircuit className="h-7 w-7" />
@@ -960,8 +960,8 @@ export function ChatInterface() {
                     >
                       {message.sender === 'bot' && (
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src="/avatars/01.png" alt="AI Assistant" />
-                          <AvatarFallback>AI</AvatarFallback>
+                          <AvatarImage src="/avatars/01.png" alt="Novexa AI" />
+                          <AvatarFallback>NX</AvatarFallback>
                         </Avatar>
                       )}
                       <div
