@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
+import ForceGraph2D from 'react-force-graph-2d';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -16,7 +16,8 @@ import {
   GanttChart,
   MessageSquare,
   Calendar,
-  ArrowLeftRight
+  ArrowLeftRight,
+  X
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';

@@ -15,8 +15,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   Download,
-  Loader2
+  Loader2,
+  Network
 } from 'lucide-react';
+
+import { ContextGraph, GraphData } from '@/components/graph/ContextGraph';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +59,44 @@ export default function Dashboard() {
     time: string;
     icon: JSX.Element;
   }>>([]);
+  
+  // Sample graph data for the ContextGraph component
+  const sampleGraphData: GraphData = {
+    nodes: [
+      { id: "doc1", label: "Project Plan", type: "document", group: "Planning" },
+      { id: "doc2", label: "Requirements Doc", type: "document", group: "Planning" },
+      { id: "doc3", label: "API Documentation", type: "document", group: "Development" },
+      { id: "task1", label: "Frontend Design", type: "task", group: "Design" },
+      { id: "task2", label: "Backend API", type: "task", group: "Development" },
+      { id: "task3", label: "Database Setup", type: "task", group: "Development" },
+      { id: "person1", label: "Sarah Miller", type: "person", group: "Design Team" },
+      { id: "person2", label: "Alex Kim", type: "person", group: "Development Team" },
+      { id: "person3", label: "Jamal Wilson", type: "person", group: "Project Management" },
+      { id: "proj1", label: "Website Redesign", type: "project", group: "Main Projects" },
+      { id: "topic1", label: "UI/UX", type: "topic", group: "Design Concepts" },
+      { id: "topic2", label: "Authentication", type: "topic", group: "Security" },
+      { id: "event1", label: "Design Review", type: "event", group: "Meetings" },
+      { id: "entity1", label: "Customer Feedback", type: "entity", group: "External" }
+    ],
+    links: [
+      { source: "proj1", target: "doc1", type: "contains" },
+      { source: "proj1", target: "doc2", type: "contains" },
+      { source: "proj1", target: "task1", type: "contains" },
+      { source: "proj1", target: "task2", type: "contains" },
+      { source: "person1", target: "task1", type: "assigned" },
+      { source: "person2", target: "task2", type: "assigned" },
+      { source: "person3", target: "doc1", type: "created" },
+      { source: "person3", target: "proj1", type: "manages" },
+      { source: "doc1", target: "doc2", type: "references" },
+      { source: "doc2", target: "doc3", type: "references" },
+      { source: "task2", target: "doc3", type: "produces" },
+      { source: "task3", target: "task2", type: "depends_on" },
+      { source: "topic1", target: "task1", type: "relates_to" },
+      { source: "topic2", target: "task2", type: "relates_to" },
+      { source: "event1", target: "topic1", type: "discusses" },
+      { source: "entity1", target: "topic1", type: "influences" }
+    ]
+  };
   
   // Handle report generation
   const handleGenerateReport = () => {
@@ -839,6 +880,35 @@ export default function Dashboard() {
 
         {/* Insights Tab */}
         <TabsContent value="insights" className="space-y-4">
+          {/* Project Relationship Graph - Added per UI/UX PRD */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Project Relationship Graph</CardTitle>
+                  <CardDescription>Visualizing connections between project elements</CardDescription>
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Network className="h-3 w-3" /> New Visualization
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[500px] w-full border rounded-md">
+                <ContextGraph 
+                  data={sampleGraphData} 
+                  onNodeClick={(node) => {
+                    toast({
+                      title: `Selected: ${node.label}`,
+                      description: `Type: ${node.type}, Group: ${node.group}`,
+                    });
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* AI-Powered Insights */}
           <Card>
             <CardHeader>
               <CardTitle>AI-Powered Insights</CardTitle>
@@ -890,10 +960,10 @@ export default function Dashboard() {
                     time: "1 week ago",
                   },
                 ].map((insight) => (
-                  <Card key={insight.id} className="border-l-4 pl-0 
+                  <Card key={insight.id} className={`border-l-4 pl-0 
                     ${insight.type === 'warning' ? 'border-l-amber-500' : 
                     insight.type === 'success' ? 'border-l-green-500' : 
-                    insight.type === 'alert' ? 'border-l-red-500' : 'border-l-blue-500'}">
+                    insight.type === 'alert' ? 'border-l-red-500' : 'border-l-blue-500'}`}>
                     <CardHeader className="p-4">
                       <div className="flex items-center gap-2">
                         <div className={`rounded-full p-1 
