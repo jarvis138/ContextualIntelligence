@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { SearchImplementationCard } from "@/components/search/SearchImplementationCard";
 import { 
   Search, 
   Filter, 
@@ -1368,53 +1369,7 @@ export default function SearchPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Enterprise-Grade Search Implementation</CardTitle>
-          <CardDescription>
-            Features aligned with the Technical Product Requirements
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Cross-Platform Query Engine</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Tenant Isolation & Data Security</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>AI-Enhanced Result Ranking</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Multi-Index Search Architecture</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Real-Time Knowledge Graph</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SearchImplementationCard />
     </div>
   );
 }
