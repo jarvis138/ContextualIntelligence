@@ -29,6 +29,7 @@ import { TourContextProvider } from "@/contexts/TourContext";
 import { TourManager } from "@/components/tour/TourManager";
 import { ProjectAssistantProvider } from "@/contexts/ProjectAssistantContext";
 import { ChatInterface } from "@/components/chatbot/ChatInterface";
+import { PreferencesProvider } from "@/context/PreferencesContext";
 
 // Simplified App with direct routes and no authentication
 function App() {
@@ -92,67 +93,69 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TourContextProvider>
-        <ProjectAssistantProvider>
-          <Switch>
-            {/* Admin routes outside of MainLayout */}
-            <Route path="/admin/login">
-              <AdminLoginPage />
-            </Route>
-            
-            <Route path="/admin/dashboard">
-              <AdminPage />
-            </Route>
+      <PreferencesProvider>
+        <TourContextProvider>
+          <ProjectAssistantProvider>
+            <Switch>
+              {/* Admin routes outside of MainLayout */}
+              <Route path="/admin/login">
+                <AdminLoginPage />
+              </Route>
+              
+              <Route path="/admin/dashboard">
+                <AdminPage />
+              </Route>
 
-            <Route path="/admin/tenant-management">
-              <TenantManagementPage />
-            </Route>
-            
-            <Route path="/admin">
-              {/* Redirect /admin to either login or dashboard based on auth status */}
-              {() => {
-                const isAuthenticated = localStorage.getItem("admin_authenticated") === "true";
-                if (isAuthenticated) {
-                  window.location.href = "/admin/dashboard";
-                } else {
-                  window.location.href = "/admin/login";
-                }
-                return null;
-              }}
-            </Route>
-            
-            {/* All other routes with MainLayout */}
-            <Route>
-              <MainLayout>
-                <Switch>
-                  <Route path="/projects" component={Projects} />
-                  <Route path="/documents" component={DocumentsPage} />
-                  <Route path="/teams" component={TeamsPage} />
-                  <Route path="/workspace" component={WorkspacePage} />
-                  <Route path="/analytics" component={AnalyticsPage} />
-                  <Route path="/reports-alerts" component={ReportsAlertsPage} />
-                  <Route path="/insights" component={InsightsPage} />
-                  <Route path="/intelligence" component={IntelligenceDashboard} />
-                  <Route path="/integrations" component={ConnectorsPage} />
-                  <Route path="/connectors" component={ConnectorsPage} />
-                  <Route path="/graph" component={GraphPage} />
-                  <Route path="/search" component={Search} />
-                  <Route path="/settings" component={SettingsPage} />
-                  <Route path="/system" component={SystemPage} />
-                  <Route path="/profile" component={PlaceholderPage} />
-                  <Route path="/" component={Dashboard} />
-                  <Route component={NotFound} />
-                </Switch>
-              </MainLayout>
-            </Route>
-          </Switch>
-          {/* Tour Manager for guided tours */}
-          <TourManager />
-          {/* Chatbot Interface */}
-          <ChatInterface />
-          <Toaster />
-        </ProjectAssistantProvider>
-      </TourContextProvider>
+              <Route path="/admin/tenant-management">
+                <TenantManagementPage />
+              </Route>
+              
+              <Route path="/admin">
+                {/* Redirect /admin to either login or dashboard based on auth status */}
+                {() => {
+                  const isAuthenticated = localStorage.getItem("admin_authenticated") === "true";
+                  if (isAuthenticated) {
+                    window.location.href = "/admin/dashboard";
+                  } else {
+                    window.location.href = "/admin/login";
+                  }
+                  return null;
+                }}
+              </Route>
+              
+              {/* All other routes with MainLayout */}
+              <Route>
+                <MainLayout>
+                  <Switch>
+                    <Route path="/projects" component={Projects} />
+                    <Route path="/documents" component={DocumentsPage} />
+                    <Route path="/teams" component={TeamsPage} />
+                    <Route path="/workspace" component={WorkspacePage} />
+                    <Route path="/analytics" component={AnalyticsPage} />
+                    <Route path="/reports-alerts" component={ReportsAlertsPage} />
+                    <Route path="/insights" component={InsightsPage} />
+                    <Route path="/intelligence" component={IntelligenceDashboard} />
+                    <Route path="/integrations" component={ConnectorsPage} />
+                    <Route path="/connectors" component={ConnectorsPage} />
+                    <Route path="/graph" component={GraphPage} />
+                    <Route path="/search" component={Search} />
+                    <Route path="/settings" component={SettingsPage} />
+                    <Route path="/system" component={SystemPage} />
+                    <Route path="/profile" component={PlaceholderPage} />
+                    <Route path="/" component={Dashboard} />
+                    <Route component={NotFound} />
+                  </Switch>
+                </MainLayout>
+              </Route>
+            </Switch>
+            {/* Tour Manager for guided tours */}
+            <TourManager />
+            {/* Chatbot Interface */}
+            <ChatInterface />
+            <Toaster />
+          </ProjectAssistantProvider>
+        </TourContextProvider>
+      </PreferencesProvider>
     </QueryClientProvider>
   );
 }
