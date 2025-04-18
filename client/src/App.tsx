@@ -11,6 +11,7 @@ import ReportsAlertsPage from "@/pages/reports-alerts-page";
 import InsightsPage from "@/pages/insights-page";
 import IntelligenceDashboard from "@/pages/intelligence-dashboard";
 import SearchPage from "@/pages/search-page";
+import Search from "@/pages/Search";
 import SettingsPage from "@/pages/settings-page";
 import AdminPage from "@/pages/admin-page";
 import AdminLoginPage from "@/pages/admin-login";
@@ -135,7 +136,7 @@ function App() {
                   <Route path="/integrations" component={ConnectorsPage} />
                   <Route path="/connectors" component={ConnectorsPage} />
                   <Route path="/graph" component={GraphPage} />
-                  <Route path="/search" component={SearchPage} />
+                  <Route path="/search" component={Search} />
                   <Route path="/settings" component={SettingsPage} />
                   <Route path="/system" component={SystemPage} />
                   <Route path="/profile" component={PlaceholderPage} />

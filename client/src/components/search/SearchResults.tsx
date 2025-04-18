@@ -1,725 +1,474 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
+import { format } from 'date-fns';
 import { 
-  CalendarIcon, 
-  ChevronDown, 
-  ChevronUp, 
-  Clock, 
-  FileText, 
-  FilterIcon, 
-  FolderIcon, 
-  Grid, 
-  Image as ImageIcon, 
-  List, 
-  MessageSquare, 
-  MoreHorizontal, 
   Search, 
-  SlidersHorizontal, 
-  UserIcon, 
-  X 
+  Filter, 
+  DownloadCloud, 
+  Share, 
+  Calendar, 
+  User, 
+  FileText, 
+  MessageSquare, 
+  Mail,
+  Clock,
+  Tag,
+  Paperclip,
+  ChevronDown,
+  ChevronsUpDown
 } from 'lucide-react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export type SearchResultType = 
-  | 'document' 
-  | 'message' 
-  | 'contact' 
-  | 'task' 
-  | 'event' 
-  | 'project' 
-  | 'file';
+// Define types for search results
+export type SearchResultType = 'document' | 'file' | 'event' | 'message' | 'email' | 'contact' | 'task';
+export type SearchResultSource = 'workspace' | 'drive' | 'slack' | 'email' | 'figma' | 'github' | 'jira';
 
-export type SearchResultSource = 
-  | 'workspace' 
-  | 'drive' 
-  | 'slack' 
-  | 'email' 
-  | 'figma';
+export interface Author {
+  id: string;
+  name: string;
+  avatar?: string;
+}
 
 export interface SearchResult {
-  id: string | number;
+  id: string;
   title: string;
   excerpt?: string;
   type: SearchResultType;
   source: SearchResultSource;
-  url?: string;
-  created: string | Date;
-  updated: string | Date;
-  author: {
-    id: string | number;
-    name: string;
-    avatar?: string;
-  };
-  relevanceScore?: number;
+  created: Date;
+  updated: Date;
+  author: Author;
+  relevanceScore: number;
   tags?: string[];
-  folderId?: string | number;
-  folderName?: string;
+  url: string;
 }
 
 interface SearchResultsProps {
   results: SearchResult[];
-  totalCount?: number;
   query: string;
   loading?: boolean;
   onFilterChange?: (filters: any) => void;
-  selectedResult?: string | number | null;
-  onSelectResult?: (result: SearchResult) => void;
-  className?: string;
+  totalCount: number;
 }
 
 /**
- * Search icon for search result by type
- */
-const getResultIcon = (type: SearchResultType) => {
-  switch (type) {
-    case 'document':
-      return <FileText className="h-4 w-4 text-blue-500" />;
-    case 'message':
-      return <MessageSquare className="h-4 w-4 text-green-500" />;
-    case 'contact':
-      return <UserIcon className="h-4 w-4 text-purple-500" />;
-    case 'task':
-      return <Clock className="h-4 w-4 text-amber-500" />;
-    case 'event':
-      return <CalendarIcon className="h-4 w-4 text-pink-500" />;
-    case 'project':
-      return <FolderIcon className="h-4 w-4 text-orange-500" />;
-    case 'file':
-      return <ImageIcon className="h-4 w-4 text-sky-500" />;
-    default:
-      return <FileText className="h-4 w-4 text-gray-500" />;
-  }
-};
-
-/**
- * Source badge for search results
- */
-const SourceBadge = ({ source }: { source: SearchResultSource }) => {
-  const getSourceColor = () => {
-    switch (source) {
-      case 'workspace':
-        return "bg-blue-100 text-blue-800 hover:bg-blue-100";
-      case 'drive':
-        return "bg-green-100 text-green-800 hover:bg-green-100";
-      case 'slack':
-        return "bg-purple-100 text-purple-800 hover:bg-purple-100";
-      case 'email':
-        return "bg-amber-100 text-amber-800 hover:bg-amber-100";
-      case 'figma':
-        return "bg-pink-100 text-pink-800 hover:bg-pink-100";
-      default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-100";
-    }
-  };
-
-  return (
-    <Badge 
-      variant="outline" 
-      className={cn("text-xs font-normal py-0 h-5", getSourceColor())}
-    >
-      {source}
-    </Badge>
-  );
-};
-
-/**
  * SearchResults Component
- * Displays search results with filtering and preview capabilities
+ * 
+ * Displays search results with filtering options according to PRD specifications
  */
-export function SearchResults({
-  results,
-  totalCount = 0,
-  query,
+export default function SearchResults({ 
+  results, 
+  query, 
   loading = false,
   onFilterChange,
-  selectedResult,
-  onSelectResult,
-  className,
+  totalCount
 }: SearchResultsProps) {
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [sortOrder, setSortOrder] = useState<'relevance' | 'date'>('relevance');
-  const [filtersVisible, setFiltersVisible] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<{
-    types: SearchResultType[];
-    sources: SearchResultSource[];
-    dateRange: string;
-    people: string[];
-  }>({
-    types: [],
-    sources: [],
-    dateRange: 'anytime',
-    people: [],
-  });
-
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState<SearchResultType[]>([]);
+  const [selectedSources, setSelectedSources] = useState<SearchResultSource[]>([]);
+  const [dateRange, setDateRange] = useState('anytime');
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  
   // Handle filter changes
-  const handleFilterChange = (newFilters: any) => {
-    const updatedFilters = { ...activeFilters, ...newFilters };
-    setActiveFilters(updatedFilters);
+  const updateFilters = () => {
     if (onFilterChange) {
-      onFilterChange(updatedFilters);
+      onFilterChange({
+        types: selectedTypes,
+        sources: selectedSources,
+        dateRange,
+        people: selectedPeople
+      });
     }
   };
-
-  // Clear all filters
-  const clearFilters = () => {
-    const resetFilters = {
-      types: [],
-      sources: [],
-      dateRange: 'anytime',
-      people: [],
-    };
-    setActiveFilters(resetFilters);
-    if (onFilterChange) {
-      onFilterChange(resetFilters);
-    }
-  };
-
-  // Remove a single filter
-  const removeFilter = (type: keyof typeof activeFilters, value: string) => {
-    const newFilters = { ...activeFilters };
-    if (type === 'dateRange') {
-      newFilters.dateRange = 'anytime';
-    } else {
-      newFilters[type] = (newFilters[type] as string[]).filter(v => v !== value);
-    }
-    setActiveFilters(newFilters);
-    if (onFilterChange) {
-      onFilterChange(newFilters);
-    }
-  };
-
-  // Get active filter count
-  const getActiveFilterCount = () => {
-    return activeFilters.types.length + 
-           activeFilters.sources.length + 
-           (activeFilters.dateRange !== 'anytime' ? 1 : 0) + 
-           activeFilters.people.length;
-  };
-
-  // Render active filter pills
-  const renderFilterPills = () => {
-    const pills = [];
-    
-    activeFilters.types.forEach(type => {
-      pills.push(
-        <Badge key={`type-${type}`} variant="outline" className="flex items-center gap-1 h-6">
-          {getResultIcon(type)}
-          <span>{type.charAt(0).toUpperCase() + type.slice(1)}</span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-4 w-4 p-0 ml-1"
-            onClick={() => removeFilter('types', type)}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove</span>
-          </Button>
-        </Badge>
-      );
-    });
-    
-    activeFilters.sources.forEach(source => {
-      pills.push(
-        <Badge key={`source-${source}`} variant="outline" className="flex items-center gap-1 h-6">
-          <span>{source.charAt(0).toUpperCase() + source.slice(1)}</span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-4 w-4 p-0 ml-1"
-            onClick={() => removeFilter('sources', source)}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove</span>
-          </Button>
-        </Badge>
-      );
-    });
-    
-    if (activeFilters.dateRange !== 'anytime') {
-      pills.push(
-        <Badge key="date" variant="outline" className="flex items-center gap-1 h-6">
-          <CalendarIcon className="h-3 w-3 mr-1" />
-          <span>{activeFilters.dateRange.replace('-', ' ')}</span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-4 w-4 p-0 ml-1"
-            onClick={() => removeFilter('dateRange', '')}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove</span>
-          </Button>
-        </Badge>
-      );
-    }
-    
-    activeFilters.people.forEach(person => {
-      pills.push(
-        <Badge key={`person-${person}`} variant="outline" className="flex items-center gap-1 h-6">
-          <UserIcon className="h-3 w-3 mr-1" />
-          <span>{person}</span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-4 w-4 p-0 ml-1"
-            onClick={() => removeFilter('people', person)}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove</span>
-          </Button>
-        </Badge>
-      );
-    });
-    
-    return pills;
-  };
-
-  // Render empty state
-  if (results.length === 0 && !loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-          <Search className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-1">No results found</h3>
-        <p className="text-sm text-muted-foreground max-w-md mb-4">
-          We couldn't find any results matching "{query}". Try adjusting your search or filters.
-        </p>
-        <Button variant="outline" onClick={clearFilters}>
-          Clear Filters
-        </Button>
-      </div>
+  
+  // Toggle type filter
+  const toggleTypeFilter = (type: SearchResultType) => {
+    setSelectedTypes(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type) 
+        : [...prev, type]
     );
-  }
-
-  // Render loading state
+    updateFilters();
+  };
+  
+  // Toggle source filter
+  const toggleSourceFilter = (source: SearchResultSource) => {
+    setSelectedSources(prev => 
+      prev.includes(source) 
+        ? prev.filter(s => s !== source) 
+        : [...prev, source]
+    );
+    updateFilters();
+  };
+  
+  // Change date range
+  const handleDateRangeChange = (range: string) => {
+    setDateRange(range);
+    updateFilters();
+  };
+  
+  // Toggle person filter
+  const togglePersonFilter = (personId: string) => {
+    setSelectedPeople(prev => 
+      prev.includes(personId) 
+        ? prev.filter(id => id !== personId) 
+        : [...prev, personId]
+    );
+    updateFilters();
+  };
+  
+  // Get icon for result type
+  const getResultTypeIcon = (type: SearchResultType) => {
+    switch (type) {
+      case 'document': return <FileText className="h-4 w-4 text-blue-600" />;
+      case 'file': return <Paperclip className="h-4 w-4 text-green-600" />;
+      case 'event': return <Calendar className="h-4 w-4 text-amber-600" />;
+      case 'message': return <MessageSquare className="h-4 w-4 text-purple-600" />;
+      case 'email': return <Mail className="h-4 w-4 text-red-600" />;
+      case 'contact': return <User className="h-4 w-4 text-cyan-600" />;
+      case 'task': return <Clock className="h-4 w-4 text-orange-600" />;
+      default: return <FileText className="h-4 w-4 text-gray-600" />;
+    }
+  };
+  
+  // Get icon for result source
+  const getResultSourceIcon = (source: SearchResultSource) => {
+    switch (source) {
+      case 'workspace': return <FileText className="h-4 w-4" />;
+      case 'drive': return <DownloadCloud className="h-4 w-4" />;
+      case 'slack': return <MessageSquare className="h-4 w-4" />;
+      case 'email': return <Mail className="h-4 w-4" />;
+      case 'figma': return <Paperclip className="h-4 w-4" />;
+      case 'github': return <Paperclip className="h-4 w-4" />;
+      case 'jira': return <Paperclip className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
+  };
+  
+  // Get display name for source
+  const getSourceDisplayName = (source: SearchResultSource) => {
+    switch (source) {
+      case 'workspace': return 'Workspace';
+      case 'drive': return 'Google Drive';
+      case 'slack': return 'Slack';
+      case 'email': return 'Email';
+      case 'figma': return 'Figma';
+      case 'github': return 'GitHub';
+      case 'jira': return 'Jira';
+      default: return source.charAt(0).toUpperCase() + source.slice(1);
+    }
+  };
+  
+  // Highlight search query in text
+  const highlightQuery = (text: string) => {
+    if (!query.trim()) return text;
+    
+    const regex = new RegExp(`(${query.trim()})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, i) => 
+      regex.test(part) ? <mark key={i} className="bg-yellow-100 dark:bg-yellow-800">{part}</mark> : part
+    );
+  };
+  
+  // Get the icon for a type filter
+  const getTypeFilterIcon = (type: SearchResultType) => {
+    switch (type) {
+      case 'document': return <FileText className="h-4 w-4" />;
+      case 'file': return <Paperclip className="h-4 w-4" />;
+      case 'event': return <Calendar className="h-4 w-4" />;
+      case 'message': return <MessageSquare className="h-4 w-4" />;
+      case 'email': return <Mail className="h-4 w-4" />;
+      case 'contact': return <User className="h-4 w-4" />;
+      case 'task': return <Clock className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
+  };
+  
+  // Loading skeletons for search results
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="h-12 w-12 rounded-full border-4 border-muted border-t-primary animate-spin mb-4" />
-        <p className="text-muted-foreground">Searching...</p>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+        
+        {[1, 2, 3].map((item) => (
+          <Card key={item} className="overflow-hidden">
+            <CardContent className="p-4">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <div className="flex items-center space-x-2 mt-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
-
+  
+  // Empty results state
+  if (results.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+          <Search className="h-8 w-8 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No results found</h3>
+          <p className="text-muted-foreground max-w-md">
+            We couldn't find any results matching "{query}". Try adjusting your search terms or filters.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
-    <div className={cn("flex flex-col md:flex-row gap-6", className)}>
-      {/* Mobile Filter Button */}
-      <div className="flex md:hidden justify-between mb-4">
-        <p className="text-sm text-muted-foreground">
-          {totalCount} results for "{query}"
-        </p>
-        <Sheet open={filtersVisible} onOpenChange={setFiltersVisible}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center">
-              <FilterIcon className="h-4 w-4 mr-2" />
-              <span>Filters</span>
-              {getActiveFilterCount() > 0 && (
-                <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
-                  {getActiveFilterCount()}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-            <SheetHeader>
-              <SheetTitle>Filters</SheetTitle>
-            </SheetHeader>
-            <div className="py-4">
-              {/* Filter content for mobile */}
-              {/* Content types filter */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium mb-3">Content Type</h3>
-                <div className="space-y-2">
-                  {['document', 'message', 'file', 'task', 'event', 'contact', 'project'].map((type) => (
-                    <div key={type} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`mobile-type-${type}`}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        checked={activeFilters.types.includes(type as SearchResultType)}
-                        onChange={(e) => {
-                          const newTypes = e.target.checked
-                            ? [...activeFilters.types, type as SearchResultType]
-                            : activeFilters.types.filter(t => t !== type);
-                          handleFilterChange({ types: newTypes });
-                        }}
-                      />
-                      <label htmlFor={`mobile-type-${type}`} className="ml-2 text-sm">
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </label>
-                    </div>
-                  ))}
+    <div className="space-y-4">
+      <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:space-y-0">
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{totalCount}</span> results for 
+          <span className="font-medium text-foreground"> "{query}"</span>
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          className="flex items-center"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filters
+          <ChevronDown className={cn("ml-2 h-4 w-4 transition-transform", filtersOpen ? "rotate-180" : "")} />
+        </Button>
+      </div>
+      
+      {/* Filters section */}
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <CollapsibleContent>
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Type filters */}
+                <div>
+                  <h4 className="font-medium mb-2">Content Type</h4>
+                  <div className="space-y-2">
+                    {['document', 'file', 'event', 'message', 'email', 'contact', 'task'].map((type) => (
+                      <div key={type} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`type-${type}`} 
+                          checked={selectedTypes.includes(type as SearchResultType)}
+                          onCheckedChange={() => toggleTypeFilter(type as SearchResultType)}
+                        />
+                        <label 
+                          htmlFor={`type-${type}`} 
+                          className="flex items-center cursor-pointer text-sm"
+                        >
+                          {getTypeFilterIcon(type as SearchResultType)}
+                          <span className="ml-2 capitalize">{type}s</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Source filters */}
+                <div>
+                  <h4 className="font-medium mb-2">Source</h4>
+                  <div className="space-y-2">
+                    {['workspace', 'drive', 'slack', 'email', 'figma', 'github', 'jira'].map((source) => (
+                      <div key={source} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`source-${source}`} 
+                          checked={selectedSources.includes(source as SearchResultSource)}
+                          onCheckedChange={() => toggleSourceFilter(source as SearchResultSource)}
+                        />
+                        <label 
+                          htmlFor={`source-${source}`} 
+                          className="flex items-center cursor-pointer text-sm"
+                        >
+                          {getResultSourceIcon(source as SearchResultSource)}
+                          <span className="ml-2">{getSourceDisplayName(source as SearchResultSource)}</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Date range */}
+                <div>
+                  <h4 className="font-medium mb-2">Date</h4>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'anytime', label: 'Anytime' },
+                      { id: 'past-day', label: 'Past 24 hours' },
+                      { id: 'past-week', label: 'Past week' },
+                      { id: 'past-month', label: 'Past month' },
+                      { id: 'past-year', label: 'Past year' },
+                      { id: 'custom', label: 'Custom range' }
+                    ].map((range) => (
+                      <div key={range.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`date-${range.id}`} 
+                          checked={dateRange === range.id}
+                          onCheckedChange={() => handleDateRangeChange(range.id)}
+                        />
+                        <label 
+                          htmlFor={`date-${range.id}`} 
+                          className="cursor-pointer text-sm"
+                        >
+                          {range.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {/* Sources filter */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium mb-3">Sources</h3>
-                <div className="space-y-2">
-                  {['workspace', 'drive', 'slack', 'email', 'figma'].map((source) => (
-                    <div key={source} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`mobile-source-${source}`}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        checked={activeFilters.sources.includes(source as SearchResultSource)}
-                        onChange={(e) => {
-                          const newSources = e.target.checked
-                            ? [...activeFilters.sources, source as SearchResultSource]
-                            : activeFilters.sources.filter(s => s !== source);
-                          handleFilterChange({ sources: newSources });
-                        }}
-                      />
-                      <label htmlFor={`mobile-source-${source}`} className="ml-2 text-sm">
-                        {source.charAt(0).toUpperCase() + source.slice(1)}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date filter */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium mb-3">Date</h3>
-                <Select
-                  value={activeFilters.dateRange}
-                  onValueChange={(value) => handleFilterChange({ dateRange: value })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Any time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="anytime">Any time</SelectItem>
-                    <SelectItem value="past-day">Past 24 hours</SelectItem>
-                    <SelectItem value="past-week">Past week</SelectItem>
-                    <SelectItem value="past-month">Past month</SelectItem>
-                    <SelectItem value="past-year">Past year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+              
               <div className="flex justify-end mt-4">
                 <Button 
                   variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedTypes([]);
+                    setSelectedSources([]);
+                    setDateRange('anytime');
+                    setSelectedPeople([]);
+                    updateFilters();
+                  }}
                   className="mr-2"
-                  onClick={clearFilters}
                 >
-                  Clear All
+                  Reset Filters
                 </Button>
-                <Button onClick={() => setFiltersVisible(false)}>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    setFiltersOpen(false);
+                    updateFilters();
+                  }}
+                >
                   Apply Filters
                 </Button>
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Desktop Filter Panel */}
-      <div className="hidden md:block w-[240px] flex-shrink-0">
-        <div className="sticky top-4">
-          <div className="mb-4">
-            <h3 className="text-sm font-medium mb-2">Filters</h3>
-            <p className="text-xs text-muted-foreground">
-              {totalCount} results for "{query}"
-            </p>
-          </div>
-
-          {/* Content types filter */}
-          <div className="mb-6">
-            <h4 className="text-xs font-medium uppercase text-muted-foreground mb-2">
-              Content Type
-            </h4>
-            <div className="space-y-2">
-              {['document', 'message', 'file', 'task', 'event', 'contact', 'project'].map((type) => (
-                <div key={type} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`type-${type}`}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={activeFilters.types.includes(type as SearchResultType)}
-                    onChange={(e) => {
-                      const newTypes = e.target.checked
-                        ? [...activeFilters.types, type as SearchResultType]
-                        : activeFilters.types.filter(t => t !== type);
-                      handleFilterChange({ types: newTypes });
-                    }}
-                  />
-                  <label htmlFor={`type-${type}`} className="ml-2 text-sm">
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </label>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
+      
+      {/* Results list */}
+      <div className="space-y-4">
+        {results.map((result) => (
+          <Card key={result.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start">
+                <div className="mr-3 mt-1">
+                  {getResultTypeIcon(result.type)}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Sources filter */}
-          <div className="mb-6">
-            <h4 className="text-xs font-medium uppercase text-muted-foreground mb-2">
-              Sources
-            </h4>
-            <div className="space-y-2">
-              {['workspace', 'drive', 'slack', 'email', 'figma'].map((source) => (
-                <div key={source} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`source-${source}`}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={activeFilters.sources.includes(source as SearchResultSource)}
-                    onChange={(e) => {
-                      const newSources = e.target.checked
-                        ? [...activeFilters.sources, source as SearchResultSource]
-                        : activeFilters.sources.filter(s => s !== source);
-                      handleFilterChange({ sources: newSources });
-                    }}
-                  />
-                  <label htmlFor={`source-${source}`} className="ml-2 text-sm">
-                    {source.charAt(0).toUpperCase() + source.slice(1)}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Date filter */}
-          <div className="mb-6">
-            <h4 className="text-xs font-medium uppercase text-muted-foreground mb-2">
-              Date
-            </h4>
-            <Select
-              value={activeFilters.dateRange}
-              onValueChange={(value) => handleFilterChange({ dateRange: value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any time" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anytime">Any time</SelectItem>
-                <SelectItem value="past-day">Past 24 hours</SelectItem>
-                <SelectItem value="past-week">Past week</SelectItem>
-                <SelectItem value="past-month">Past month</SelectItem>
-                <SelectItem value="past-year">Past year</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {getActiveFilterCount() > 0 && (
-            <Button 
-              variant="ghost" 
-              className="text-xs px-2 h-8 text-muted-foreground"
-              onClick={clearFilters}
-            >
-              Clear all filters
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Results area */}
-      <div className="flex-1 min-w-0">
-        {/* Results header */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex flex-wrap gap-2">
-            {getActiveFilterCount() > 0 && renderFilterPills()}
-          </div>
-          <div className="flex items-center gap-2">
-            <Select 
-              value={sortOrder} 
-              onValueChange={(value) => setSortOrder(value as 'relevance' | 'date')}
-            >
-              <SelectTrigger className="w-[120px] h-8 text-xs">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="relevance">Relevance</SelectItem>
-                <SelectItem value="date">Date (newest)</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="bg-muted p-1 rounded-md hidden md:flex">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-7 w-7 p-0",
-                  viewMode === 'list' && "bg-background shadow-sm"
-                )}
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-7 w-7 p-0",
-                  viewMode === 'grid' && "bg-background shadow-sm"
-                )}
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Results */}
-        {viewMode === 'list' ? (
-          <div className="space-y-4">
-            {results.map((result) => (
-              <Card
-                key={result.id}
-                className={cn(
-                  "overflow-hidden hover:shadow-md transition-shadow",
-                  selectedResult === result.id && "ring-2 ring-primary ring-opacity-50"
-                )}
-                onClick={() => onSelectResult && onSelectResult(result)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex">
-                    <div className={`w-2 ${
-                      result.source === 'drive' ? 'bg-green-500' :
-                      result.source === 'slack' ? 'bg-purple-500' :
-                      result.source === 'email' ? 'bg-amber-500' :
-                      result.source === 'figma' ? 'bg-pink-500' :
-                      'bg-blue-500'
-                    }`}></div>
-                    <div className="flex-1 ml-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center">
-                          {getResultIcon(result.type)}
-                          <h3 className="ml-2 font-medium">
-                            <Link href={result.url || '#'} className="hover:underline">
-                              {result.title}
-                            </Link>
-                          </h3>
-                        </div>
-                        <SourceBadge source={result.source} />
-                      </div>
-                      
-                      {result.excerpt && (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {result.excerpt}
-                        </p>
-                      )}
-                      
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
-                        <div className="flex items-center">
-                          <Avatar className="h-5 w-5 mr-2">
-                            <AvatarImage src={result.author.avatar} alt={result.author.name} />
-                            <AvatarFallback>{result.author.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs text-muted-foreground">{result.author.name}</span>
-                          <span className="mx-2 text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">
-                            {typeof result.updated === 'string' 
-                              ? result.updated 
-                              : new Date(result.updated).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          {result.folderName && (
-                            <span className="text-xs text-muted-foreground flex items-center">
-                              <FolderIcon className="h-3 w-3 mr-1" />
-                              {result.folderName}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {results.map((result) => (
-              <Card
-                key={result.id}
-                className={cn(
-                  "overflow-hidden hover:shadow-md transition-shadow cursor-pointer",
-                  selectedResult === result.id && "ring-2 ring-primary ring-opacity-50"
-                )}
-                onClick={() => onSelectResult && onSelectResult(result)}
-              >
-                <CardHeader className="p-4 pb-2">
+                
+                <div className="flex-1">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center">
-                      {getResultIcon(result.type)}
-                      <CardTitle className="ml-2 text-base">
-                        <Link href={result.url || '#'} className="hover:underline">
-                          {result.title}
-                        </Link>
-                      </CardTitle>
-                    </div>
-                    <SourceBadge source={result.source} />
+                    <Link 
+                      href={result.url}
+                      className="text-lg font-medium hover:underline text-primary"
+                    >
+                      {highlightQuery(result.title)}
+                    </Link>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <ChevronsUpDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Share className="mr-2 h-4 w-4" />
+                          <span>Share</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <DownloadCloud className="mr-2 h-4 w-4" />
+                          <span>Download</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Search className="mr-2 h-4 w-4" />
+                          <span>Find similar</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
+                  
                   {result.excerpt && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {result.excerpt}
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {highlightQuery(result.excerpt)}
                     </p>
                   )}
-                </CardContent>
-                <CardFooter className="p-4 pt-0 border-t flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Avatar className="h-5 w-5 mr-2">
-                      <AvatarImage src={result.author.avatar} alt={result.author.name} />
-                      <AvatarFallback>{result.author.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-muted-foreground">{result.author.name}</span>
+                  
+                  <div className="mt-2 flex flex-wrap items-center text-xs text-muted-foreground">
+                    <div className="flex items-center mr-4">
+                      <User className="mr-1 h-3 w-3" />
+                      <span>{result.author.name}</span>
+                    </div>
+                    
+                    <div className="flex items-center mr-4">
+                      <Clock className="mr-1 h-3 w-3" />
+                      <span>
+                        {format(result.updated, 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center mr-4">
+                      <span className="flex items-center">
+                        {getResultSourceIcon(result.source)}
+                        <span className="ml-1">{getSourceDisplayName(result.source)}</span>
+                      </span>
+                    </div>
+                    
+                    {result.tags && result.tags.length > 0 && (
+                      <div className="flex items-center flex-wrap mt-1 md:mt-0">
+                        <Tag className="mr-1 h-3 w-3" />
+                        {result.tags.map((tag, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline" 
+                            className="mr-1 px-1 py-0 text-xs"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {typeof result.updated === 'string' 
-                      ? result.updated 
-                      : new Date(result.updated).toLocaleDateString()}
-                  </span>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
 }
-
-export default SearchResults;
