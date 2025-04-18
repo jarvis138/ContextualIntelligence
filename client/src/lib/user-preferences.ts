@@ -1,262 +1,150 @@
+import { AnimationSpeed } from './animations';
+
+// Define preference types
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type AccentColor = 'blue' | 'violet' | 'green' | 'orange' | 'red' | 'neutral';
+export type BorderRadius = 'none' | 'small' | 'medium' | 'large' | 'full';
+export type ViewMode = 'table' | 'grid' | 'list';
+
 /**
- * User preferences configuration for Novexa 
- * Controls notification settings, theme preferences, and application behavior
+ * User preferences schema
  */
+export interface UserPreferences {
+  theme: {
+    mode: ThemeMode;
+    accentColor: AccentColor;
+    borderRadius: BorderRadius;
+    animations: AnimationSpeed;
+    reduceMotion: boolean;
+    contrastMode: boolean;
+  };
+  layout: {
+    sidebarCollapsed: boolean;
+    denseMode: boolean;
+    defaultView: ViewMode;
+    showDocumentPreview: boolean;
+  };
+  ai: {
+    aiSuggestions: boolean;
+    personalization: boolean;
+    collectUsageData: boolean;
+  };
+}
 
-import { z } from "zod";
-
-// Theme related types
-export type ThemeMode = "light" | "dark" | "system";
-export type AccentColor = "blue" | "violet" | "green" | "orange" | "red" | "neutral";
-export type BorderRadius = "none" | "small" | "medium" | "large" | "full";
-export type AnimationSpeed = "none" | "slow" | "medium" | "fast";
-
-// Notification settings schemas
-export const notificationSchema = z.object({
-  email: z.object({
-    enabled: z.boolean().default(true),
-    dailyDigest: z.boolean().default(true),
-    mentions: z.boolean().default(true),
-    documentUpdates: z.boolean().default(true),
-    projectUpdates: z.boolean().default(true),
-    taskAssignments: z.boolean().default(true),
-    teamAnnouncements: z.boolean().default(true),
-    securityAlerts: z.boolean().default(true),
-  }),
-  inApp: z.object({
-    enabled: z.boolean().default(true),
-    mentions: z.boolean().default(true),
-    documentUpdates: z.boolean().default(true),
-    projectUpdates: z.boolean().default(true),
-    taskAssignments: z.boolean().default(true),
-    teamAnnouncements: z.boolean().default(true),
-    securityAlerts: z.boolean().default(true),
-    sound: z.boolean().default(true),
-  }),
-  desktop: z.object({
-    enabled: z.boolean().default(true),
-    mentions: z.boolean().default(true),
-    documentUpdates: z.boolean().default(true),
-    projectUpdates: z.boolean().default(false),
-    taskAssignments: z.boolean().default(true),
-    teamAnnouncements: z.boolean().default(false),
-    securityAlerts: z.boolean().default(true),
-  }),
-  slack: z.object({
-    enabled: z.boolean().default(false),
-    mentions: z.boolean().default(true),
-    documentUpdates: z.boolean().default(false),
-    projectUpdates: z.boolean().default(false),
-    taskAssignments: z.boolean().default(true),
-    teamAnnouncements: z.boolean().default(false),
-    securityAlerts: z.boolean().default(false),
-  }),
-});
-
-// User interface preferences schema
-export const uiPreferencesSchema = z.object({
-  theme: z.object({
-    mode: z.enum(["light", "dark", "system"]).default("system"),
-    accentColor: z.enum(["blue", "violet", "green", "orange", "red", "neutral"]).default("blue"),
-    borderRadius: z.enum(["none", "small", "medium", "large", "full"]).default("medium"),
-    animations: z.enum(["none", "slow", "medium", "fast"]).default("medium"),
-    reduceMotion: z.boolean().default(false),
-    contrastMode: z.boolean().default(false),
-  }),
-  layout: z.object({
-    sidebarCollapsed: z.boolean().default(false),
-    denseMode: z.boolean().default(false),
-    defaultView: z.enum(["grid", "list", "table"]).default("grid"),
-    showDocumentPreview: z.boolean().default(true),
-  }),
-  ai: z.object({
-    autoSuggestions: z.boolean().default(true),
-    showConfidence: z.boolean().default(true),
-    autoCreateTasks: z.boolean().default(false),
-  }),
-});
-
-// Full user preference schema
-export const userPreferencesSchema = z.object({
-  notifications: notificationSchema,
-  ui: uiPreferencesSchema,
-  privacy: z.object({
-    shareUsageData: z.boolean().default(true),
-    documentIndexing: z.boolean().default(true),
-  }),
-  accessibility: z.object({
-    screenReader: z.boolean().default(false),
-    highContrast: z.boolean().default(false),
-    largeText: z.boolean().default(false),
-    reducedMotion: z.boolean().default(false),
-  }),
-});
-
-// Type for the user preferences
-export type UserPreferences = z.infer<typeof userPreferencesSchema>;
-
-// Default user preferences
+/**
+ * Default user preferences
+ */
 export const defaultPreferences: UserPreferences = {
-  notifications: {
-    email: {
-      enabled: true,
-      dailyDigest: true,
-      mentions: true,
-      documentUpdates: true,
-      projectUpdates: true,
-      taskAssignments: true,
-      teamAnnouncements: true,
-      securityAlerts: true,
-    },
-    inApp: {
-      enabled: true,
-      mentions: true,
-      documentUpdates: true,
-      projectUpdates: true,
-      taskAssignments: true,
-      teamAnnouncements: true,
-      securityAlerts: true,
-      sound: true,
-    },
-    desktop: {
-      enabled: true,
-      mentions: true,
-      documentUpdates: true,
-      projectUpdates: false,
-      taskAssignments: true,
-      teamAnnouncements: false,
-      securityAlerts: true,
-    },
-    slack: {
-      enabled: false,
-      mentions: true,
-      documentUpdates: false,
-      projectUpdates: false,
-      taskAssignments: true,
-      teamAnnouncements: false,
-      securityAlerts: false,
-    },
+  theme: {
+    mode: 'system',
+    accentColor: 'blue',
+    borderRadius: 'medium',
+    animations: 'medium',
+    reduceMotion: false,
+    contrastMode: false,
   },
-  ui: {
-    theme: {
-      mode: "system",
-      accentColor: "blue",
-      borderRadius: "medium",
-      animations: "medium",
-      reduceMotion: false,
-      contrastMode: false,
-    },
-    layout: {
-      sidebarCollapsed: false,
-      denseMode: false,
-      defaultView: "grid",
-      showDocumentPreview: true,
-    },
-    ai: {
-      autoSuggestions: true,
-      showConfidence: true,
-      autoCreateTasks: false,
-    },
+  layout: {
+    sidebarCollapsed: false,
+    denseMode: false,
+    defaultView: 'table',
+    showDocumentPreview: true,
   },
-  privacy: {
-    shareUsageData: true,
-    documentIndexing: true,
-  },
-  accessibility: {
-    screenReader: false,
-    highContrast: false,
-    largeText: false,
-    reducedMotion: false,
-  },
+  ai: {
+    aiSuggestions: true,
+    personalization: true,
+    collectUsageData: false,
+  }
 };
 
-// Helper functions
-export function getUserPreferences(): UserPreferences {
+const PREFERENCES_STORAGE_KEY = 'novexa-user-preferences';
+
+/**
+ * Save user preferences to localStorage
+ */
+export const savePreferences = (preferences: UserPreferences): void => {
+  if (typeof window === 'undefined') return;
+  
   try {
-    const storedPreferences = localStorage.getItem('userPreferences');
-    if (storedPreferences) {
-      const parsedPreferences = JSON.parse(storedPreferences);
-      return userPreferencesSchema.parse(parsedPreferences);
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+  } catch (error) {
+    console.error('Failed to save user preferences:', error);
+  }
+};
+
+/**
+ * Load user preferences from localStorage
+ */
+export const loadPreferences = (): UserPreferences => {
+  if (typeof window === 'undefined') return defaultPreferences;
+  
+  try {
+    const storedPreferences = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+    
+    if (!storedPreferences) {
+      return defaultPreferences;
     }
+    
+    const parsedPreferences = JSON.parse(storedPreferences) as UserPreferences;
+    
+    // Merge with default preferences to handle missing properties
+    // if the stored preferences are from an older version
+    return {
+      theme: { ...defaultPreferences.theme, ...parsedPreferences.theme },
+      layout: { ...defaultPreferences.layout, ...parsedPreferences.layout },
+      ai: { ...defaultPreferences.ai, ...parsedPreferences.ai },
+    };
   } catch (error) {
-    console.error('Error loading user preferences:', error);
+    console.error('Failed to load user preferences:', error);
+    return defaultPreferences;
   }
+};
+
+/**
+ * Apply theme according to user preferences
+ */
+export const applyTheme = (preferences: UserPreferences): void => {
+  if (typeof window === 'undefined' || !preferences) return;
   
-  return defaultPreferences;
-}
-
-export function saveUserPreferences(preferences: UserPreferences): void {
-  try {
-    localStorage.setItem('userPreferences', JSON.stringify(preferences));
-  } catch (error) {
-    console.error('Error saving user preferences:', error);
-  }
-}
-
-export function updateUserPreferences(updates: Partial<UserPreferences>): UserPreferences {
-  const currentPreferences = getUserPreferences();
-  const newPreferences = {
-    ...currentPreferences,
-    ...updates,
-    notifications: {
-      ...currentPreferences.notifications,
-      ...(updates.notifications || {}),
-    },
-    ui: {
-      ...currentPreferences.ui,
-      ...(updates.ui || {}),
-    },
-    privacy: {
-      ...currentPreferences.privacy,
-      ...(updates.privacy || {}),
-    },
-    accessibility: {
-      ...currentPreferences.accessibility,
-      ...(updates.accessibility || {}),
-    },
-  };
-  
-  saveUserPreferences(newPreferences);
-  return newPreferences;
-}
-
-// Apply theme preferences based on saved settings
-export function applyThemePreferences(): void {
-  const preferences = getUserPreferences();
-  const { mode, accentColor, borderRadius, contrastMode, reduceMotion } = preferences.ui.theme;
+  const root = document.documentElement;
   
   // Apply theme mode
-  if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark');
+  if (preferences.theme.mode === 'dark' || 
+     (preferences.theme.mode === 'system' && 
+      window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    root.classList.add('dark');
   } else {
-    document.documentElement.classList.remove('dark');
+    root.classList.remove('dark');
   }
   
-  // Apply accent color
-  document.documentElement.style.setProperty('--color-primary', `var(--color-${accentColor}-500)`);
-  document.documentElement.style.setProperty('--color-primary-foreground', `var(--color-${accentColor}-50)`);
+  // Apply high contrast if enabled
+  if (preferences.theme.contrastMode) {
+    root.classList.add('high-contrast');
+  } else {
+    root.classList.remove('high-contrast');
+  }
+  
+  // Apply reduced motion if enabled or system preference
+  if (preferences.theme.reduceMotion) {
+    root.classList.add('reduce-motion');
+  } else {
+    root.classList.remove('reduce-motion');
+  }
   
   // Apply border radius
-  const radiusMap = {
-    none: '0px',
-    small: '0.25rem',
-    medium: '0.375rem',
-    large: '0.5rem',
-    full: '9999px',
-  };
-  document.documentElement.style.setProperty('--radius', radiusMap[borderRadius]);
-  
-  // Apply contrast mode
-  if (contrastMode) {
-    document.documentElement.classList.add('high-contrast');
-  } else {
-    document.documentElement.classList.remove('high-contrast');
-  }
-  
-  // Apply reduced motion
-  if (reduceMotion) {
-    document.documentElement.classList.add('reduce-motion');
-  } else {
-    document.documentElement.classList.remove('reduce-motion');
-  }
+  root.style.setProperty('--radius', getBorderRadiusValue(preferences.theme.borderRadius));
 }
+
+/**
+ * Get CSS value for border radius
+ */
+const getBorderRadiusValue = (radius: BorderRadius): string => {
+  switch (radius) {
+    case 'none': return '0';
+    case 'small': return '0.25rem';
+    case 'medium': return '0.5rem';
+    case 'large': return '0.75rem';
+    case 'full': return '9999px';
+    default: return '0.5rem';
+  }
+};

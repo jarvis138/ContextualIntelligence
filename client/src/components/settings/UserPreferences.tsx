@@ -1,949 +1,540 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { usePreferences } from "@/context/PreferencesContext";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { AnimatedButton } from "@/components/ui/animated-button";
+import React from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AccentColor, AnimationSpeed, BorderRadius, ThemeMode } from "@/lib/user-preferences";
-import { containerVariants, listItemVariants } from "@/lib/animations";
-import { AlertTriangle, Monitor, CheckCircle, Undo2 } from "lucide-react";
+import { AnimatedList } from "@/components/ui/animated-list";
+
+import { usePreferences } from '@/context/PreferencesContext';
+import { 
+  ThemeMode, 
+  AccentColor, 
+  BorderRadius, 
+  ViewMode,
+  UserPreferences as UserPreferencesType 
+} from '@/lib/user-preferences';
+import { AnimationSpeed } from '@/lib/animations';
+
+import { 
+  Moon, 
+  Sun, 
+  Monitor, 
+  LayoutGrid, 
+  LayoutList, 
+  Table2, 
+  Eye, 
+  EyeOff,
+  PanelLeft,
+  RefreshCw
+} from 'lucide-react';
+
+interface IPreferenceSection {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+const PreferenceSection: React.FC<IPreferenceSection> = ({ 
+  title, 
+  description, 
+  children 
+}) => (
+  <Card className="mb-6">
+    <CardHeader>
+      <CardTitle>{title}</CardTitle>
+      <CardDescription>{description}</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      {children}
+    </CardContent>
+  </Card>
+);
 
 const UserPreferences: React.FC = () => {
-  const { preferences, updatePreferences, resetPreferences } = usePreferences();
-  const [hasChanges, setHasChanges] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const { preferences, setPreference, resetPreferences } = usePreferences();
 
-  // Handle form reset
-  const handleReset = () => {
-    if (confirmReset) {
-      resetPreferences();
-      setHasChanges(false);
-      setConfirmReset(false);
-    } else {
-      setConfirmReset(true);
-      setTimeout(() => setConfirmReset(false), 3000);
-    }
+  // Theme Mode preferences
+  const handleThemeModeChange = (mode: ThemeMode) => {
+    setPreference('theme', 'mode', mode);
+  };
+
+  // Accent Color preferences
+  const handleAccentColorChange = (color: AccentColor) => {
+    setPreference('theme', 'accentColor', color);
+  };
+
+  // Border Radius preferences
+  const handleBorderRadiusChange = (radius: BorderRadius) => {
+    setPreference('theme', 'borderRadius', radius);
+  };
+
+  // Animation Speed preferences
+  const handleAnimationSpeedChange = (speed: AnimationSpeed) => {
+    setPreference('theme', 'animations', speed);
+  };
+
+  // Reduced Motion preferences
+  const handleReducedMotionChange = (checked: boolean) => {
+    setPreference('theme', 'reduceMotion', checked);
+  };
+
+  // High Contrast preferences
+  const handleHighContrastChange = (checked: boolean) => {
+    setPreference('theme', 'contrastMode', checked);
+  };
+
+  // Layout: Sidebar preferences
+  const handleSidebarChange = (collapsed: boolean) => {
+    setPreference('layout', 'sidebarCollapsed', collapsed);
+  };
+
+  // Layout: Density preferences
+  const handleDensityChange = (dense: boolean) => {
+    setPreference('layout', 'denseMode', dense);
+  };
+
+  // Layout: Default View preferences
+  const handleDefaultViewChange = (view: ViewMode) => {
+    setPreference('layout', 'defaultView', view);
+  };
+
+  // Layout: Document Preview preferences
+  const handlePreviewChange = (show: boolean) => {
+    setPreference('layout', 'showDocumentPreview', show);
+  };
+
+  // AI preferences
+  const handleAiSuggestionsChange = (enabled: boolean) => {
+    setPreference('ai', 'aiSuggestions', enabled);
+  };
+
+  const handlePersonalizationChange = (enabled: boolean) => {
+    setPreference('ai', 'personalization', enabled);
+  };
+
+  const handleUsageDataChange = (enabled: boolean) => {
+    setPreference('ai', 'collectUsageData', enabled);
   };
 
   return (
-    <motion.div 
-      className="w-full max-w-5xl"
-      variants={containerVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-    >
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-bold">User Preferences</h2>
-          <p className="text-muted-foreground mt-1">
-            Customize your experience with Novexa
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center">
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              <span>Unsaved changes</span>
-            </div>
-          )}
-          <AnimatedButton
-            variant="outline"
-            onClick={handleReset}
-            className={confirmReset ? "bg-destructive text-destructive-foreground" : ""}
+    <Tabs defaultValue="theme" className="w-full">
+      <TabsList className="mb-4">
+        <TabsTrigger value="theme">Theme</TabsTrigger>
+        <TabsTrigger value="layout">Layout</TabsTrigger>
+        <TabsTrigger value="ai">AI Features</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="theme" className="space-y-4">
+        <PreferenceSection
+          title="Theme Mode"
+          description="Choose your preferred color scheme"
+        >
+          <RadioGroup
+            value={preferences.theme.mode}
+            onValueChange={(value) => handleThemeModeChange(value as ThemeMode)}
+            className="flex flex-col md:flex-row gap-4"
           >
-            <Undo2 className="h-4 w-4 mr-2" />
-            {confirmReset ? "Confirm Reset" : "Reset All"}
-          </AnimatedButton>
-        </div>
-      </div>
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="light" id="theme-light" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="theme-light" className="font-medium flex items-center">
+                  <Sun className="h-4 w-4 mr-2" />
+                  Light
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Light mode for bright environments
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="dark" id="theme-dark" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="theme-dark" className="font-medium flex items-center">
+                  <Moon className="h-4 w-4 mr-2" />
+                  Dark
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Dark mode for low-light environments
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="system" id="theme-system" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="theme-system" className="font-medium flex items-center">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  System
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Follow your system preferences
+                </p>
+              </div>
+            </div>
+          </RadioGroup>
+        </PreferenceSection>
 
-      <Tabs defaultValue="appearance" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="accessibility">Accessibility</TabsTrigger>
-          <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="ai">AI Features</TabsTrigger>
-        </TabsList>
-
-        {/* Appearance Tab */}
-        <TabsContent value="appearance">
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Theme</CardTitle>
-                  <CardDescription>Customize the look and feel of the application</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Mode</Label>
-                    <RadioGroup 
-                      defaultValue={preferences.ui.theme.mode}
-                      onValueChange={(value: ThemeMode) => {
-                        updatePreferences({ 
-                          ui: { 
-                            theme: { 
-                              ...preferences.ui.theme, 
-                              mode: value 
-                            } 
-                          } 
-                        });
-                        setHasChanges(true);
-                      }}
-                      className="flex space-x-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="light" id="light" />
-                        <Label htmlFor="light">Light</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="dark" id="dark" />
-                        <Label htmlFor="dark">Dark</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="system" id="system" />
-                        <Label htmlFor="system" className="flex items-center">
-                          <Monitor className="h-4 w-4 mr-1" />
-                          System
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Accent Color</Label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {["blue", "violet", "green", "orange", "red", "neutral"].map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => {
-                            updatePreferences({
-                              ui: {
-                                theme: {
-                                  ...preferences.ui.theme,
-                                  accentColor: color as AccentColor,
-                                },
-                              },
-                            });
-                            setHasChanges(true);
-                          }}
-                          className={`w-full aspect-square rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                            preferences.ui.theme.accentColor === color
-                              ? "ring-2 ring-ring ring-offset-2"
-                              : ""
-                          }`}
-                          style={{
-                            backgroundColor: `var(--color-${color}-500)`,
-                          }}
-                          aria-label={`${color} theme`}
-                        >
-                          {preferences.ui.theme.accentColor === color && (
-                            <CheckCircle className="h-4 w-4 text-white mx-auto" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Border Radius</Label>
-                    <Select 
-                      defaultValue={preferences.ui.theme.borderRadius}
-                      onValueChange={(value: BorderRadius) => {
-                        updatePreferences({ 
-                          ui: { 
-                            theme: { 
-                              ...preferences.ui.theme, 
-                              borderRadius: value 
-                            } 
-                          } 
-                        });
-                        setHasChanges(true);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select border radius" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="small">Small</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="large">Large</SelectItem>
-                        <SelectItem value="full">Full (Rounded)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Animation Speed</Label>
-                    <Select 
-                      defaultValue={preferences.ui.theme.animations}
-                      onValueChange={(value: AnimationSpeed) => {
-                        updatePreferences({ 
-                          ui: { 
-                            theme: { 
-                              ...preferences.ui.theme, 
-                              animations: value 
-                            } 
-                          } 
-                        });
-                        setHasChanges(true);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select animation speed" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="slow">Slow</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="fast">Fast</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Layout Preferences</CardTitle>
-                  <CardDescription>Configure how the interface is displayed</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Sidebar Collapsed</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Start with the sidebar collapsed
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.layout.sidebarCollapsed}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            layout: {
-                              ...preferences.ui.layout,
-                              sidebarCollapsed: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Dense Mode</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Compact view with less padding
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.layout.denseMode}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            layout: {
-                              ...preferences.ui.layout,
-                              denseMode: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <Label>Default View Type</Label>
-                    <RadioGroup 
-                      defaultValue={preferences.ui.layout.defaultView}
-                      onValueChange={(value) => {
-                        updatePreferences({ 
-                          ui: { 
-                            layout: { 
-                              ...preferences.ui.layout, 
-                              defaultView: value as "grid" | "list" | "table"
-                            } 
-                          } 
-                        });
-                        setHasChanges(true);
-                      }}
-                      className="flex flex-col gap-2 pt-1"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="grid" id="grid" />
-                        <Label htmlFor="grid">Grid</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="list" id="list" />
-                        <Label htmlFor="list">List</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="table" id="table" />
-                        <Label htmlFor="table">Table</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="space-y-0.5">
-                      <Label>Document Preview</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Show document previews in listings
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.layout.showDocumentPreview}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            layout: {
-                              ...preferences.ui.layout,
-                              showDocumentPreview: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+        <PreferenceSection
+          title="Accent Color"
+          description="Choose the primary color for buttons, links, and accents"
+        >
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            {(
+              [
+                { name: "blue", color: "#2563eb" },
+                { name: "violet", color: "#7c3aed" },
+                { name: "green", color: "#10b981" },
+                { name: "orange", color: "#f97316" },
+                { name: "red", color: "#ef4444" },
+                { name: "neutral", color: "#6b7280" },
+              ] as const
+            ).map(({ name, color }) => (
+              <div key={name} className="text-center">
+                <button
+                  type="button"
+                  onClick={() => handleAccentColorChange(name)}
+                  className={`h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2 transition-all ${
+                    preferences.theme.accentColor === name
+                      ? "ring-2 ring-offset-2 ring-foreground"
+                      : ""
+                  }`}
+                  style={{ backgroundColor: color }}
+                >
+                  {preferences.theme.accentColor === name && (
+                    <span className="text-white">✓</span>
+                  )}
+                </button>
+                <span className="text-sm capitalize">{name}</span>
+              </div>
+            ))}
           </div>
-        </TabsContent>
+        </PreferenceSection>
 
-        {/* Notifications Tab */}
-        <TabsContent value="notifications">
-          <div className="grid gap-6 grid-cols-1">
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notification Preferences</CardTitle>
-                  <CardDescription>Configure how you receive notifications</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Email Notifications */}
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-medium">Email Notifications</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Configure email notification settings
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.notifications.email.enabled}
-                          onCheckedChange={(checked) => {
-                            updatePreferences({
-                              notifications: {
-                                ...preferences.notifications,
-                                email: {
-                                  ...preferences.notifications.email,
-                                  enabled: checked,
-                                },
-                              },
-                            });
-                            setHasChanges(true);
-                          }}
-                        />
-                      </div>
-
-                      <div className={`space-y-3 ${!preferences.notifications.email.enabled && "opacity-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="email-digest">Daily digest</Label>
-                          <Switch
-                            id="email-digest"
-                            disabled={!preferences.notifications.email.enabled}
-                            checked={preferences.notifications.email.dailyDigest}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  email: {
-                                    ...preferences.notifications.email,
-                                    dailyDigest: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="email-mentions">Mentions</Label>
-                          <Switch
-                            id="email-mentions"
-                            disabled={!preferences.notifications.email.enabled}
-                            checked={preferences.notifications.email.mentions}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  email: {
-                                    ...preferences.notifications.email,
-                                    mentions: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="email-docs">Document updates</Label>
-                          <Switch
-                            id="email-docs"
-                            disabled={!preferences.notifications.email.enabled}
-                            checked={preferences.notifications.email.documentUpdates}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  email: {
-                                    ...preferences.notifications.email,
-                                    documentUpdates: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="email-projects">Project updates</Label>
-                          <Switch
-                            id="email-projects"
-                            disabled={!preferences.notifications.email.enabled}
-                            checked={preferences.notifications.email.projectUpdates}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  email: {
-                                    ...preferences.notifications.email,
-                                    projectUpdates: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="email-tasks">Task assignments</Label>
-                          <Switch
-                            id="email-tasks"
-                            disabled={!preferences.notifications.email.enabled}
-                            checked={preferences.notifications.email.taskAssignments}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  email: {
-                                    ...preferences.notifications.email,
-                                    taskAssignments: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* In-App Notifications */}
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-medium">In-App Notifications</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Configure in-app notification settings
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.notifications.inApp.enabled}
-                          onCheckedChange={(checked) => {
-                            updatePreferences({
-                              notifications: {
-                                ...preferences.notifications,
-                                inApp: {
-                                  ...preferences.notifications.inApp,
-                                  enabled: checked,
-                                },
-                              },
-                            });
-                            setHasChanges(true);
-                          }}
-                        />
-                      </div>
-
-                      <div className={`space-y-3 ${!preferences.notifications.inApp.enabled && "opacity-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="inapp-sound">Sound notifications</Label>
-                          <Switch
-                            id="inapp-sound"
-                            disabled={!preferences.notifications.inApp.enabled}
-                            checked={preferences.notifications.inApp.sound}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  inApp: {
-                                    ...preferences.notifications.inApp,
-                                    sound: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="inapp-mentions">Mentions</Label>
-                          <Switch
-                            id="inapp-mentions"
-                            disabled={!preferences.notifications.inApp.enabled}
-                            checked={preferences.notifications.inApp.mentions}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  inApp: {
-                                    ...preferences.notifications.inApp,
-                                    mentions: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="inapp-docs">Document updates</Label>
-                          <Switch
-                            id="inapp-docs"
-                            disabled={!preferences.notifications.inApp.enabled}
-                            checked={preferences.notifications.inApp.documentUpdates}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  inApp: {
-                                    ...preferences.notifications.inApp,
-                                    documentUpdates: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="inapp-tasks">Task assignments</Label>
-                          <Switch
-                            id="inapp-tasks"
-                            disabled={!preferences.notifications.inApp.enabled}
-                            checked={preferences.notifications.inApp.taskAssignments}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  inApp: {
-                                    ...preferences.notifications.inApp,
-                                    taskAssignments: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Desktop Notifications */}
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-medium">Desktop Notifications</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Configure browser notifications
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.notifications.desktop.enabled}
-                          onCheckedChange={(checked) => {
-                            // Request permissions if enabling
-                            if (checked && "Notification" in window) {
-                              Notification.requestPermission();
-                            }
-                            
-                            updatePreferences({
-                              notifications: {
-                                ...preferences.notifications,
-                                desktop: {
-                                  ...preferences.notifications.desktop,
-                                  enabled: checked,
-                                },
-                              },
-                            });
-                            setHasChanges(true);
-                          }}
-                        />
-                      </div>
-
-                      <div className={`space-y-3 ${!preferences.notifications.desktop.enabled && "opacity-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="desktop-mentions">Mentions</Label>
-                          <Switch
-                            id="desktop-mentions"
-                            disabled={!preferences.notifications.desktop.enabled}
-                            checked={preferences.notifications.desktop.mentions}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  desktop: {
-                                    ...preferences.notifications.desktop,
-                                    mentions: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="desktop-docs">Document updates</Label>
-                          <Switch
-                            id="desktop-docs"
-                            disabled={!preferences.notifications.desktop.enabled}
-                            checked={preferences.notifications.desktop.documentUpdates}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  desktop: {
-                                    ...preferences.notifications.desktop,
-                                    documentUpdates: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="desktop-tasks">Task assignments</Label>
-                          <Switch
-                            id="desktop-tasks"
-                            disabled={!preferences.notifications.desktop.enabled}
-                            checked={preferences.notifications.desktop.taskAssignments}
-                            onCheckedChange={(checked) => {
-                              updatePreferences({
-                                notifications: {
-                                  ...preferences.notifications,
-                                  desktop: {
-                                    ...preferences.notifications.desktop,
-                                    taskAssignments: checked,
-                                  },
-                                },
-                              });
-                              setHasChanges(true);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+        <PreferenceSection
+          title="Border Radius"
+          description="Adjust the roundness of corners throughout the interface"
+        >
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <Label>Corner Roundness</Label>
+              <div className="text-sm text-muted-foreground capitalize">
+                {preferences.theme.borderRadius}
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {(["none", "small", "medium", "large", "full"] as const).map(
+                (radius) => (
+                  <button
+                    key={radius}
+                    type="button"
+                    onClick={() => handleBorderRadiusChange(radius)}
+                    className={`h-16 border transition-colors ${
+                      preferences.theme.borderRadius === radius
+                        ? "border-2 border-primary"
+                        : "border-border"
+                    }`}
+                    style={{
+                      borderRadius:
+                        radius === "none"
+                          ? "0"
+                          : radius === "small"
+                          ? "0.25rem"
+                          : radius === "medium"
+                          ? "0.5rem"
+                          : radius === "large"
+                          ? "0.75rem"
+                          : "9999px",
+                    }}
+                  ></button>
+                )
+              )}
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>No corners</span>
+              <span>Fully rounded</span>
+            </div>
           </div>
-        </TabsContent>
+        </PreferenceSection>
 
-        {/* Accessibility Tab */}
-        <TabsContent value="accessibility">
-          <div className="grid gap-6 grid-cols-1">
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Accessibility Settings</CardTitle>
-                  <CardDescription>Customize accessibility features</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Screen Reader Support</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Optimize interface for screen readers
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.accessibility.screenReader}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          accessibility: {
-                            ...preferences.accessibility,
-                            screenReader: checked,
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
+        <PreferenceSection
+          title="Animations"
+          description="Control the speed and behavior of animations"
+        >
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <Label>Animation Speed</Label>
+              <div className="text-sm text-muted-foreground capitalize">
+                {preferences.theme.animations}
+              </div>
+            </div>
+            <RadioGroup
+              value={preferences.theme.animations}
+              onValueChange={(value) => handleAnimationSpeedChange(value as AnimationSpeed)}
+              className="flex flex-col gap-4"
+            >
+              <div className="flex items-start space-x-2">
+                <RadioGroupItem value="none" id="animation-none" className="mt-1" />
+                <div className="grid gap-1.5">
+                  <Label htmlFor="animation-none" className="font-medium">
+                    None
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Disable all animations
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-2">
+                <RadioGroupItem value="slow" id="animation-slow" className="mt-1" />
+                <div className="grid gap-1.5">
+                  <Label htmlFor="animation-slow" className="font-medium">
+                    Slow
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Slower, more gentle animations
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-2">
+                <RadioGroupItem value="medium" id="animation-medium" className="mt-1" />
+                <div className="grid gap-1.5">
+                  <Label htmlFor="animation-medium" className="font-medium">
+                    Medium
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Standard animation speed (default)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-2">
+                <RadioGroupItem value="fast" id="animation-fast" className="mt-1" />
+                <div className="grid gap-1.5">
+                  <Label htmlFor="animation-fast" className="font-medium">
+                    Fast
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Quick, snappy animations
+                  </p>
+                </div>
+              </div>
+            </RadioGroup>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>High Contrast Mode</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Increase contrast for better visibility
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.accessibility.highContrast}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          accessibility: {
-                            ...preferences.accessibility,
-                            highContrast: checked,
-                          },
-                          ui: {
-                            ...preferences.ui,
-                            theme: {
-                              ...preferences.ui.theme,
-                              contrastMode: checked,
-                            }
-                          }
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Large Text</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Increase font size for better readability
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.accessibility.largeText}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          accessibility: {
-                            ...preferences.accessibility,
-                            largeText: checked,
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Reduced Motion</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Minimize animations and motion effects
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.accessibility.reducedMotion}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          accessibility: {
-                            ...preferences.accessibility,
-                            reducedMotion: checked,
-                          },
-                          ui: {
-                            ...preferences.ui,
-                            theme: {
-                              ...preferences.ui.theme,
-                              reduceMotion: checked,
-                            }
-                          }
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <div className="flex items-center justify-between pt-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="reduced-motion">Reduced Motion</Label>
+                <p className="text-sm text-muted-foreground">
+                  Minimize animations for improved accessibility
+                </p>
+              </div>
+              <Switch
+                id="reduced-motion"
+                checked={preferences.theme.reduceMotion}
+                onCheckedChange={handleReducedMotionChange}
+              />
+            </div>
           </div>
-        </TabsContent>
+        </PreferenceSection>
 
-        {/* Privacy Tab */}
-        <TabsContent value="privacy">
-          <div className="grid gap-6 grid-cols-1">
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Privacy Settings</CardTitle>
-                  <CardDescription>Control how your data is used</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Share Usage Data</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Help improve the platform by sharing anonymous usage data
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.privacy.shareUsageData}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          privacy: {
-                            ...preferences.privacy,
-                            shareUsageData: checked,
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Document Indexing</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Allow AI to index and analyze your documents for better search results
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.privacy.documentIndexing}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          privacy: {
-                            ...preferences.privacy,
-                            documentIndexing: checked,
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+        <PreferenceSection
+          title="Accessibility"
+          description="Additional settings to improve accessibility"
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="high-contrast">High Contrast Mode</Label>
+              <p className="text-sm text-muted-foreground">
+                Increase contrast for better readability
+              </p>
+            </div>
+            <Switch
+              id="high-contrast"
+              checked={preferences.theme.contrastMode}
+              onCheckedChange={handleHighContrastChange}
+            />
           </div>
-        </TabsContent>
+        </PreferenceSection>
+      </TabsContent>
 
-        {/* AI Features Tab */}
-        <TabsContent value="ai">
-          <div className="grid gap-6 grid-cols-1">
-            <motion.div variants={listItemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>AI Feature Settings</CardTitle>
-                  <CardDescription>Configure AI-powered assistance</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Auto-Suggestions</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Show AI-powered suggestions based on context
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.ai.autoSuggestions}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            ...preferences.ui,
-                            ai: {
-                              ...preferences.ui.ai,
-                              autoSuggestions: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Show AI Confidence</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Display confidence levels for AI predictions
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.ai.showConfidence}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            ...preferences.ui,
-                            ai: {
-                              ...preferences.ui.ai,
-                              showConfidence: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Auto-Create Tasks</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically create tasks from document analysis
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.ui.ai.autoCreateTasks}
-                      onCheckedChange={(checked) => {
-                        updatePreferences({
-                          ui: {
-                            ...preferences.ui,
-                            ai: {
-                              ...preferences.ui.ai,
-                              autoCreateTasks: checked,
-                            },
-                          },
-                        });
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+      <TabsContent value="layout" className="space-y-4">
+        <PreferenceSection
+          title="Sidebar"
+          description="Configure sidebar visibility and behavior"
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="sidebar-collapsed">Collapsed Sidebar</Label>
+              <p className="text-sm text-muted-foreground">
+                Use a compact sidebar with icons only
+              </p>
+            </div>
+            <Switch
+              id="sidebar-collapsed"
+              checked={preferences.layout.sidebarCollapsed}
+              onCheckedChange={handleSidebarChange}
+            />
           </div>
-        </TabsContent>
-      </Tabs>
-    </motion.div>
+        </PreferenceSection>
+
+        <PreferenceSection
+          title="Layout Density"
+          description="Control the compactness of the interface"
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="dense-mode">Dense Mode</Label>
+              <p className="text-sm text-muted-foreground">
+                Reduce spacing to fit more content on screen
+              </p>
+            </div>
+            <Switch
+              id="dense-mode"
+              checked={preferences.layout.denseMode}
+              onCheckedChange={handleDensityChange}
+            />
+          </div>
+        </PreferenceSection>
+
+        <PreferenceSection
+          title="Default View"
+          description="Set your preferred content view mode"
+        >
+          <RadioGroup
+            value={preferences.layout.defaultView}
+            onValueChange={(value) => handleDefaultViewChange(value as ViewMode)}
+            className="flex flex-col sm:flex-row gap-4"
+          >
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="grid" id="view-grid" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="view-grid" className="font-medium flex items-center">
+                  <LayoutGrid className="h-4 w-4 mr-2" />
+                  Grid
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Card-based grid layout
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="list" id="view-list" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="view-list" className="font-medium flex items-center">
+                  <LayoutList className="h-4 w-4 mr-2" />
+                  List
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Compact list view
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
+              <RadioGroupItem value="table" id="view-table" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="view-table" className="font-medium flex items-center">
+                  <Table2 className="h-4 w-4 mr-2" />
+                  Table
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Detailed tabular view
+                </p>
+              </div>
+            </div>
+          </RadioGroup>
+        </PreferenceSection>
+
+        <PreferenceSection
+          title="Document Preview"
+          description="Configure document preview behavior"
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="show-preview">Document Previews</Label>
+              <p className="text-sm text-muted-foreground">
+                Show document previews when hovering over items
+              </p>
+            </div>
+            <Switch
+              id="show-preview"
+              checked={preferences.layout.showDocumentPreview}
+              onCheckedChange={handlePreviewChange}
+            />
+          </div>
+        </PreferenceSection>
+      </TabsContent>
+
+      <TabsContent value="ai" className="space-y-4">
+        <PreferenceSection
+          title="AI Features"
+          description="Configure AI-assisted features and suggestions"
+        >
+          <AnimatedList className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="ai-suggestions">AI Suggestions</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive AI-powered suggestions and insights
+                </p>
+              </div>
+              <Switch
+                id="ai-suggestions"
+                checked={preferences.ai.aiSuggestions}
+                onCheckedChange={handleAiSuggestionsChange}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="personalization">Personalization</Label>
+                <p className="text-sm text-muted-foreground">
+                  Allow AI to personalize your experience based on usage
+                </p>
+              </div>
+              <Switch
+                id="personalization"
+                checked={preferences.ai.personalization}
+                onCheckedChange={handlePersonalizationChange}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="usage-data">Usage Data Collection</Label>
+                <p className="text-sm text-muted-foreground">
+                  Share anonymous usage data to improve AI capabilities
+                </p>
+              </div>
+              <Switch
+                id="usage-data"
+                checked={preferences.ai.collectUsageData}
+                onCheckedChange={handleUsageDataChange}
+              />
+            </div>
+          </AnimatedList>
+        </PreferenceSection>
+      </TabsContent>
+
+      <Button 
+        variant="outline" 
+        onClick={resetPreferences}
+        className="mt-6 flex items-center"
+      >
+        <RefreshCw className="w-4 h-4 mr-2" />
+        Reset to Defaults
+      </Button>
+    </Tabs>
   );
 };
 
