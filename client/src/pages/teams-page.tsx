@@ -900,52 +900,6 @@ export default function TeamsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Feature Implementation Status</CardTitle>
-          <CardDescription>Current status of team management features</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Team permissions and role-based access</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Team activity analytics</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Team communication insights</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>AI-powered team suggestions</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>Cross-team collaboration tools</span>
-                <span className="text-green-500">Complete</span>
-              </div>
-              <Progress value={100} className="h-2" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
