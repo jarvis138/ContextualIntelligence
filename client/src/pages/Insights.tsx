@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Breadcrumb from '@/components/navigation/Breadcrumb';
 
 export default function Insights() {
   const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -71,6 +72,16 @@ export default function Insights() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb 
+        items={[
+          {
+            label: 'Insights',
+            icon: <Lightbulb className="h-4 w-4 mr-1" />
+          }
+        ]}
+        className="mb-4"
+      />
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI Insights</h1>
