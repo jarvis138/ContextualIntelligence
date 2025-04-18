@@ -8,12 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, Upload, Plus, Settings, Share, Download, MoreHorizontal, Clock, Star } from 'lucide-react';
+import { 
+  Search, Upload, Plus, Settings, Share, Download, 
+  MoreHorizontal, Clock, Star, Grid, List, LayoutGrid 
+} from 'lucide-react';
+import DocumentGrid from '@/components/documents/DocumentGrid';
 
 export default function Documents() {
   const { toast } = useToast();
   const [_, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'detailed'>('grid');
   
   const navigateToDocumentManagement = () => {
     navigate('/documents/manage');
