@@ -900,7 +900,7 @@ export function ChatInterface() {
                   <span className="relative inline-flex rounded-full h-1 w-1 bg-primary-foreground"></span>
                 </span>
               </div>
-              <h3 className="font-medium">Novexa Assistant</h3>
+              <h3 className="font-medium">Novexa AI</h3>
             </div>
             <div className="flex items-center gap-1">
               <Button 

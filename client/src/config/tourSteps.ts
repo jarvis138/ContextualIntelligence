@@ -8,12 +8,12 @@ interface TourConfig {
 export const welcomeTour: StepType[] = [
   {
     selector: 'body',
-    content: 'Welcome to CPI Hub! This quick tour will help you get started with the main features of the platform.',
+    content: 'Welcome to Novexa! This quick tour will help you get started with the main features of the platform.',
     position: 'center',
   },
   {
     selector: '[data-tour="sidebar"]',
-    content: 'This is the main navigation sidebar. You can access all the key areas of CPI Hub from here.',
+    content: 'This is the main navigation sidebar. You can access all the key areas of Novexa from here.',
     position: 'right',
   },
   {
@@ -58,7 +58,7 @@ export const welcomeTour: StepType[] = [
   },
   {
     selector: 'body',
-    content: "You're all set! Explore the platform and discover how CPI Hub can help you manage your projects more effectively. You can access this tour again from the Help menu.",
+    content: "You're all set! Explore the platform and discover how Novexa can help you manage your projects more effectively. You can access this tour again from the Help menu.",
     position: 'center',
   },
 ];
@@ -67,7 +67,7 @@ export const welcomeTour: StepType[] = [
 export const connectorTour: StepType[] = [
   {
     selector: '[data-tour="connectors-page"]',
-    content: 'Welcome to the Connectors page! This is where you can integrate CPI Hub with external services.',
+    content: 'Welcome to the Connectors page! This is where you can integrate Novexa with external services.',
     position: 'top',
   },
   {
