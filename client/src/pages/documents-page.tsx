@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 export default function DocumentsPage() {
   const { toast } = useToast();
   const [activeDocument, setActiveDocument] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("infrastructure");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [batchProcessDialogOpen, setBatchProcessDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -237,20 +238,21 @@ Strategic direction and organizational coordination.
     const docs = documents[categoryId as keyof typeof documents] || [];
     
     return (
-      <div className="space-y-3">
+      <ul className="space-y-1 list-none pl-0">
         {docs.map(doc => (
-          <div
+          <li
             key={doc.id}
-            className={`border rounded-md p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
-              activeDocument === doc.id ? 'border-primary border-2' : 'border-border'
+            className={`block w-full text-left px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
+              activeDocument === doc.id 
+                ? 'bg-primary/20 text-primary font-medium' 
+                : 'hover:bg-accent/50'
             }`}
             onClick={() => setActiveDocument(doc.id)}
           >
-            <div className="font-medium text-sm">{doc.title}</div>
-            <div className="text-xs text-muted-foreground mt-1">{doc.description}</div>
-          </div>
+            {doc.title}
+          </li>
         ))}
-      </div>
+      </ul>
     );
   };
 
@@ -415,22 +417,30 @@ Strategic direction and organizational coordination.
       )}
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="md:col-span-1">
-          <Tabs defaultValue="infrastructure" className="w-full">
-            <TabsList className="w-full grid grid-cols-2 md:grid-cols-1 mb-4">
+        <div className="md:col-span-1 border-r pr-4">
+          <div className="mb-4">
+            <h3 className="font-medium mb-2">Categories</h3>
+            <div className="flex flex-col space-y-1">
               {categories.map(category => (
-                <TabsTrigger key={category.id} value={category.id} className="justify-start text-left">
+                <button
+                  key={category.id}
+                  className={`text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    activeCategory === category.id
+                      ? 'bg-primary text-primary-foreground font-medium'
+                      : 'hover:bg-accent'
+                  }`}
+                  onClick={() => setActiveCategory(category.id)}
+                >
                   {category.name}
-                </TabsTrigger>
+                </button>
               ))}
-            </TabsList>
-            
-            {categories.map(category => (
-              <TabsContent key={category.id} value={category.id} className="mt-0">
-                <DocumentList categoryId={category.id} />
-              </TabsContent>
-            ))}
-          </Tabs>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-medium mb-2">Documents</h3>
+            <DocumentList categoryId={activeCategory} />
+          </div>
         </div>
         
         <div className="md:col-span-3">
