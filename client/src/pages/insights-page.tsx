@@ -337,51 +337,7 @@ export default function InsightsPage() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Feature Implementation Status</CardTitle>
-            <CardDescription>Current status of AI insights features</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>AI-driven project risk assessment</span>
-                  <span className="text-green-500">Complete</span>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>Automated bottleneck identification</span>
-                  <span className="text-green-500">Complete</span>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>Communication sentiment analysis</span>
-                  <span className="text-green-500">Complete</span>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>Project progress forecasting</span>
-                  <span className="text-green-500">Complete</span>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>Resource allocation optimization</span>
-                  <span className="text-green-500">Complete</span>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Feature Implementation Status card removed as requested */}
 
         <Card>
           <CardHeader>

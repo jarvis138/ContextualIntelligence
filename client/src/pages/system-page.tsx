@@ -249,29 +249,7 @@ export default function SystemPage() {
         {/* Development Status Tab */}
         <TabsContent value="development" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Feature Implementation Status</CardTitle>
-                <CardDescription>Current status of this feature's implementation</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {featureStatuses.map((feature, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <span>{feature.name}</span>
-                    <div className="flex items-center">
-                      <span className={`mr-2 ${feature.status === "Complete" ? "text-green-500" : 
-                        feature.status === "In Progress" ? "text-amber-500" : "text-gray-500"}`}>
-                        {feature.status}
-                      </span>
-                      <div className={`h-2 w-16 rounded-full ${
-                        feature.status === "Complete" ? "bg-green-500" : 
-                        feature.status === "In Progress" ? "bg-amber-500" : "bg-gray-200"
-                      }`}></div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+{/* Feature Implementation Status card removed as requested */}
             
             <Card>
               <CardHeader>
@@ -320,39 +298,7 @@ export default function SystemPage() {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Implementation Phases</CardTitle>
-              <CardDescription>Roadmap for CPI Hub development</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {implementationPhases.map(phase => (
-                  <div key={phase.id} className="flex items-start space-x-4">
-                    <div className="flex-none">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        phase.status === 'complete' ? 'bg-green-100 text-green-600' :
-                        phase.status === 'in-progress' ? 'bg-blue-100 text-blue-600' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {phase.id}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center mb-1">
-                        <h3 className="font-semibold mr-2">{phase.name}</h3>
-                        {getPhaseStatusBadge(phase.status)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-1">{phase.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {phase.status === 'complete' ? 'Completed' : 'Target completion'}: {phase.completionDate}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Implementation Phases card removed as requested */}
         </TabsContent>
 
         {/* System Monitoring Tab */}
