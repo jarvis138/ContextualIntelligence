@@ -1,78 +1,69 @@
-import React, { ReactNode } from "react";
-import { motion, VariantLabels } from "framer-motion";
-import { cardVariants, getAnimationSpeed, shouldReduceMotion } from "@/lib/animations";
-import { usePreferences } from "@/context/PreferencesContext";
+import React from "react";
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { usePreferences } from "@/context/PreferencesContext";
+import { shouldReduceMotion, cardVariants, getAnimationSpeed } from "@/lib/animations";
 
-interface AnimatedCardProps {
-  children: ReactNode;
-  className?: string;
-  clickable?: boolean;
-  delay?: number;
-  initialAnimation?: VariantLabels;
+interface AnimatedCardProps extends React.HTMLAttributes<HTMLDivElement> {
+  index?: number;
   animate?: boolean;
-  whileHover?: boolean;
-  onClick?: () => void;
+  hover?: boolean;
+  initialDelay?: number;
 }
 
 /**
  * AnimatedCard component
- * Card component with animations for entrance, hover and click
+ * Card component with entrance and hover animations
  * Respects user accessibility preferences
  */
-const AnimatedCard: React.FC<AnimatedCardProps> = ({
-  children,
-  className = "",
-  clickable = false,
-  delay = 0,
-  initialAnimation = "initial",
-  animate = true,
-  whileHover = true,
-  onClick,
-}) => {
-  const { preferences } = usePreferences();
-  
-  // Determine if animations should be reduced or disabled
-  const reduceMotion = shouldReduceMotion() || 
-    preferences?.accessibility?.reducedMotion || 
-    preferences?.ui?.theme?.reduceMotion;
-  
-  // Determine animation speed from user preferences
-  const animationSpeed = preferences?.ui?.theme?.animations || 'medium';
-  
-  // Get appropriate transition timing with delay
-  const transition = {
-    ...getAnimationSpeed(animationSpeed),
-    ...(delay > 0 ? { delay } : {})
-  };
-
-  return (
-    <motion.div
-      initial={animate && !reduceMotion ? initialAnimation : false}
-      animate={animate && !reduceMotion ? "animate" : undefined}
-      exit={animate && !reduceMotion ? "exit" : undefined}
-      whileHover={whileHover && !reduceMotion ? "hover" : undefined}
-      whileTap={clickable && !reduceMotion ? { scale: 0.98 } : undefined}
-      variants={!reduceMotion ? cardVariants : undefined}
-      transition={transition}
-      onClick={onClick}
-      className={cn(
-        clickable ? "cursor-pointer" : "",
-        "h-full w-full"
-      )}
-    >
-      <Card 
-        className={cn(
-          "border h-full transition-colors",
-          clickable && "hover:border-primary/50",
-          className
-        )}
+const AnimatedCard = React.forwardRef<HTMLDivElement, AnimatedCardProps>(
+  ({ className, children, index = 0, animate = true, hover = true, initialDelay = 0, ...props }, ref) => {
+    const { preferences } = usePreferences();
+    
+    // Determine if animations should be reduced or disabled
+    const reduceMotion = shouldReduceMotion() || 
+      preferences?.theme?.reduceMotion;
+    
+    // Determine animation speed from user preferences
+    const animationSpeed = preferences?.theme?.animations || 'medium';
+    
+    // Add staggered delay based on index for list items
+    const delay = initialDelay + (index * 0.1);
+    
+    // Customize transition
+    const transition = {
+      ...getAnimationSpeed(animationSpeed),
+      delay,
+    };
+    
+    // If reduced motion is enabled or animation is disabled, render regular card
+    if (reduceMotion || animationSpeed === 'none' || !animate) {
+      return (
+        <Card className={cn(className)} ref={ref} {...props}>
+          {children}
+        </Card>
+      );
+    }
+    
+    return (
+      <motion.div
+        className={cn(className)}
+        ref={ref}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        whileHover={hover ? "hover" : undefined}
+        variants={cardVariants}
+        transition={transition}
+        {...props}
       >
         {children}
-      </Card>
-    </motion.div>
-  );
-};
+      </motion.div>
+    );
+  }
+);
+
+AnimatedCard.displayName = "AnimatedCard";
 
 export { AnimatedCard };

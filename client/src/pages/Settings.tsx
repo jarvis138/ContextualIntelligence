@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import UserPreferences from "@/components/settings/UserPreferences";
 import { 
   User, 
   Shield, 

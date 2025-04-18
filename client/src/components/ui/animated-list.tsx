@@ -1,100 +1,131 @@
 import React, { ReactNode } from "react";
-import { motion, Variants } from "framer-motion";
-import { containerVariants, listItemVariants, getAnimationSpeed, shouldReduceMotion } from "@/lib/animations";
+import { motion } from "framer-motion";
 import { usePreferences } from "@/context/PreferencesContext";
+import { shouldReduceMotion, containerVariants, listItemVariants, getAnimationSpeed } from "@/lib/animations";
+import { cn } from "@/lib/utils";
 
 interface AnimatedListProps {
-  children: ReactNode[];
+  children: ReactNode;
   className?: string;
-  itemClassName?: string;
   staggerDelay?: number;
-  customVariants?: {
-    container?: Variants;
-    item?: Variants;
-  };
-  as?: React.ElementType;
-  itemAs?: React.ElementType;
+  childVariants?: any;
+  containerClassName?: string;
+  itemClassName?: string;
+  animateOnMount?: boolean;
+}
+
+interface AnimatedListItemProps {
+  children: ReactNode;
+  className?: string;
+  index?: number;
 }
 
 /**
  * AnimatedList component
- * Renders a list with staggered animations for each child item
+ * Container component for animated list items with staggered animations
  * Respects user accessibility preferences
  */
-const AnimatedList: React.FC<AnimatedListProps> = ({
+const AnimatedList = ({
   children,
-  className = "",
-  itemClassName = "",
+  className,
   staggerDelay = 0.05,
-  customVariants,
-  as: Container = "ul",
-  itemAs: Item = "li",
-}) => {
+  childVariants = listItemVariants,
+  containerClassName,
+  itemClassName,
+  animateOnMount = true,
+}: AnimatedListProps) => {
   const { preferences } = usePreferences();
   
   // Determine if animations should be reduced or disabled
   const reduceMotion = shouldReduceMotion() || 
-    preferences?.accessibility?.reducedMotion || 
-    preferences?.ui?.theme?.reduceMotion;
+    preferences?.theme?.reduceMotion;
   
   // Determine animation speed from user preferences
-  const animationSpeed = preferences?.ui?.theme?.animations || 'medium';
+  const animationSpeed = preferences?.theme?.animations || 'medium';
   
-  // Define container animation variants
-  const containerAnimVariants = customVariants?.container || {
+  // If reduced motion is enabled, render without animations
+  if (reduceMotion || animationSpeed === 'none') {
+    return <div className={className}>{children}</div>;
+  }
+
+  // Create custom container variants with specified stagger delay
+  const customContainerVariants = {
     ...containerVariants,
     animate: {
       ...containerVariants.animate,
       transition: {
-        staggerChildren: reduceMotion ? 0 : staggerDelay,
-        delayChildren: 0.02,
+        ...containerVariants.animate.transition,
+        staggerChildren: staggerDelay,
       },
     },
   };
 
-  // Define item animation variants
-  const itemAnimVariants = customVariants?.item || listItemVariants;
-  
-  // If reduced motion is enabled, simplify animations
-  const containerProps = reduceMotion 
-    ? { initial: false, animate: { opacity: 1 } }
-    : {
-        initial: "initial",
-        animate: "animate",
-        exit: "exit",
-        variants: containerAnimVariants,
-      };
-
-  const itemProps = reduceMotion
-    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0.1 } }
-    : {
-        variants: itemAnimVariants,
-        transition: getAnimationSpeed(animationSpeed),
-      };
-
-  // Create the container component
-  const AnimatedContainer = motion[Container as keyof typeof motion] || motion.div;
-  
-  // Create the item component
-  const AnimatedItem = motion[Item as keyof typeof motion] || motion.div;
-  
   return (
-    <AnimatedContainer
-      className={className}
-      {...containerProps}
+    <motion.div
+      className={cn(className, containerClassName)}
+      initial={animateOnMount ? "initial" : false}
+      animate="animate"
+      exit="exit"
+      variants={customContainerVariants}
+      transition={getAnimationSpeed(animationSpeed)}
     >
-      {React.Children.map(children, (child, index) => (
-        <AnimatedItem
-          key={index}
-          className={itemClassName}
-          custom={index}
-          {...itemProps}
-        >
-          {child}
-        </AnimatedItem>
-      ))}
-    </AnimatedContainer>
+      {React.Children.map(children, (child, index) => {
+        if (React.isValidElement(child)) {
+          return (
+            <motion.div
+              className={itemClassName}
+              variants={childVariants}
+              transition={getAnimationSpeed(animationSpeed)}
+              key={index}
+            >
+              {child}
+            </motion.div>
+          );
+        }
+        return child;
+      })}
+    </motion.div>
   );
 };
 
-export { AnimatedList };
+/**
+ * AnimatedListItem component
+ * Individual item in an animated list
+ * Can be used independently of AnimatedList
+ */
+const AnimatedListItem = ({ children, className, index = 0 }: AnimatedListItemProps) => {
+  const { preferences } = usePreferences();
+  
+  // Determine if animations should be reduced or disabled
+  const reduceMotion = shouldReduceMotion() || 
+    preferences?.theme?.reduceMotion;
+  
+  // Determine animation speed from user preferences
+  const animationSpeed = preferences?.theme?.animations || 'medium';
+  
+  // Customize transition based on index for staggered effect
+  const transition = {
+    ...getAnimationSpeed(animationSpeed),
+    delay: index * 0.05,
+  };
+  
+  // If reduced motion is enabled, render without animations
+  if (reduceMotion || animationSpeed === 'none') {
+    return <div className={className}>{children}</div>;
+  }
+  
+  return (
+    <motion.div
+      className={className}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      variants={listItemVariants}
+      transition={transition}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+export { AnimatedList, AnimatedListItem };
