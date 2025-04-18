@@ -74,7 +74,7 @@ export default function AdminLoginPage() {
           <div className="flex items-center justify-center mb-4">
             <Shield className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-2xl text-center">CPI Hub Admin</CardTitle>
+          <CardTitle className="text-2xl text-center">Novexa Admin</CardTitle>
           <CardDescription className="text-center">
             Enter your credentials to access the admin panel
           </CardDescription>

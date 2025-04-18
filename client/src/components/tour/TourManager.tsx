@@ -55,7 +55,7 @@ export function TourManager() {
       disableKeyboardNavigation={false}
       disableInteraction={false}
       maskSpace={10}
-      className={cn("cpi-hub-tour rounded-xl shadow-xl")}
+      className={cn("novexa-tour rounded-xl shadow-xl")}
       closeButtonText={<X size={18} />}
       nextButton={<div style={buttonStyles}>Next <ArrowRight size={16} /></div>}
       prevButton={<div style={{...buttonStyles, backgroundColor: 'var(--muted)'}}>Previous</div>}

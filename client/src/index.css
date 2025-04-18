@@ -12,10 +12,10 @@
   }
 }
 
-/* CPI Hub Custom Styles for Tour and Chatbot */
+/* Novexa Custom Styles for Tour and Chatbot */
 @layer components {
   /* Tour Styles */
-  .cpi-hub-tour {
+  .novexa-tour {
     --reactour-accent: var(--primary);
     font-family: var(--font-sans);
     border-radius: 12px !important;
@@ -27,11 +27,11 @@
     line-height: 1.5 !important;
   }
 
-  .cpi-hub-tour button {
+  .novexa-tour button {
     transition: all 0.2s ease;
   }
 
-  .cpi-hub-tour button:hover {
+  .novexa-tour button:hover {
     opacity: 0.9;
     transform: translateY(-1px);
   }

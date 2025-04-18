@@ -1666,7 +1666,7 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-medium mb-4">Webhook Configurations</h3>
                 <div className="p-4 border rounded-md">
                   <p className="text-sm mb-4">
-                    Configure webhooks to receive real-time notifications about events in your CPI Hub instance.
+                    Configure webhooks to receive real-time notifications about events in your Novexa instance.
                   </p>
                   
                   <div className="space-y-4">
@@ -1771,7 +1771,7 @@ export default function SettingsPage() {
                     <div className="space-y-1">
                       <Label className="text-sm">Query Parameter</Label>
                       <code className="text-xs block bg-muted p-2 rounded-md">
-                        https://api.cpi-hub.com/v1/projects?tenant_id=tenant-123
+                        https://api.novexa.com/v1/projects?tenant_id=tenant-123
                       </code>
                       <p className="text-xs text-muted-foreground">
                         Include the tenant_id as a query parameter.
