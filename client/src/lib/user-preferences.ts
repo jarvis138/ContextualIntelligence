@@ -38,7 +38,7 @@ export interface UserPreferences {
 export const defaultPreferences: UserPreferences = {
   theme: {
     mode: 'system',
-    accentColor: 'blue',
+    accentColor: 'blue', // Changed to #0B4C79 
     borderRadius: 'medium',
     animations: 'medium',
     reduceMotion: false,

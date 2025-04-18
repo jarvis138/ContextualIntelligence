@@ -195,12 +195,12 @@ const UserPreferences: React.FC = () => {
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {(
               [
-                { name: "blue", color: "#2563eb" },
+                { name: "blue", color: "#0B4C79" },
                 { name: "violet", color: "#7c3aed" },
                 { name: "green", color: "#10b981" },
                 { name: "orange", color: "#f97316" },
                 { name: "red", color: "#ef4444" },
-                { name: "neutral", color: "#6b7280" },
+                { name: "neutral", color: "#CED7DD" },
               ] as const
             ).map(({ name, color }) => (
               <div key={name} className="text-center">
