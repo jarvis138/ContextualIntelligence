@@ -1008,6 +1008,26 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        {/* Products Tab */}
+        <TabsContent value="products" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Nuvexa Product Ecosystem</CardTitle>
+                  <CardDescription>Explore our integrated suite of project intelligence tools</CardDescription>
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  Enterprise Ready
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <ProductEcosystem />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
       
       {/* Report Generation Dialog */}
