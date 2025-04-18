@@ -40,7 +40,7 @@ export default function DocumentsPage() {
   const [isUploading, setIsUploading] = useState(false);
   
   // Document data structure
-  const documents = {
+  const [documents, setDocuments] = useState({
     infrastructure: [
       {
         id: "iac",
@@ -222,7 +222,7 @@ Strategic direction and organizational coordination.
         `
       }
     ]
-  };
+  });
 
   // Category names for easy reference
   const categories = [
@@ -245,8 +245,8 @@ Strategic direction and organizational coordination.
             onClick={() => setActiveDocument(doc.id)}
           >
             <CardHeader className="p-4">
-              <CardTitle className="text-md mb-1">{doc.title}</CardTitle>
-              <CardDescription className="text-xs">{doc.description}</CardDescription>
+              <CardTitle className="text-md mb-1 relative z-10">{doc.title}</CardTitle>
+              <CardDescription className="text-xs relative z-0">{doc.description}</CardDescription>
             </CardHeader>
           </Card>
         ))}
@@ -286,6 +286,11 @@ Strategic direction and organizational coordination.
       return;
     }
     
+    // Get the document metadata from the form
+    const title = (document.getElementById('title') as HTMLInputElement)?.value || selectedFile.name;
+    const description = (document.getElementById('description') as HTMLInputElement)?.value || 'Uploaded document';
+    const category = (document.getElementById('document-type') as HTMLSelectElement)?.value || 'infrastructure';
+    
     // Start uploading process
     setIsUploading(true);
     setUploadProgress(0);
@@ -296,6 +301,30 @@ Strategic direction and organizational coordination.
         if (prev >= 100) {
           clearInterval(interval);
           setIsUploading(false);
+          
+          // Create a new document ID
+          const newDocId = `uploaded-${Date.now()}`;
+          
+          // Add the new document to the documents collection
+          const newDoc = {
+            id: newDocId,
+            title: title,
+            description: description,
+            content: `# ${title}\n\nUploaded on ${new Date().toLocaleString()}\n\nThis is the content of the uploaded document "${selectedFile.name}".`
+          };
+          
+          // Add the document to the appropriate category using state updater
+          setDocuments(prevDocuments => {
+            const updatedDocuments = { ...prevDocuments };
+            updatedDocuments[category as keyof typeof documents] = [
+              ...(updatedDocuments[category as keyof typeof documents] || []),
+              newDoc
+            ];
+            return updatedDocuments;
+          });
+          
+          // Set the new document as active
+          setActiveDocument(newDocId);
           
           // Complete the upload
           toast({
@@ -594,134 +623,109 @@ Strategic direction and organizational coordination.
                   <label htmlFor="auto-tag" className="text-sm">Auto-Tag</label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="analyze-text" className="rounded" />
-                  <label htmlFor="analyze-text" className="text-sm">Analyze Text</label>
+                  <input type="checkbox" id="ocr" className="rounded" />
+                  <label htmlFor="ocr" className="text-sm">OCR Scanned Docs</label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="ocr-scan" className="rounded" />
-                  <label htmlFor="ocr-scan" className="text-sm">OCR Scan</label>
+                  <input type="checkbox" id="analyze" className="rounded" />
+                  <label htmlFor="analyze" className="text-sm">AI Analysis</label>
                 </div>
               </div>
             </div>
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBatchProcessDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setBatchProcessDialogOpen(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={() => {
-              toast({
-                title: "Batch process started",
-                description: "Your documents are being processed. You will be notified when complete."
-              });
-              setBatchProcessDialogOpen(false);
-            }}>
-              Start Processing
+            <Button>
+              Process Files
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       {/* Share Document Dialog */}
-      {activeDoc && (
-        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Share Document</DialogTitle>
-              <DialogDescription>
-                Share "{activeDoc.title}" with team members or external collaborators.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>People with access</Label>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Sarah Chen', email: 'sarah.c@example.com', role: 'Editor' },
-                    { name: 'Mark Johnson', email: 'mark.j@example.com', role: 'Viewer' },
-                  ].map((person, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 mr-3 flex items-center justify-center text-xs font-medium">
-                          {person.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-medium">{person.name}</div>
-                          <div className="text-xs text-muted-foreground">{person.email}</div>
-                        </div>
-                      </div>
-                      <Select defaultValue={person.role.toLowerCase()}>
-                        <SelectTrigger className="w-[100px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Add people</Label>
-                <div className="flex space-x-2">
-                  <Input placeholder="Add email or name" className="flex-1" />
-                  <Select defaultValue="viewer">
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Share link</Label>
-                <div className="flex space-x-2">
-                  <Input 
-                    value={`https://cpihub.com/documents/${activeDoc.id}`} 
-                    readOnly 
-                    className="flex-1" 
-                  />
-                  <Button variant="outline" size="sm" onClick={() => {
-                    toast({
-                      title: "Link copied",
-                      description: "Document link has been copied to clipboard"
-                    });
-                  }}>
-                    Copy
-                  </Button>
-                </div>
-                <div className="flex items-center space-x-2 mt-2">
-                  <input type="checkbox" id="anyone-with-link" className="rounded" />
-                  <label htmlFor="anyone-with-link" className="text-sm">Anyone with the link can view</label>
-                </div>
-              </div>
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Share Document</DialogTitle>
+            <DialogDescription>
+              Share this document with team members or external partners.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="share-email">Email Addresses</Label>
+              <Input id="share-email" placeholder="Enter email addresses separated by commas" />
             </div>
             
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
+            <div className="space-y-2">
+              <Label htmlFor="share-permission">Permission Level</Label>
+              <Select defaultValue="view">
+                <SelectTrigger id="share-permission">
+                  <SelectValue placeholder="Select permission level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View Only</SelectItem>
+                  <SelectItem value="comment">Can Comment</SelectItem>
+                  <SelectItem value="edit">Can Edit</SelectItem>
+                  <SelectItem value="manage">Can Manage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="share-message">Message (Optional)</Label>
+              <Input id="share-message" placeholder="Add a message to recipients" />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input type="checkbox" id="notify" className="rounded" checked />
+              <label htmlFor="notify" className="text-sm">Notify recipients via email</label>
+            </div>
+            
+            <div className="rounded-md border p-4 mt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span className="text-sm">Document Link</span>
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 truncate">
+                https://example.com/docs/shared/{activeDoc?.id}-{new Date().getTime()}
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShareDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
                 toast({
-                  title: "Sharing settings updated",
-                  description: "Your document sharing preferences have been saved."
+                  title: "Document shared",
+                  description: "The document has been shared successfully."
                 });
                 setShareDialogOpen(false);
-              }}>
-                Save Settings
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+              }}
+            >
+              Share
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
