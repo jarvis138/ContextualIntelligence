@@ -138,7 +138,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <SheetContent side="left" className="w-[240px] sm:w-[300px]">
                 <div className="flex items-center justify-between mb-4">
                   <Link href="/" className="flex items-center gap-2">
-                    <NovexaLogo className="h-8 w-auto" />
+                    <NovexaLogo className="h-8 w-auto" variant="light" />
                   </Link>
                   <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
                     <X className="h-5 w-5" />
@@ -171,7 +171,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               href="/"
               className="flex items-center gap-2"
             >
-              <NovexaLogo className="h-10 w-auto" />
+              <NovexaLogo className="h-10 w-auto" variant="light" />
             </Link>
           </div>
 
