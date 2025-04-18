@@ -23,6 +23,7 @@ import {
 import Breadcrumb from '@/components/navigation/Breadcrumb';
 
 import { ContextGraph, GraphData } from '@/components/graph/ContextGraph';
+import { ProductEcosystem } from '@/components/dashboard/ProductEcosystem';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -265,7 +266,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome to your Contextual Project Intelligence Hub
+            Welcome to Nuvexa - Your Comprehensive Project Intelligence Solution
           </p>
         </div>
         <div className="flex gap-2">
@@ -296,6 +297,7 @@ export default function Dashboard() {
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
