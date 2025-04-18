@@ -121,8 +121,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               href="/"
               className="flex items-center gap-2"
             >
-              <Grid className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">Novexa</span>
+              <img 
+                src="/images/novexa-logo.png" 
+                alt="Novexa Logo" 
+                className="h-8 w-auto" 
+              />
             </Link>
           </div>
 
