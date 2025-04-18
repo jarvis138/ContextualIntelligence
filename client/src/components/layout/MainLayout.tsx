@@ -71,7 +71,7 @@ const navItems = [
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const isAdminPage = location === "/admin";
   
   // If this is the admin page, we want to render a different layout
@@ -84,6 +84,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Handle search submission
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setIsSearching(true);
+      // Navigate to search page with query
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      setIsSearching(false);
+    }
+  };
+
+  // Handle keyboard shortcut for search (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const [notifications, setNotifications] = useState<{ id: number; title: string; message: string }[]>([
     { id: 1, title: 'New comment', message: 'John commented on your document' },
     { id: 2, title: 'Document processed', message: 'Project requirements.pdf was processed' },
@@ -186,17 +218,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           {/* Global search - Updated per requirements */}
           <div className="flex-1 flex justify-center px-4">
-            <div className="relative w-full max-w-sm md:max-w-md lg:max-w-xl">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search anything... (Ctrl+K)"
-                className="w-full pl-10 pr-10 rounded-md border border-input h-10 shadow-sm focus:ring-primary"
-              />
-              <kbd className="absolute right-3 top-2.5 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                <span className="text-xs">⌘</span>K
-              </kbd>
-            </div>
+            <form onSubmit={handleSearch} className="w-full">
+              <div className="relative w-full max-w-sm md:max-w-md lg:max-w-xl mx-auto">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="global-search"
+                  type="search"
+                  placeholder="Search anything... (Ctrl+K)"
+                  className="w-full pl-10 pr-10 rounded-md border border-input h-10 shadow-sm focus:ring-primary"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-tour="search"
+                  autoComplete="off"
+                />
+                <kbd className="absolute right-3 top-2.5 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                  <span className="text-xs">⌘</span>K
+                </kbd>
+              </div>
+            </form>
           </div>
 
           {/* Right side icons */}
@@ -207,10 +246,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
               Create
             </Button>
             
-            {/* Help Button */}
-            <Button variant="ghost" size="icon" className="relative hidden md:flex">
-              <HelpCircle className="h-5 w-5" />
-            </Button>
+            {/* Help Button with Tour */}
+            <HelpMenu />
 
             {/* Notifications - Updated to match requirements */}
             <DropdownMenu>
