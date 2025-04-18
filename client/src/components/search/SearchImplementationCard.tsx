@@ -39,21 +39,21 @@ export function SearchImplementationCard() {
 
   return (
     <Card className="border rounded-md">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold">Enterprise-Grade Search Implementation</CardTitle>
+      <CardHeader className="pb-2 px-4 pt-4">
+        <CardTitle className="text-xl font-semibold">Enterprise-Grade Search Implementation</CardTitle>
         <p className="text-sm text-muted-foreground">Features aligned with the Technical Product Requirements</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         <div className="space-y-4">
           {features.map((feature) => (
             <div key={feature.name} className="space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-sm">{feature.name}</span>
-                <span className="text-xs text-primary">
+                <span className="text-sm font-medium">{feature.name}</span>
+                <span className="text-xs text-cyan-600 font-medium">
                   Complete
                 </span>
               </div>
-              <Progress value={feature.progress} className="h-2 bg-cyan-50" indicatorClassName="bg-cyan-500" />
+              <Progress value={feature.progress} className="h-2 bg-background" indicatorClassName="bg-cyan-500" />
             </div>
           ))}
         </div>

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Loader2, Info, Search as SearchIcon, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SearchImplementationCard } from '@/components/search/SearchImplementationCard';
 
 interface SearchResults {
   projects: any[];
@@ -612,6 +613,10 @@ export default function Search() {
                             )}
                           </TabsContent>
                         </Tabs>
+                        
+                        <div className="mt-8">
+                          <SearchImplementationCard />
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center py-12">
@@ -620,6 +625,10 @@ export default function Search() {
                         <p className="text-gray-500 max-w-md mx-auto">
                           We couldn't find any matches for "{searchQuery}". Try adjusting your search terms or browse through the project categories.
                         </p>
+                        
+                        <div className="mt-12 max-w-xl mx-auto">
+                          <SearchImplementationCard />
+                        </div>
                       </div>
                     )}
                   </>
