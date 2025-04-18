@@ -7,14 +7,14 @@ interface NovexaLogoProps {
 }
 
 export function NovexaLogo({ className = "h-10 w-auto", variant = 'light' }: NovexaLogoProps) {
-  // Colors for the hexagon logo
-  const lightBlue1 = '#94B0FF'; // Light blue for first hexagon
-  const lightBlue2 = '#7998FF'; // Light blue for second hexagon
-  const lightBlue3 = '#5B80FF'; // Light blue for third hexagon
-  const brightBlue = '#3F8BFF'; // Bright blue for the main hexagon
+  // Colors to match the image exactly
+  const lightBlue = '#94b0ff'; // Light blue for top left hexagon
+  const mediumBlue = '#6a8dff'; // Medium blue for top right hexagon
+  const brightBlue = '#3f8bff'; // Bright blue for bottom right hexagon (main)
+  const brandBlue = '#0B4C79'; // Primary brand blue color
   
-  // Text color (adapts to context based on variant)
-  const textColor = variant === 'light' ? '#0B4C79' : '#FFFFFF'; // Primary blue or white
+  // Text color based on variant
+  const textColor = variant === 'light' ? '#FFFFFF' : '#FFFFFF'; // White in both cases as shown in the image
 
   return (
     <svg 
@@ -25,40 +25,51 @@ export function NovexaLogo({ className = "h-10 w-auto", variant = 'light' }: Nov
       xmlns="http://www.w3.org/2000/svg" 
       className={className}
     >
-      {/* Hexagon cluster logo */}
-      <g transform="translate(0, 2)">
+      {/* Create a gradient blue background similar to the image */}
+      <defs>
+        <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0039aa" />
+          <stop offset="100%" stopColor="#0077ff" />
+        </linearGradient>
+      </defs>
+      
+      {/* Background rectangle with rounded corners */}
+      <rect x="0" y="0" width="240" height="40" rx="4" fill="url(#blueGradient)" />
+      
+      {/* Hexagon cluster logo - positioned exactly as in the reference image */}
+      <g transform="translate(9, 5) scale(0.7)">
         {/* First hexagon (top left) */}
-        <path d="M12 8L19 12V20L12 24L5 20V12L12 8Z" fill={lightBlue1} />
+        <path d="M12 8L19 12V20L12 24L5 20V12L12 8Z" fill={lightBlue} />
         
-        {/* Second hexagon (middle left) */}
-        <path d="M24 8L31 12V20L24 24L17 20V12L24 8Z" fill={lightBlue2} />
+        {/* Second hexagon (top right) - positioned to connect with first */}
+        <path d="M24 8L31 12V20L24 24L17 20V12L24 8Z" fill={mediumBlue} />
         
-        {/* Third hexagon (top right) */}
-        <path d="M18 20L25 24V32L18 36L11 32V24L18 20Z" fill={lightBlue3} />
+        {/* Third hexagon (bottom left) - positioned to connect with first */}
+        <path d="M18 20L25 24V32L18 36L11 32V24L18 20Z" fill={mediumBlue} />
         
-        {/* Main hexagon (bottom right) */}
+        {/* Main hexagon (bottom right) - positioned to connect with all others */}
         <path d="M30 20L37 24V32L30 36L23 32V24L30 20Z" fill={brightBlue} />
       </g>
       
-      {/* NOVEXA text - primary blue color */}
-      <g transform="translate(60, 5)">
+      {/* NOVEXA text - white bold text as shown in the image */}
+      <g transform="translate(60, 7)">
         {/* N */}
-        <path d="M0 0V27H8V0H0ZM8 0L25 13.5L8 27" fill={textColor}/>
+        <path d="M0 0V24H7V0H0ZM7 0L22 12L7 24" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
         
         {/* O */}
-        <path d="M35 0C43 0 49 6 49 13.5C49 21 43 27 35 27C27 27 21 21 21 13.5C21 6 27 0 35 0ZM35 7C31 7 28 10 28 13.5C28 17 31 20 35 20C39 20 42 17 42 13.5C42 10 39 7 35 7Z" fill={textColor}/>
+        <path d="M32 0C40 0 46 6 46 12C46 18 40 24 32 24C24 24 18 18 18 12C18 6 24 0 32 0ZM32 6C28 6 25 8.5 25 12C25 15.5 28 18 32 18C36 18 39 15.5 39 12C39 8.5 36 6 32 6Z" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
         
         {/* V */}
-        <path d="M55 0H63L75 24L87 0H95L77 28H73L55 0Z" fill={textColor}/>
+        <path d="M52 0H60L70 20L80 0H88L73 25H67L52 0Z" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
         
         {/* E */}
-        <path d="M100 0H125V6H108V11H125V16H108V21H125V27H100V0Z" fill={textColor}/>
+        <path d="M95 0H120V5H102V9.5H120V14.5H102V19H120V24H95V0Z" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
         
         {/* X */}
-        <path d="M130 0H140L150 10L160 0H170L155 13.5L170 27H160L150 17L140 27H130L145 13.5L130 0Z" fill={textColor}/>
+        <path d="M127 0H135L145 9L155 0H163L148 12L163 24H155L145 15L135 24H127L142 12L127 0Z" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
         
         {/* A */}
-        <path d="M175 0H183L198 27H190L187 21H171L168 27H160L175 0ZM179 7L173 15H185L179 7Z" fill={textColor}/>
+        <path d="M170 0H178L193 24H185L182 18H166L163 24H155L170 0ZM174 6L168 14H180L174 6Z" fill={textColor} style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))' }}/>
       </g>
     </svg>
   );
