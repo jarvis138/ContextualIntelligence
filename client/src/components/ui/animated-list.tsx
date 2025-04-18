@@ -1,69 +1,100 @@
 import React, { ReactNode } from "react";
-import { motion } from "framer-motion";
-import { listVariants, listItemVariants } from "@/lib/animations";
+import { motion, Variants } from "framer-motion";
+import { containerVariants, listItemVariants, getAnimationSpeed, shouldReduceMotion } from "@/lib/animations";
+import { usePreferences } from "@/context/PreferencesContext";
 
 interface AnimatedListProps {
-  items: any[];
-  renderItem: (item: any, index: number) => ReactNode;
+  children: ReactNode[];
   className?: string;
   itemClassName?: string;
-  keyExtractor?: (item: any, index: number) => string;
-  delay?: number;
+  staggerDelay?: number;
+  customVariants?: {
+    container?: Variants;
+    item?: Variants;
+  };
+  as?: React.ElementType;
+  itemAs?: React.ElementType;
 }
 
 /**
  * AnimatedList component
- * Renders a list with staggered animations for items
+ * Renders a list with staggered animations for each child item
+ * Respects user accessibility preferences
  */
-export function AnimatedList({
-  items,
-  renderItem,
+const AnimatedList: React.FC<AnimatedListProps> = ({
+  children,
   className = "",
   itemClassName = "",
-  keyExtractor,
-  delay = 0
-}: AnimatedListProps) {
+  staggerDelay = 0.05,
+  customVariants,
+  as: Container = "ul",
+  itemAs: Item = "li",
+}) => {
+  const { preferences } = usePreferences();
+  
+  // Determine if animations should be reduced or disabled
+  const reduceMotion = shouldReduceMotion() || 
+    preferences?.accessibility?.reducedMotion || 
+    preferences?.ui?.theme?.reduceMotion;
+  
+  // Determine animation speed from user preferences
+  const animationSpeed = preferences?.ui?.theme?.animations || 'medium';
+  
+  // Define container animation variants
+  const containerAnimVariants = customVariants?.container || {
+    ...containerVariants,
+    animate: {
+      ...containerVariants.animate,
+      transition: {
+        staggerChildren: reduceMotion ? 0 : staggerDelay,
+        delayChildren: 0.02,
+      },
+    },
+  };
+
+  // Define item animation variants
+  const itemAnimVariants = customVariants?.item || listItemVariants;
+  
+  // If reduced motion is enabled, simplify animations
+  const containerProps = reduceMotion 
+    ? { initial: false, animate: { opacity: 1 } }
+    : {
+        initial: "initial",
+        animate: "animate",
+        exit: "exit",
+        variants: containerAnimVariants,
+      };
+
+  const itemProps = reduceMotion
+    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0.1 } }
+    : {
+        variants: itemAnimVariants,
+        transition: getAnimationSpeed(animationSpeed),
+      };
+
+  // Create the container component
+  const AnimatedContainer = motion[Container as keyof typeof motion] || motion.div;
+  
+  // Create the item component
+  const AnimatedItem = motion[Item as keyof typeof motion] || motion.div;
+  
   return (
-    <motion.div
+    <AnimatedContainer
       className={className}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={listVariants}
-      transition={{ staggerChildren: 0.05, delayChildren: delay }}
+      {...containerProps}
     >
-      {items.map((item, index) => (
-        <motion.div
-          key={keyExtractor ? keyExtractor(item, index) : index}
+      {React.Children.map(children, (child, index) => (
+        <AnimatedItem
+          key={index}
           className={itemClassName}
-          variants={listItemVariants}
+          custom={index}
+          {...itemProps}
         >
-          {renderItem(item, index)}
-        </motion.div>
+          {child}
+        </AnimatedItem>
       ))}
-    </motion.div>
+    </AnimatedContainer>
   );
-}
+};
 
-interface AnimatedListItemProps {
-  children: ReactNode;
-  className?: string;
-}
-
-/**
- * AnimatedListItem component
- * For use when you need to manually create list items
- */
-export function AnimatedListItem({ children, className = "" }: AnimatedListItemProps) {
-  return (
-    <motion.div
-      className={className}
-      variants={listItemVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-    >
-      {children}
-    </motion.div>
-  );
-}
+export { AnimatedList };

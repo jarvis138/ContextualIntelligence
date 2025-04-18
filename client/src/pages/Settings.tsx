@@ -27,7 +27,8 @@ import {
   Moon,
   Sun,
   Monitor,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  RefreshCw
 } from 'lucide-react';
 
 import Breadcrumb from '@/components/navigation/Breadcrumb';
