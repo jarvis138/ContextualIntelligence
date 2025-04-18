@@ -237,18 +237,18 @@ Strategic direction and organizational coordination.
     const docs = documents[categoryId as keyof typeof documents] || [];
     
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {docs.map(doc => (
-          <Card 
-            key={doc.id} 
-            className={`cursor-pointer hover:bg-accent/50 transition-colors ${activeDocument === doc.id ? 'border-primary' : ''}`}
+          <div
+            key={doc.id}
+            className={`border rounded-md p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
+              activeDocument === doc.id ? 'border-primary border-2' : 'border-border'
+            }`}
             onClick={() => setActiveDocument(doc.id)}
           >
-            <CardHeader className="p-4">
-              <div className="mb-2">{doc.title}</div>
-              <div className="text-xs text-muted-foreground">{doc.description}</div>
-            </CardHeader>
-          </Card>
+            <div className="font-medium text-sm">{doc.title}</div>
+            <div className="text-xs text-muted-foreground mt-1">{doc.description}</div>
+          </div>
         ))}
       </div>
     );
