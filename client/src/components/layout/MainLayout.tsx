@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Network
 } from 'lucide-react';
+import novexaLogo from '@/assets/novexa-logo.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -122,7 +123,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="flex items-center gap-2"
             >
               <img 
-                src="/assets/novexa-logo.svg" 
+                src={novexaLogo} 
                 alt="Novexa Logo" 
                 className="h-10 w-auto" 
               />
