@@ -1,5 +1,6 @@
 import React, { useState, useEffect, KeyboardEvent } from 'react';
 import { Link, useLocation } from 'wouter';
+import PageTransition from '@/components/layout/PageTransition';
 import { 
   Bell, 
   Menu, 
@@ -495,7 +496,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           
           {/* Page content */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
-            {children}
+            <PageTransition>
+              {children}
+            </PageTransition>
           </main>
         </div>
       </div>
