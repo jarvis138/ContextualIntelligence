@@ -122,7 +122,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="flex items-center gap-2"
             >
               <Grid className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">CPI Hub</span>
+              <span className="font-bold text-lg">Novexa</span>
             </Link>
           </div>
 
