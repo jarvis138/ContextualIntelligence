@@ -1,643 +1,382 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
-import Sidebar from '@/components/Sidebar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Loader2, Info, Search as SearchIcon, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { SearchImplementationCard } from '@/components/search/SearchImplementationCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Filter,
+  FilterIcon,
+  Search as SearchIcon,
+  SlidersHorizontal,
+  Save,
+  Star,
+  Calendar,
+  Clock,
+  FileText,
+  FolderIcon,
+  User,
+} from 'lucide-react';
 
-interface SearchResults {
-  projects: any[];
-  documents: any[];
-  tasks: any[];
-  users: any[];
-  teams: any[];
-  semanticResults: any[];
-  source?: string;
-}
+import Breadcrumb from '@/components/navigation/Breadcrumb';
+import SearchResults from '@/components/search/SearchResults';
+import { SearchResult, SearchResultSource, SearchResultType } from '@/components/search/SearchResults';
 
+/**
+ * Search page component
+ * 
+ * This component integrates the SearchResults component from the UI/UX PRD
+ */
 export default function Search() {
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [projectFilter, setProjectFilter] = useState<number | null>(null);
-  const [selectedTab, setSelectedTab] = useState('all');
-  const [searchResults, setSearchResults] = useState<SearchResults>({
-    projects: [],
-    documents: [],
-    tasks: [],
-    users: [],
-    teams: [],
-    semanticResults: []
+  const [query, setQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [resultsView, setResultsView] = useState<'relevance' | 'timeline' | 'source'>('relevance');
+  const [activeFilters, setActiveFilters] = useState({
+    types: [] as SearchResultType[],
+    sources: [] as SearchResultSource[],
+    dateRange: 'anytime',
+    people: [] as string[],
   });
 
-  // Check if Elasticsearch is available
-  const { 
-    data: elasticsearchStatus,
-    isLoading: isLoadingStatus
-  } = useQuery({
-    queryKey: ['/api/search/status'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/search/status');
-      return await response.json();
-    },
-  });
-
-  // Mutation for performing search
-  const searchMutation = useMutation({
-    mutationFn: async ({ query, projectId }: { query: string, projectId?: number }) => {
-      const endpoint = elasticsearchStatus?.available ? '/api/search/hybrid' : '/api/search/global';
-      const response = await apiRequest('POST', endpoint, { 
-        query, 
-        projectId,
-        filters: projectId ? { projectId } : {}
-      });
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        setSearchResults(data.results);
-      } else {
-        toast({
-          title: 'Search failed',
-          description: data.message || 'Failed to perform search. Please try again.',
-          variant: 'destructive'
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Search failed',
-        description: error.message || 'An error occurred while searching',
-        variant: 'destructive'
-      });
+  // Parse query string from URL if any
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const q = searchParams.get('q');
+    if (q) {
+      setQuery(q);
+      performSearch(q);
     }
-  });
+  }, [location]);
 
-  // Initialization mutation for Elasticsearch (admin only)
-  const initializeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/search/initialize');
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: 'Search index initialized',
-          description: `Indexed ${data.results.projects} projects, ${data.results.documents} documents, ${data.results.tasks} tasks, ${data.results.users} users, and ${data.results.teams} teams.`,
-        });
-        queryClient.invalidateQueries({queryKey: ['/api/search/status']});
-      } else {
-        toast({
-          title: 'Initialization failed',
-          description: data.message || 'Failed to initialize search index',
-          variant: 'destructive'
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Initialization failed',
-        description: error.message || 'An error occurred while initializing search',
-        variant: 'destructive'
-      });
-    }
-  });
+  // Perform search
+  const performSearch = (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    
+    // Mock search results with sample data for demonstration
+    // In a real implementation, this would be replaced with an API call
+    setTimeout(() => {
+      const mockResults: SearchResult[] = [
+        {
+          id: '1',
+          title: 'Project Intelligence Hub Design Documentation',
+          excerpt: 'This document outlines the design principles and UI components of the Novexa platform.',
+          type: 'document',
+          source: 'workspace',
+          created: new Date(2023, 1, 15),
+          updated: new Date(2023, 4, 20),
+          author: {
+            id: '101',
+            name: 'Alex Johnson',
+            avatar: '/avatars/alex.png'
+          },
+          relevanceScore: 0.95,
+          tags: ['design', 'documentation', 'UI/UX'],
+          url: '/documents/1'
+        },
+        {
+          id: '2',
+          title: 'Integration API Specifications',
+          excerpt: 'Technical specifications for the Novexa API integration protocols.',
+          type: 'document',
+          source: 'drive',
+          created: new Date(2023, 2, 5),
+          updated: new Date(2023, 5, 12),
+          author: {
+            id: '102',
+            name: 'Sam Wright',
+            avatar: '/avatars/sam.png'
+          },
+          relevanceScore: 0.82,
+          tags: ['API', 'integration', 'technical'],
+          url: '/documents/2'
+        },
+        {
+          id: '3',
+          title: 'Weekly Team Sync Meeting',
+          excerpt: 'Notes from the weekly sync meeting discussing project status and tasks.',
+          type: 'event',
+          source: 'workspace',
+          created: new Date(2023, 5, 1),
+          updated: new Date(2023, 5, 1),
+          author: {
+            id: '103',
+            name: 'Robin Chen',
+            avatar: '/avatars/robin.png'
+          },
+          relevanceScore: 0.78,
+          tags: ['meeting', 'sync', 'weekly'],
+          url: '/calendar/events/3'
+        },
+        {
+          id: '4',
+          title: 'Product Roadmap Q3 2023',
+          excerpt: 'Detailed roadmap for Q3 2023 product development and feature releases.',
+          type: 'document',
+          source: 'workspace',
+          created: new Date(2023, 4, 25),
+          updated: new Date(2023, 4, 25),
+          author: {
+            id: '104',
+            name: 'Jordan Lee',
+            avatar: '/avatars/jordan.png'
+          },
+          relevanceScore: 0.88,
+          tags: ['roadmap', 'planning', 'product'],
+          url: '/documents/4'
+        },
+        {
+          id: '5',
+          title: 'Design System Components',
+          excerpt: 'Library of design system components used in the Novexa platform.',
+          type: 'file',
+          source: 'figma',
+          created: new Date(2023, 3, 10),
+          updated: new Date(2023, 5, 8),
+          author: {
+            id: '105',
+            name: 'Taylor Kim',
+            avatar: '/avatars/taylor.png'
+          },
+          relevanceScore: 0.75,
+          tags: ['design', 'components', 'library'],
+          url: '/files/5'
+        }
+      ];
+      
+      setSearchResults(mockResults);
+      setIsSearching(false);
+    }, 1000);
+  };
 
+  // Handle search form submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    if (!query.trim()) return;
+    
+    // Update URL with search query
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', query);
+    setLocation(`/search?${searchParams.toString()}`);
+    
+    performSearch(query);
+  };
 
-    searchMutation.mutate({
-      query: searchQuery,
-      projectId: projectFilter
+  // Handle filter changes
+  const handleFilterChange = (filters: any) => {
+    setActiveFilters(filters);
+    // In a real app, this would trigger a new search with the updated filters
+  };
+
+  // Get filtered results based on active tab
+  const getFilteredResults = () => {
+    if (activeTab === 'all') return searchResults;
+    return searchResults.filter(result => {
+      switch (activeTab) {
+        case 'documents': return result.type === 'document';
+        case 'events': return result.type === 'event';
+        case 'files': return result.type === 'file';
+        case 'messages': return result.type === 'message';
+        case 'people': return result.type === 'contact';
+        default: return true;
+      }
     });
   };
 
-  // Calculate total results
-  const totalResults = 
-    searchResults.projects.length +
-    searchResults.documents.length +
-    searchResults.tasks.length +
-    searchResults.users.length +
-    searchResults.teams.length +
-    searchResults.semanticResults.length;
-
-  // Mock user for demonstration
-  const user = {
-    id: 1,
-    avatar: null,
-    fullName: 'Current User',
-    role: 'user'
+  // Save search as favorite
+  const saveSearch = () => {
+    toast({
+      title: "Search Saved",
+      description: `Your search for "${query}" has been saved.`
+    });
   };
-  
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar user={user} />
-      
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-800">Search</h1>
-              
-              {user?.role === 'admin' && (
-                <Button 
-                  variant="outline"
-                  onClick={() => initializeMutation.mutate()}
-                  disabled={initializeMutation.isPending}
-                >
-                  {initializeMutation.isPending ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Initializing...</>
-                  ) : (
-                    <>Initialize Search Index</>
-                  )}
-                </Button>
-              )}
-            </div>
-            
-            {isLoadingStatus ? (
-              <div className="text-center py-4">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                <p className="mt-2 text-sm text-gray-500">Checking search service status...</p>
-              </div>
-            ) : (
-              <>
-                {!elasticsearchStatus?.available && (
-                  <Alert className="mb-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Full-text search is currently unavailable. The system will use basic search capabilities.
-                      {user?.role === 'admin' && ' Click "Initialize Search Index" to set up the search service.'}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                
-                <form onSubmit={handleSearch} className="mb-8">
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      placeholder="Search for projects, documents, tasks, users, or teams..."
-                      className="pl-10 pr-24 py-6 text-lg"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <div className="absolute left-3 top-4">
-                      <SearchIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <div className="absolute right-3 top-2">
-                      <Button 
-                        type="submit" 
-                        disabled={!searchQuery.trim() || searchMutation.isPending}
-                        className="py-4"
-                      >
-                        {searchMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
-                          </>
-                        ) : (
-                          'Search'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 text-sm text-gray-500">
-                    Try searching for project names, document titles, or task descriptions
-                  </div>
-                </form>
-                
-                {searchMutation.isPending ? (
-                  <div className="text-center py-12">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-gray-500">Searching across all project data...</p>
-                  </div>
-                ) : (
-                  <>
-                    {searchMutation.isSuccess && totalResults > 0 ? (
-                      <div>
-                        <div className="mb-6">
-                          <h2 className="text-lg font-medium text-gray-700">
-                            Found {totalResults} results for "{searchQuery}"
-                            {searchResults.source && (
-                              <Badge className="ml-2" variant="outline">Source: {searchResults.source}</Badge>
-                            )}
-                          </h2>
-                        </div>
-                        
-                        <Tabs defaultValue="all" onValueChange={setSelectedTab}>
-                          <TabsList className="mb-6">
-                            <TabsTrigger value="all">All Results ({totalResults})</TabsTrigger>
-                            {searchResults.projects.length > 0 && (
-                              <TabsTrigger value="projects">Projects ({searchResults.projects.length})</TabsTrigger>
-                            )}
-                            {searchResults.documents.length > 0 && (
-                              <TabsTrigger value="documents">Documents ({searchResults.documents.length})</TabsTrigger>
-                            )}
-                            {searchResults.tasks.length > 0 && (
-                              <TabsTrigger value="tasks">Tasks ({searchResults.tasks.length})</TabsTrigger>
-                            )}
-                            {searchResults.users.length > 0 && (
-                              <TabsTrigger value="users">Users ({searchResults.users.length})</TabsTrigger>
-                            )}
-                            {searchResults.teams.length > 0 && (
-                              <TabsTrigger value="teams">Teams ({searchResults.teams.length})</TabsTrigger>
-                            )}
-                            {searchResults.semanticResults.length > 0 && (
-                              <TabsTrigger value="semantic">Semantic Results ({searchResults.semanticResults.length})</TabsTrigger>
-                            )}
-                          </TabsList>
-                          
-                          <TabsContent value="all" className="space-y-6">
-                            {/* Projects */}
-                            {searchResults.projects.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Projects</h3>
-                                <div className="space-y-3">
-                                  {searchResults.projects.map(project => (
-                                    <Card key={project.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-start">
-                                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 mr-3">
-                                            <i className="ri-file-list-3-line"></i>
-                                          </div>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{project.name}</h4>
-                                            <p className="text-sm text-gray-600">{project.description}</p>
-                                            <div className="mt-2 flex items-center">
-                                              <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
-                                                <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${project.progress}%` }}></div>
-                                              </div>
-                                              <span className="text-xs text-gray-500">{project.progress}% complete</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Documents */}
-                            {searchResults.documents.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Documents</h3>
-                                <div className="space-y-3">
-                                  {searchResults.documents.map(doc => (
-                                    <Card key={doc.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-start">
-                                          <div className={`w-10 h-10 rounded flex items-center justify-center mr-3 ${
-                                            doc.fileType === 'pdf' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                                          }`}>
-                                            <i className={doc.fileType === 'pdf' ? 'ri-file-pdf-line' : 'ri-file-text-line'}></i>
-                                          </div>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{doc.title}</h4>
-                                            <p className="text-sm text-gray-500">Updated {doc.updatedAt} by {doc.updatedBy}</p>
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Tasks */}
-                            {searchResults.tasks.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Tasks</h3>
-                                <div className="space-y-3">
-                                  {searchResults.tasks.map(task => (
-                                    <Card key={task.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-start">
-                                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mr-3">
-                                            <i className="ri-task-line"></i>
-                                          </div>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{task.title}</h4>
-                                            <div className="flex items-center mt-1">
-                                              <span className={`px-2 py-1 text-xs rounded-full mr-2 ${
-                                                task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                              }`}>
-                                                {task.status.replace('_', ' ')}
-                                              </span>
-                                              <span className="text-sm text-gray-500">Assigned to {task.assignee}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Users */}
-                            {searchResults.users.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Users</h3>
-                                <div className="space-y-3">
-                                  {searchResults.users.map((user) => (
-                                    <Card key={user.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-center">
-                                          <Avatar className="h-10 w-10 mr-3">
-                                            <AvatarImage src={user.avatar} alt={user.fullName} />
-                                            <AvatarFallback>{user.fullName.split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
-                                          </Avatar>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{user.fullName}</h4>
-                                            <p className="text-sm text-gray-500">{user.role}</p>
-                                          </div>
-                                          <Badge variant="outline" className="ml-auto">{user.username}</Badge>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Teams */}
-                            {searchResults.teams.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Teams</h3>
-                                <div className="space-y-3">
-                                  {searchResults.teams.map((team) => (
-                                    <Card key={team.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-start">
-                                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-700 mr-3">
-                                            <i className="ri-team-line"></i>
-                                          </div>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{team.name}</h4>
-                                            <p className="text-sm text-gray-600">{team.description}</p>
-                                            {team.memberCount && <p className="text-xs text-gray-500 mt-1">{team.memberCount} members</p>}
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Semantic Results */}
-                            {searchResults.semanticResults.length > 0 && (
-                              <div>
-                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Semantic Matches</h3>
-                                <div className="space-y-3">
-                                  {searchResults.semanticResults.map((result) => (
-                                    <Card key={result.id} className="hover:shadow-md transition-shadow">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-start">
-                                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mr-3">
-                                            <Info className="h-5 w-5" />
-                                          </div>
-                                          <div>
-                                            <h4 className="text-md font-medium text-gray-800">{result.title || result.name}</h4>
-                                            <p className="text-sm text-gray-600">{result.description || result.content}</p>
-                                            {result.similarity && (
-                                              <div className="mt-2 flex items-center">
-                                                <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
-                                                  <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${result.similarity * 100}%` }}></div>
-                                                </div>
-                                                <span className="text-xs text-gray-500">{Math.round(result.similarity * 100)}% match</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="projects">
-                            {searchResults.projects.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.projects.map(project => (
-                                  <Card key={project.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-start">
-                                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 mr-3">
-                                          <i className="ri-file-list-3-line"></i>
-                                        </div>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{project.name}</h4>
-                                          <p className="text-sm text-gray-600">{project.description}</p>
-                                          <div className="mt-2 flex items-center">
-                                            <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
-                                              <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${project.progress}%` }}></div>
-                                            </div>
-                                            <span className="text-xs text-gray-500">{project.progress}% complete</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No project results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="documents">
-                            {searchResults.documents.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.documents.map(doc => (
-                                  <Card key={doc.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-start">
-                                        <div className={`w-10 h-10 rounded flex items-center justify-center mr-3 ${
-                                          doc.fileType === 'pdf' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                          <i className={doc.fileType === 'pdf' ? 'ri-file-pdf-line' : 'ri-file-text-line'}></i>
-                                        </div>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{doc.title}</h4>
-                                          <p className="text-sm text-gray-500">Updated {doc.updatedAt} by {doc.updatedBy}</p>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No document results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="tasks">
-                            {searchResults.tasks.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.tasks.map(task => (
-                                  <Card key={task.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-start">
-                                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mr-3">
-                                          <i className="ri-task-line"></i>
-                                        </div>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{task.title}</h4>
-                                          <div className="flex items-center mt-1">
-                                            <span className={`px-2 py-1 text-xs rounded-full mr-2 ${
-                                              task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                              task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                              'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                              {task.status.replace('_', ' ')}
-                                            </span>
-                                            <span className="text-sm text-gray-500">Assigned to {task.assignee}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No task results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="users">
-                            {searchResults.users.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.users.map((user) => (
-                                  <Card key={user.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-center">
-                                        <Avatar className="h-10 w-10 mr-3">
-                                          <AvatarImage src={user.avatar} alt={user.fullName} />
-                                          <AvatarFallback>{user.fullName.split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{user.fullName}</h4>
-                                          <p className="text-sm text-gray-500">{user.role}</p>
-                                        </div>
-                                        <Badge variant="outline" className="ml-auto">{user.username}</Badge>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No user results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="teams">
-                            {searchResults.teams.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.teams.map((team) => (
-                                  <Card key={team.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-start">
-                                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-700 mr-3">
-                                          <i className="ri-team-line"></i>
-                                        </div>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{team.name}</h4>
-                                          <p className="text-sm text-gray-600">{team.description}</p>
-                                          {team.memberCount && <p className="text-xs text-gray-500 mt-1">{team.memberCount} members</p>}
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No team results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
 
-                          <TabsContent value="semantic">
-                            {searchResults.semanticResults.length > 0 ? (
-                              <div className="space-y-3">
-                                {searchResults.semanticResults.map((result) => (
-                                  <Card key={result.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-start">
-                                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mr-3">
-                                          <Info className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                          <h4 className="text-md font-medium text-gray-800">{result.title || result.name}</h4>
-                                          <p className="text-sm text-gray-600">{result.description || result.content}</p>
-                                          {result.similarity && (
-                                            <div className="mt-2 flex items-center">
-                                              <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
-                                                <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${result.similarity * 100}%` }}></div>
-                                              </div>
-                                              <span className="text-xs text-gray-500">{Math.round(result.similarity * 100)}% match</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-gray-500">No semantic results found</p>
-                              </div>
-                            )}
-                          </TabsContent>
-                        </Tabs>
-                        
-                        <div className="mt-8">
-                          <SearchImplementationCard />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-12">
-                        <div className="ri-search-line text-5xl text-gray-300 mb-6"></div>
-                        <h3 className="text-xl font-medium text-gray-700 mb-2">No results found</h3>
-                        <p className="text-gray-500 max-w-md mx-auto">
-                          We couldn't find any matches for "{searchQuery}". Try adjusting your search terms or browse through the project categories.
-                        </p>
-                        
-                        <div className="mt-12 max-w-xl mx-auto">
-                          <SearchImplementationCard />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+  return (
+    <div className="space-y-6">
+      <Breadcrumb 
+        items={[
+          {
+            label: 'Search',
+            icon: <SearchIcon className="h-4 w-4 mr-1" />
+          }
+        ]}
+        className="mb-4"
+      />
+      
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Search</h1>
+        
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <SearchIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search documents, messages, people..."
+              className="pl-10"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </div>
-        </div>
-      </main>
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Search in..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Content</SelectItem>
+              <SelectItem value="documents">Documents</SelectItem>
+              <SelectItem value="messages">Messages</SelectItem>
+              <SelectItem value="people">People</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="submit">Search</Button>
+        </form>
+        
+        {query && (
+          <div className="mt-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <div className="flex justify-between items-center mb-4">
+                <TabsList>
+                  <TabsTrigger value="all">All Results</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                  <TabsTrigger value="events">Events</TabsTrigger>
+                  <TabsTrigger value="messages">Messages</TabsTrigger>
+                  <TabsTrigger value="people">People</TabsTrigger>
+                </TabsList>
+                
+                {searchResults.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={saveSearch}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Search
+                    </Button>
+                    <Select 
+                      value={resultsView} 
+                      onValueChange={(value: 'relevance' | 'timeline' | 'source') => setResultsView(value)}
+                    >
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="View by..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="relevance">Relevance</SelectItem>
+                        <SelectItem value="timeline">Timeline</SelectItem>
+                        <SelectItem value="source">Source</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              <TabsContent value="all">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.length}
+                />
+              </TabsContent>
+              
+              <TabsContent value="documents">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.filter(r => r.type === 'document').length}
+                />
+              </TabsContent>
+              
+              <TabsContent value="files">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.filter(r => r.type === 'file').length}
+                />
+              </TabsContent>
+              
+              <TabsContent value="events">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.filter(r => r.type === 'event').length}
+                />
+              </TabsContent>
+              
+              <TabsContent value="messages">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.filter(r => r.type === 'message').length}
+                />
+              </TabsContent>
+              
+              <TabsContent value="people">
+                <SearchResults
+                  results={getFilteredResults()}
+                  query={query}
+                  loading={isSearching}
+                  onFilterChange={handleFilterChange}
+                  totalCount={searchResults.filter(r => r.type === 'contact').length}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+        
+        {!query && !searchResults.length && (
+          <Card className="mt-12">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-primary/10 p-4 mb-4">
+                <SearchIcon className="h-8 w-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Search for anything</h2>
+              <p className="text-muted-foreground max-w-md mb-6">
+                Search across documents, messages, tasks, events, and contacts in your workspace.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl">
+                <Card className="p-4 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                  <FileText className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                  <p className="font-medium">Documents</p>
+                </Card>
+                <Card className="p-4 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                  <Calendar className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                  <p className="font-medium">Events</p>
+                </Card>
+                <Card className="p-4 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                  <User className="h-8 w-8 mx-auto mb-2 text-purple-500" />
+                  <p className="font-medium">People</p>
+                </Card>
+                <Card className="p-4 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                  <FolderIcon className="h-8 w-8 mx-auto mb-2 text-amber-500" />
+                  <p className="font-medium">Projects</p>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

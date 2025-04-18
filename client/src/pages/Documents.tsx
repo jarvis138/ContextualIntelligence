@@ -10,9 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   Search, Upload, Plus, Settings, Share, Download, 
-  MoreHorizontal, Clock, Star, Grid, List, LayoutGrid 
+  MoreHorizontal, Clock, Star, Grid, List, LayoutGrid, 
+  FileText, FolderIcon
 } from 'lucide-react';
 import DocumentGrid from '@/components/documents/DocumentGrid';
+import Breadcrumb from '@/components/navigation/Breadcrumb';
 
 export default function Documents() {
   const { toast } = useToast();
@@ -66,6 +68,16 @@ export default function Documents() {
   
   return (
     <div>
+      <Breadcrumb 
+        items={[
+          {
+            label: 'Documents',
+            icon: <FolderIcon className="h-4 w-4 mr-1" />
+          }
+        ]}
+        className="mb-4"
+      />
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Documents</h1>
         
@@ -112,6 +124,37 @@ export default function Documents() {
         </TabsList>
         
         <TabsContent value="all" className="mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">All Documents</h3>
+            {/* View mode toggles */}
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant={viewMode === 'grid' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button 
+                variant={viewMode === 'list' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+              <Button 
+                variant={viewMode === 'detailed' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('detailed')}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Details</span>
+              </Button>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="text-center">
@@ -120,83 +163,109 @@ export default function Documents() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredDocuments?.map(document => (
-                <Card key={document.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardContent className="p-0">
-                    <div 
-                      className="p-4 cursor-pointer" 
-                      onClick={() => navigate(`/documents/${document.id}`)}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-12 h-12 rounded flex items-center justify-center ${getDocumentIconColor(document.fileType)}`}>
-                          <FileIcon fileType={document.fileType} />
-                        </div>
-                        <div>
-                          <h3 className="text-md font-medium">{document.title}</h3>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            <span>
-                              Updated {formatTimeAgo(document.updatedAt)}
-                              {document.updatedByUser && ` by ${document.updatedByUser.fullName}`}
-                            </span>
-                          </div>
-                          {document.content && (
-                            <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                              {document.content}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border-t px-4 py-2 bg-muted/30 flex justify-between">
-                      <div>
-                        <Button variant="ghost" size="sm" onClick={() => toast({ 
-                          title: "Share Document", 
-                          description: `Share ${document.title} with team members`
-                        })}>
-                          <Share className="h-4 w-4 mr-2" /> Share
-                        </Button>
-                      </div>
-                      <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm" onClick={() => toast({ 
-                          title: "Download Document", 
-                          description: `Download ${document.title}`
-                        })}>
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => toast({ 
-                          title: "More Options", 
-                          description: `Options for ${document.title}`
-                        })}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              
-              {filteredDocuments?.length === 0 && (
-                <div className="col-span-full flex justify-center items-center h-64">
-                  <div className="text-center">
-                    <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium">No documents found</h3>
-                    <p className="text-muted-foreground mt-1">Try adjusting your search or upload a new document</p>
-                  </div>
+            <DocumentGrid 
+              documents={filteredDocuments?.map(document => ({
+                id: document.id,
+                title: document.title,
+                description: document.content,
+                documentType: document.fileType || 'text',
+                updatedAt: document.updatedAt,
+                createdAt: document.createdAt || document.updatedAt,
+                author: { name: document.updatedByUser?.fullName || 'Unknown', id: document.updatedByUser?.id || '1' },
+                commentCount: document.commentCount || 0,
+                tags: document.tags || [],
+                favorited: document.favorited || false,
+                size: document.size || '0KB'
+              })) || []}
+              initialViewMode={viewMode}
+              emptyState={
+                <div className="text-center p-8">
+                  <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-1">No documents found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try adjusting your search or upload a new document
+                  </p>
+                  <Button onClick={() => toast({ 
+                    title: "Upload Document", 
+                    description: "This would open a document upload form"
+                  })}>
+                    <Upload className="h-4 w-4 mr-2" /> Upload Document
+                  </Button>
                 </div>
-              )}
-            </div>
+              }
+            />
           )}
         </TabsContent>
         
         <TabsContent value="recent" className="mt-6">
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">Recent Documents</h3>
-              <p className="text-muted-foreground mt-1">This tab would show recently accessed documents</p>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Recent Documents</h3>
+            {/* View mode toggles */}
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant={viewMode === 'grid' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button 
+                variant={viewMode === 'list' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+              <Button 
+                variant={viewMode === 'detailed' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('detailed')}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Details</span>
+              </Button>
             </div>
           </div>
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full mb-4"></div>
+                <p className="text-muted-foreground">Loading documents...</p>
+              </div>
+            </div>
+          ) : (
+            <DocumentGrid 
+              documents={(filteredDocuments || [])
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                .slice(0, 12)
+                .map(document => ({
+                  id: document.id,
+                  title: document.title,
+                  description: document.content,
+                  documentType: document.fileType || 'text',
+                  updatedAt: document.updatedAt,
+                  createdAt: document.createdAt || document.updatedAt,
+                  author: { name: document.updatedByUser?.fullName || 'Unknown', id: document.updatedByUser?.id || '1' },
+                  commentCount: document.commentCount || 0,
+                  tags: document.tags || [],
+                  favorited: document.favorited || false,
+                  size: document.size || '0KB'
+                }))}
+              initialViewMode={viewMode}
+              emptyState={
+                <div className="text-center p-8">
+                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-1">No recent documents</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your recently accessed documents will appear here
+                  </p>
+                </div>
+              }
+            />
+          )}
         </TabsContent>
         
         <TabsContent value="shared" className="mt-6">
