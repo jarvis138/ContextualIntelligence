@@ -22,9 +22,11 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  RefreshCcw
+  RefreshCcw,
+  FolderIcon
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import Breadcrumb from "@/components/navigation/Breadcrumb";
 
 // Default user - would typically come from auth context
 const user = {
@@ -210,6 +212,21 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
       <div className="flex h-screen overflow-hidden">
         <Sidebar user={user} />
         <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+          <Breadcrumb 
+            items={[
+              {
+                label: 'Documents',
+                icon: <FolderIcon className="h-4 w-4 mr-1" />,
+                href: '/documents'
+              },
+              {
+                label: 'Document Not Found',
+                icon: <FileText className="h-4 w-4 mr-1" />
+              }
+            ]}
+            className="mb-4"
+          />
+          
           <div className="flex flex-col items-center justify-center h-full">
             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Document Not Found</h2>
@@ -229,6 +246,21 @@ export default function DocumentDetail({ documentId: docIdProp }: DocumentDetail
       
       <main className="flex-1 overflow-y-auto bg-gray-50">
         <div className="p-6">
+          <Breadcrumb 
+            items={[
+              {
+                label: 'Documents',
+                icon: <FolderIcon className="h-4 w-4 mr-1" />,
+                href: '/documents'
+              },
+              {
+                label: document.title,
+                icon: <FileText className="h-4 w-4 mr-1" />
+              }
+            ]}
+            className="mb-4"
+          />
+          
           {/* Header with back button and actions */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center">

@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import Breadcrumb from '@/components/navigation/Breadcrumb';
+import { Users } from 'lucide-react';
 
 export default function Team() {
   const { toast } = useToast();
@@ -105,6 +107,16 @@ export default function Team() {
       
       <main className="flex-1 overflow-y-auto bg-gray-50">
         <div className="p-6">
+          <Breadcrumb 
+            items={[
+              {
+                label: 'Team',
+                icon: <Users className="h-4 w-4 mr-1" />
+              }
+            ]}
+            className="mb-4"
+          />
+          
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Team</h1>
             
