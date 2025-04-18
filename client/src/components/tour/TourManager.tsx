@@ -32,15 +32,34 @@ export function TourManager() {
   // Get the steps for the active tour
   const steps = tourConfig[activeTour] || [];
 
-  // Add custom styles to each step
+  // Add custom styles to each step with improved text visibility
   const enhancedSteps = steps.map(step => ({
     ...step,
     content: (
-      <div className="p-2">
-        {step.content}
+      <div className="p-3 text-gray-900 font-medium" style={{ color: '#111827', fontWeight: 600 }}>
+        {typeof step.content === 'string' ? (
+          <p style={{ color: '#111827', fontSize: '15px', lineHeight: 1.6 }}>{step.content}</p>
+        ) : (
+          step.content
+        )}
       </div>
-    )
+    ),
+    style: {
+      backgroundColor: '#FAF9F9',
+      color: '#111827',
+      fontWeight: 600,
+      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+    }
   }));
+
+  // Create custom styles for better visibility
+  const tourStyle: React.CSSProperties = {
+    backgroundColor: '#FAF9F9',
+    color: '#1a1a1a',
+    fontWeight: 500,
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+    border: '1px solid rgba(0, 0, 0, 0.1)'
+  };
 
   return (
     <Tour
@@ -60,6 +79,7 @@ export function TourManager() {
       nextButton={<div style={buttonStyles}>Next <ArrowRight size={16} /></div>}
       prevButton={<div style={{...buttonStyles, backgroundColor: 'var(--muted)'}}>Previous</div>}
       lastStepNextButton={<div style={buttonStyles}>Finish <Check size={16} /></div>}
+      style={tourStyle}
     />
   );
 }
