@@ -123,6 +123,23 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
       <div className="flex h-screen overflow-hidden">
         <Sidebar user={user} />
         <main className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-6">
+            <Breadcrumb 
+              items={[
+                {
+                  label: 'Projects',
+                  icon: <FolderOpenIcon className="h-4 w-4 mr-1" />,
+                  href: '/projects'
+                },
+                {
+                  label: 'Loading Project...',
+                  icon: <FolderOpenIcon className="h-4 w-4 mr-1" />
+                }
+              ]}
+              className="mb-4"
+            />
+          </div>
+          
           <div className="flex justify-center items-center h-screen">
             <div className="text-center">
               <div className="ri-loader-4-line animate-spin text-4xl text-primary mb-4"></div>
@@ -139,6 +156,23 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
       <div className="flex h-screen overflow-hidden">
         <Sidebar user={user} />
         <main className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-6">
+            <Breadcrumb 
+              items={[
+                {
+                  label: 'Projects',
+                  icon: <FolderOpenIcon className="h-4 w-4 mr-1" />,
+                  href: '/projects'
+                },
+                {
+                  label: 'Project Not Found',
+                  icon: <FolderOpenIcon className="h-4 w-4 mr-1" />
+                }
+              ]}
+              className="mb-4"
+            />
+          </div>
+          
           <div className="flex justify-center items-center h-screen">
             <div className="text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
@@ -166,6 +200,21 @@ export default function ProjectDetail({ params }: ProjectDetailProps) {
         />
         
         <div className="p-6">
+          <Breadcrumb 
+            items={[
+              {
+                label: 'Projects',
+                icon: <FolderOpenIcon className="h-4 w-4 mr-1" />,
+                href: '/projects'
+              },
+              {
+                label: project.name,
+                icon: <FolderOpenIcon className="h-4 w-4 mr-1" />
+              }
+            ]}
+            className="mb-4"
+          />
+          
           {/* Project Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
