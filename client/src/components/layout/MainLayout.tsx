@@ -124,7 +124,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <img 
                 src="/images/novexa-logo.png" 
                 alt="Novexa Logo" 
-                className="h-8 w-auto" 
+                className="h-10 w-auto" 
               />
             </Link>
           </div>

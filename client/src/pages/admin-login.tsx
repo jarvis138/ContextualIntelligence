@@ -75,7 +75,7 @@ export default function AdminLoginPage() {
             <img 
               src="/images/novexa-logo.png" 
               alt="Novexa Logo" 
-              className="h-16 w-auto" 
+              className="h-20 w-auto" 
             />
           </div>
           <CardTitle className="text-2xl text-center">Admin Portal</CardTitle>
