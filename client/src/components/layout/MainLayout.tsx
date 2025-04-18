@@ -122,7 +122,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="flex items-center gap-2"
             >
               <img 
-                src="/images/novexa-logo.png" 
+                src="/assets/novexa-logo.svg" 
                 alt="Novexa Logo" 
                 className="h-10 w-auto" 
               />

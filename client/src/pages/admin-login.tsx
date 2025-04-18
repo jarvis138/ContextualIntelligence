@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
             <img 
-              src="/images/novexa-logo.png" 
+              src="/assets/novexa-logo.svg" 
               alt="Novexa Logo" 
               className="h-20 w-auto" 
             />
