@@ -16,8 +16,11 @@ import {
   AlertTriangle,
   Download,
   Loader2,
-  Network
+  Network,
+  Home
 } from 'lucide-react';
+
+import Breadcrumb from '@/components/navigation/Breadcrumb';
 
 import { ContextGraph, GraphData } from '@/components/graph/ContextGraph';
 
@@ -247,6 +250,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb 
+        items={[
+          {
+            label: 'Dashboard',
+            icon: <Home className="h-4 w-4 mr-1" />
+          }
+        ]}
+        className="mb-4"
+      />
+      
       {/* Dashboard Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

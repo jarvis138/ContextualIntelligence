@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, Share, Settings, Calendar, Users, CheckCircle2, X, Clock } from 'lucide-react';
+import { Search, Plus, Eye, Share, Settings, Calendar, Users, CheckCircle2, X, Clock, Briefcase } from 'lucide-react';
+import Breadcrumb from '@/components/navigation/Breadcrumb';
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,16 @@ export default function Projects() {
     
   return (
     <div>
+      <Breadcrumb 
+        items={[
+          {
+            label: 'Projects',
+            icon: <Briefcase className="h-4 w-4 mr-1" />
+          }
+        ]}
+        className="mb-4"
+      />
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Projects</h1>
         
