@@ -200,7 +200,7 @@ const UserPreferences: React.FC = () => {
                 { name: "green", color: "#10b981" },
                 { name: "orange", color: "#f97316" },
                 { name: "red", color: "#ef4444" },
-                { name: "neutral", color: "#CED7DD" },
+                { name: "neutral", color: "#FAF9F9" },
               ] as const
             ).map(({ name, color }) => (
               <div key={name} className="text-center">
