@@ -2,8 +2,63 @@ import { storage } from '../storage';
 import OpenAI from 'openai';
 import { DocumentSummary, GraphData, GraphNode, GraphEdge, SearchResult } from '../../client/src/lib/nlpService';
 
-// Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Initialize OpenAI client with fallback for development
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || 'sk-dummy-key-for-development-environment-only'
+});
+
+// Mock implementation for development
+const mockOpenAI = {
+  chat: {
+    completions: {
+      create: async (params: any) => {
+        console.log('Using mock OpenAI response for local development');
+        // Return a mock response based on the request
+        if (params.messages[1].content.includes('Analyze the following text')) {
+          return {
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  summary: "This is a mock summary for local development. The application is working in development mode.",
+                  keyTopics: ["Development", "Testing", "Mock Data", "Nuvexa"],
+                  sentiment: { label: "positive", score: 0.8 }
+                })
+              }
+            }]
+          };
+        } else if (params.messages[1].content.includes('Extract entities')) {
+          return {
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  entities: [
+                    { name: "Nuvexa", type: "product", confidence: 0.95 },
+                    { name: "Development", type: "concept", confidence: 0.9 },
+                    { name: "Application", type: "product", confidence: 0.85 }
+                  ]
+                })
+              }
+            }]
+          };
+        } else {
+          return {
+            choices: [{
+              message: {
+                content: JSON.stringify({ result: "Mock response for development" })
+              }
+            }]
+          };
+        }
+      }
+    }
+  }
+};
+
+// Use mock implementation in development mode
+const aiClient = isDevelopment ? mockOpenAI : openai;
 
 // Define entity type
 export interface Entity {
@@ -30,7 +85,7 @@ export async function analyzeTextContent(content: string): Promise<{
     const entities = await extractEntities(content);
     
     // Analyze sentiment and extract key topics using OpenAI
-    const response = await openai.chat.completions.create({
+    const response = await aiClient.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
@@ -81,7 +136,7 @@ ${content}`
 export async function extractEntities(text: string): Promise<Entity[]> {
   try {
     // Use OpenAI to extract entities
-    const response = await openai.chat.completions.create({
+    const response = await aiClient.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
@@ -378,7 +433,7 @@ export async function semanticSearch(projectId: number, query: string): Promise<
     }
     
     // Use OpenAI to rank the chunks by relevance
-    const response = await openai.chat.completions.create({
+    const response = await aiClient.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {

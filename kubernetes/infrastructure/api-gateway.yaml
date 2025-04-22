@@ -1,0 +1,459 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: contextual-intelligence
+  labels:
+    app: contextual-intelligence
+    component: api-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: contextual-intelligence
+      component: api-gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: contextual-intelligence
+        component: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: kong/kong:3.4
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8443
+          name: proxy-ssl
+        - containerPort: 8001
+          name: admin-api
+        - containerPort: 8444
+          name: admin-api-ssl
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/kong/kong.yaml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: contextual-intelligence
+  labels:
+    app: contextual-intelligence
+    component: api-gateway
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: proxy
+  - port: 443
+    targetPort: 8443
+    protocol: TCP
+    name: proxy-ssl
+  selector:
+    app: contextual-intelligence
+    component: api-gateway
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: contextual-intelligence
+data:
+  kong.yaml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: auth-service
+        url: http://auth-service
+        routes:
+          - name: auth-routes
+            paths:
+              - /api/v1/auth
+              - /api/v1/users
+            strip_path: false
+            protocols:
+              - http
+              - https
+        plugins:
+          - name: cors
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: prometheus
+          - name: request-termination
+            config:
+              status_code: 503
+              message: "Service Unavailable"
+            enabled: false
+
+      - name: document-service
+        url: http://document-service
+        routes:
+          - name: document-routes
+            paths:
+              - /api/v1/documents
+              - /api/v1/folders
+              - /api/v1/search
+            strip_path: false
+            protocols:
+              - http
+              - https
+        plugins:
+          - name: cors
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: prometheus
+          - name: request-termination
+            config:
+              status_code: 503
+              message: "Service Unavailable"
+            enabled: false
+
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - https://app.contextualintelligence.com
+            - https://*.contextualintelligence.com
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Accept-Version
+            - Content-Length
+            - Content-MD5
+            - Content-Type
+            - Date
+            - X-Auth-Token
+            - X-Tenant-ID
+            - Authorization
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
+
+      - name: prometheus
+        config:
+          status_code_metrics: true
+          latency_metrics: true
+          bandwidth_metrics: true
+          upstream_health_metrics: true
+
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+          hide_client_headers: false
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: contextual-intelligence
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: contextual-intelligence
+  labels:
+    app: contextual-intelligence
+    component: api-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: contextual-intelligence
+      component: api-gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: contextual-intelligence
+        component: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: kong/kong:3.4
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8443
+          name: proxy-ssl
+        - containerPort: 8001
+          name: admin-api
+        - containerPort: 8444
+          name: admin-api-ssl
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/kong/kong.yaml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: contextual-intelligence
+  labels:
+    app: contextual-intelligence
+    component: api-gateway
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: proxy
+  - port: 443
+    targetPort: 8443
+    protocol: TCP
+    name: proxy-ssl
+  selector:
+    app: contextual-intelligence
+    component: api-gateway
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: contextual-intelligence
+data:
+  kong.yaml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: auth-service
+        url: http://auth-service
+        routes:
+          - name: auth-routes
+            paths:
+              - /api/v1/auth
+              - /api/v1/users
+            strip_path: false
+            protocols:
+              - http
+              - https
+        plugins:
+          - name: cors
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: prometheus
+          - name: request-termination
+            config:
+              status_code: 503
+              message: "Service Unavailable"
+            enabled: false
+
+      - name: document-service
+        url: http://document-service
+        routes:
+          - name: document-routes
+            paths:
+              - /api/v1/documents
+              - /api/v1/folders
+              - /api/v1/search
+            strip_path: false
+            protocols:
+              - http
+              - https
+        plugins:
+          - name: cors
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: prometheus
+          - name: request-termination
+            config:
+              status_code: 503
+              message: "Service Unavailable"
+            enabled: false
+
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - https://app.contextualintelligence.com
+            - https://*.contextualintelligence.com
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Accept-Version
+            - Content-Length
+            - Content-MD5
+            - Content-Type
+            - Date
+            - X-Auth-Token
+            - X-Tenant-ID
+            - Authorization
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
+
+      - name: prometheus
+        config:
+          status_code_metrics: true
+          latency_metrics: true
+          bandwidth_metrics: true
+          upstream_health_metrics: true
+
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+          hide_client_headers: false
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: contextual-intelligence
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

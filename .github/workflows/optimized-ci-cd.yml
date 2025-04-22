@@ -1,0 +1,375 @@
+name: Optimized CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      services:
+        description: 'Services to deploy (comma-separated)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '18'
+  DOCKER_REGISTRY: ghcr.io/contextualintelligence
+
+jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      auth_service: ${{ steps.filter.outputs.auth_service }}
+      document_service: ${{ steps.filter.outputs.document_service }}
+      ai_service: ${{ steps.filter.outputs.ai_service }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 50
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            auth_service:
+              - 'services/auth-service/**'
+            document_service:
+              - 'services/document-service/**'
+            ai_service:
+              - 'services/ai-service/**'
+            frontend:
+              - 'frontend/**'
+            infrastructure:
+              - 'kubernetes/**'
+              - 'terraform/**'
+              - 'helm/**'
+
+      - id: set-matrix
+        run: |
+          SERVICES=()
+          
+          # Check manual inputs first
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.services }}" ]; then
+            IFS=',' read -ra MANUAL_SERVICES <<< "${{ github.event.inputs.services }}"
+            for service in "${MANUAL_SERVICES[@]}"; do
+              SERVICES+=("\"$service\"")
+            done
+          else
+            # Add services based on changes
+            if [ "${{ steps.filter.outputs.auth_service }}" == "true" ]; then
+              SERVICES+=("\"auth-service\"")
+            fi
+            
+            if [ "${{ steps.filter.outputs.document_service }}" == "true" ]; then
+              SERVICES+=("\"document-service\"")
+            fi
+            
+            if [ "${{ steps.filter.outputs.ai_service }}" == "true" ]; then
+              SERVICES+=("\"ai-service\"")
+            fi
+            
+            if [ "${{ steps.filter.outputs.frontend }}" == "true" ]; then
+              SERVICES+=("\"frontend\"")
+            fi
+          fi
+          
+          # If no services detected, build all
+          if [ ${#SERVICES[@]} -eq 0 ]; then
+            SERVICES=("\"auth-service\"" "\"document-service\"" "\"ai-service\"" "\"frontend\"")
+          fi
+          
+          # Create JSON array for matrix
+          MATRIX="{\"service\":[${SERVICES[*]}]}"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Services to build: $MATRIX"
+
+  lint-and-test:
+    name: Lint and Test
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.matrix != '{"service":[]}' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+      
+      - name: Lint
+        working-directory: services/${{ matrix.service }}
+        run: npm run lint
+      
+      - name: Test
+        working-directory: services/${{ matrix.service }}
+        run: npm test
+        
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage/
+          retention-days: 7
+
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: [detect-changes, lint-and-test]
+    if: ${{ success() && needs.detect-changes.outputs.matrix != '{"service":[]}' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+            BUILD_VERSION=${{ github.sha }}
+      
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [detect-changes, build-and-push]
+    if: ${{ success() && (github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev') }}
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency: deploy-dev
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v1
+      
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Configure Kubernetes
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_DEV }}
+      
+      - name: Deploy to Dev
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd kubernetes
+          kustomize edit set image ${DOCKER_REGISTRY}/auth-service=${DOCKER_REGISTRY}/auth-service:${IMAGE_TAG}
+          kustomize edit set image ${DOCKER_REGISTRY}/document-service=${DOCKER_REGISTRY}/document-service:${IMAGE_TAG}
+          kustomize edit set image ${DOCKER_REGISTRY}/ai-service=${DOCKER_REGISTRY}/ai-service:${IMAGE_TAG}
+          kustomize build | kubectl apply -f -
+          
+          # Wait for rollout
+          kubectl rollout status deployment/auth-service -n contextual-intelligence --timeout=300s
+          kubectl rollout status deployment/document-service -n contextual-intelligence --timeout=300s
+          kubectl rollout status deployment/ai-service -n contextual-intelligence --timeout=300s
+      
+      - name: Run Integration Tests
+        run: |
+          echo "Running integration tests against dev environment"
+          # Add integration test commands here
+      
+      - name: Notify Slack on Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_TITLE: Dev Deployment Successful
+          SLACK_MESSAGE: 'Services deployed to dev environment'
+          SLACK_COLOR: good
+      
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_TITLE: Dev Deployment Failed
+          SLACK_MESSAGE: 'Services failed to deploy to dev environment'
+          SLACK_COLOR: danger
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [detect-changes, build-and-push]
+    if: ${{ success() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') }}
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency: deploy-staging
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v1
+      
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Configure Kubernetes
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+      
+      - name: Deploy to Staging
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd kubernetes/overlays/staging
+          kustomize edit set image ${DOCKER_REGISTRY}/auth-service=${DOCKER_REGISTRY}/auth-service:${IMAGE_TAG}
+          kustomize edit set image ${DOCKER_REGISTRY}/document-service=${DOCKER_REGISTRY}/document-service:${IMAGE_TAG}
+          kustomize edit set image ${DOCKER_REGISTRY}/ai-service=${DOCKER_REGISTRY}/ai-service:${IMAGE_TAG}
+          kustomize build | kubectl apply -f -
+          
+          # Wait for rollout
+          kubectl rollout status deployment/auth-service -n contextual-intelligence --timeout=300s
+          kubectl rollout status deployment/document-service -n contextual-intelligence --timeout=300s
+          kubectl rollout status deployment/ai-service -n contextual-intelligence --timeout=300s
+      
+      - name: Run Smoke Tests
+        run: |
+          echo "Running smoke tests against staging environment"
+          # Add smoke test commands here
+      
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_TITLE: Staging Deployment ${{ job.status }}
+          SLACK_MESSAGE: 'Services deployed to staging environment'
+          SLACK_COLOR: ${{ job.status == 'success' && 'good' || 'danger' }}
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging]
+    if: ${{ success() && github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' }}
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: deploy-production
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v1
+      
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Configure Kubernetes
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+      
+      - name: Deploy to Production
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Deploy to multiple regions
+          for region in us-east eu-west; do
+            echo "Deploying to region: $region"
+            cd kubernetes/overlays/regions/$region
+            kustomize edit set image ${DOCKER_REGISTRY}/auth-service=${DOCKER_REGISTRY}/auth-service:${IMAGE_TAG}
+            kustomize edit set image ${DOCKER_REGISTRY}/document-service=${DOCKER_REGISTRY}/document-service:${IMAGE_TAG}
+            kustomize edit set image ${DOCKER_REGISTRY}/ai-service=${DOCKER_REGISTRY}/ai-service:${IMAGE_TAG}
+            kustomize build | kubectl apply -f -
+            
+            # Wait for rollout
+            kubectl rollout status deployment/auth-service -n contextual-intelligence --timeout=300s
+            kubectl rollout status deployment/document-service -n contextual-intelligence --timeout=300s
+            kubectl rollout status deployment/ai-service -n contextual-intelligence --timeout=300s
+          done
+      
+      - name: Verify Production Deployment
+        run: |
+          echo "Verifying production deployment"
+          # Add verification commands here
+      
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_TITLE: Production Deployment ${{ job.status }}
+          SLACK_MESSAGE: 'Services deployed to production environment'
+          SLACK_COLOR: ${{ job.status == 'success' && 'good' || 'danger' }}

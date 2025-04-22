@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../
+
+namespace: contextual-intelligence
+
+commonLabels:
+  region: eu-west
+
+patches:
+  - path: region-config.yaml
+
+configMapGenerator:
+  - name: region-config
+    literals:
+      - REGION=eu-west
+      - PRIMARY_DATABASE_URL=postgresql://user:password@eu-west-db.contextualintelligence.internal:5432/contextual_intelligence
+      - REDIS_URL=redis://eu-west-redis.contextualintelligence.internal:6379
+      - ELASTICSEARCH_URL=http://eu-west-elasticsearch.contextualintelligence.internal:9200
+      - CDN_ENDPOINT=https://eu-west-cdn.contextualintelligence.com
+
+images:
+  - name: ${DOCKER_REGISTRY}/contextual-intelligence
+    newName: ${DOCKER_REGISTRY}/contextual-intelligence
+    newTag: ${IMAGE_TAG}
+  - name: ${DOCKER_REGISTRY}/auth-service
+    newName: ${DOCKER_REGISTRY}/auth-service
+    newTag: ${IMAGE_TAG}
+  - name: ${DOCKER_REGISTRY}/document-service
+    newName: ${DOCKER_REGISTRY}/document-service
+    newTag: ${IMAGE_TAG}
+  - name: ${DOCKER_REGISTRY}/ai-service
+    newName: ${DOCKER_REGISTRY}/ai-service
+    newTag: ${IMAGE_TAG}

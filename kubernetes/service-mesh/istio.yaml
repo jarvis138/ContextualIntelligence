@@ -1,0 +1,193 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: istio-control-plane
+spec:
+  profile: default
+  components:
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+    pilot:
+      enabled: true
+  meshConfig:
+    accessLogFile: /dev/stdout
+    enableTracing: true
+    defaultConfig:
+      tracing:
+        sampling: 100
+        zipkin:
+          address: jaeger.monitoring:9411
+    enableAutoMtls: true
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: contextual-intelligence-gateway
+  namespace: contextual-intelligence
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*.api.contextualintelligence.com"
+    - "api.contextualintelligence.com"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: contextual-intelligence-tls
+    hosts:
+    - "*.api.contextualintelligence.com"
+    - "api.contextualintelligence.com"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: contextual-intelligence-vs
+  namespace: contextual-intelligence
+spec:
+  hosts:
+  - "*.api.contextualintelligence.com"
+  - "api.contextualintelligence.com"
+  gateways:
+  - contextual-intelligence-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1/auth
+    - uri:
+        prefix: /api/v1/users
+    route:
+    - destination:
+        host: auth-service
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: /api/v1/documents
+    - uri:
+        prefix: /api/v1/folders
+    - uri:
+        prefix: /api/v1/search
+    route:
+    - destination:
+        host: document-service
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: /api/v1/ai
+    route:
+    - destination:
+        host: ai-service
+        port:
+          number: 80
+  - route:
+    - destination:
+        host: api-gateway
+        port:
+          number: 80
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: auth-service
+  namespace: contextual-intelligence
+spec:
+  host: auth-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30ms
+      http:
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: document-service
+  namespace: contextual-intelligence
+spec:
+  host: document-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30ms
+      http:
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ai-service
+  namespace: contextual-intelligence
+spec:
+  host: ai-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 30ms
+      http:
+        http2MaxRequests: 500
+        maxRequestsPerConnection: 5
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: contextual-intelligence
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-policy
+  namespace: contextual-intelligence
+spec:
+  selector:
+    matchLabels:
+      app: contextual-intelligence
+      component: api-gateway
+  rules:
+  - from:
+    - source:
+        namespaces: ["istio-system"]
+  - from:
+    - source:
+        principals: ["cluster.local/ns/contextual-intelligence/sa/default"]

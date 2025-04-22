@@ -19,6 +19,7 @@ import TenantManagementPage from "@/pages/admin/tenant-management";
 import SystemPage from "@/pages/system-page";
 import GraphPage from "@/pages/graph-page";
 import PlaceholderPage from "@/pages/placeholder-page";
+import NotificationsPage from "@/pages/notifications-page";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -142,6 +143,7 @@ function App() {
                     <Route path="/settings" component={SettingsPage} />
                     <Route path="/system" component={SystemPage} />
                     <Route path="/profile" component={PlaceholderPage} />
+                    <Route path="/notifications" component={NotificationsPage} />
                     <Route path="/" component={Dashboard} />
                     <Route component={NotFound} />
                   </Switch>
