@@ -5,12 +5,23 @@
 
 [functions]
   directory = "dist/functions"
+  node_bundler = "esbuild"
+  included_files = ["*.cjs"]
+
+# API redirects - note the force parameter to ensure proper handling
+[[redirects]]
+  from = "/api"
+  to = "/.netlify/functions/api-simple.cjs"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/api-simple.cjs/:splat"
   status = 200
+  force = true
 
+# SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
