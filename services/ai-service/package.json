@@ -36,6 +36,8 @@
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "20.16.11",
     "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.30.4",
     "eslint": "^8.57.0",
